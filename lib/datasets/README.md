@@ -45,13 +45,6 @@ The evaluators/ directory holds different types of evaluation method. The main t
 
 -> for sample datasets, how will we evaluate a mixture of "coco" and "not coco" data?
 
-
-## evaluators/
-
-The evaluators/ directory holds different types of evaluation method. The main two different types of evaluation are currently "COCO" and "not-COCO". The difference is because the COCO API offers an effecifient method of computing evaluation.
-
--> for sample datasets, how will we evaluate a mixture of "coco" and "not coco" data?
-
 # Sample Datasets
 
 This section is for information about a "sampleDataset" object which uses a list of imdbs for initialization of the class.
