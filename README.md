@@ -1,5 +1,12 @@
 # metaDatasetGenerator
 
+## to install
+
+```Shell
+
+export PYTHONPATH="/opt/caffe-faster-rcnn/python"
+```
+
 ## this repo creates generates information about the paper written by the CAM2 team in 2018
 
 The repo offers functionality for:
@@ -27,6 +34,24 @@ What questions do we aim to answer?
 4. What is the relationship between b, the sample dataset annotations, and the observed model outcomes?
 
 
-## Directories
+# Directories
 
+## [./lib/core](./lib/core/)
+## [./lib/datasets](./lib/datasets/)
+
+# TODO
+
+-> create a sample dataset object
+   -> it takes in imdbs (image data bases) as it's input with the mixture of each imdb defined
+   -> it is a child of the "imdb" class; e.g. the interface is the same
+   -> it can grow
+   -> it can save the ids used at each step of growth
+
+-> create modules (a folder in `./lib`) where we compute intrinsic information about datasets
+      -> this is an extension of the work over the previous semester
+      -> this includes:
+      	 -> the "name that dataset" game
+	 -> the annotation distribution information (metrics M1 & M2, ...)
+
+-> create modules (a folder in `./lib`) compute testing informationa about a given ".caffemodel" file
 
