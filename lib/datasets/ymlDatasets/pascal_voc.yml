@@ -1,0 +1,11 @@
+EXP_DATASET: pascal_voc
+PATH_ROOT: /home/gauenk/Documents/data/pascal_voc/VOCdevkit/VOC0712/
+PATH_TO_IMAGES: /home/gauenk/Documents/data/pascal_voc/VOCdevkit/VOC0712/JPEGImages/
+PATH_TO_ANNOTATIONS: /home/gauenk/Documents/data/pascal_voc/VOCdevkit/VOC0712/Annotations
+PATH_TO_IMAGESETS: /home/gauenk/Documents/data/pascal_voc/VOCdevkit/VOC0712/ImageSets/Main/
+PATH_TO_RESULTS: /home/gauenk/Documents/data/pascal_voc/VOCdevkit/VOC0712/results
+CLASSES: /home/gauenk/Documents/data/pascal_voc/VOCdevkit/VOC0712/classes.txt
+COMPID: meaninglessPrefix
+IMAGE_TYPE: .jpg
+ANNOTATION_TYPE: xml
+IMAGE_INDEX_TO_IMAGE_PATH: default
