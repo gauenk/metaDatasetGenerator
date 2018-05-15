@@ -1,15 +1,22 @@
 # metaDatasetGenerator
 
-## to install
+## Install on HELPS computer
+
+Add the following line to the bottom of your "~/.bashrc" file.
 
 ```Shell
-
 export PYTHONPATH="/opt/caffe-faster-rcnn/python"
 ```
 
-## this repo creates generates information about the paper written by the CAM2 team in 2018
+Then run:
 
-The repo offers functionality for:
+```Shell
+source ~/.bashrc
+```
+
+## Summary
+
+This repo generates information about the paper written by the CAM2 team in 2018. The repo offers functionality for:
 
 1. generating sample datasets from a mixture of original datasets
    -> saving (&loading) these sample datasets to (&from) file
@@ -53,5 +60,5 @@ What questions do we aim to answer?
       	 -> the "name that dataset" game
 	 -> the annotation distribution information (metrics M1 & M2, ...)
 
--> create modules (a folder in `./lib`) compute testing informationa about a given ".caffemodel" file
+-> create modules (a folder in `./lib`) to compute testing information about a given ".caffemodel" file
 
