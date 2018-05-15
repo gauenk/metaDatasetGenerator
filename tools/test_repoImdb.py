@@ -6,7 +6,7 @@ import os,sys
 import os.path as osp
 from core.train import get_training_roidb, train_net
 from core.config import cfg, cfg_from_file, cfg_from_list, get_output_dir
-from datasets.xmlimdb import XmlImdb
+from datasets.repo_imdb import ReopImdb
 import caffe
 
 def parse_args():
@@ -73,8 +73,8 @@ if __name__ == "__main__":
     caffe.set_device(args.gpu_id)
 
 
-    print("testing_xmlImdb")
-    imdb = XmlImdb("pascal_voc", "train", "default")
+    print("testing_repoImdb")
+    imdb = RepoImdb("pascal_voc", "train", "default")
     roidb = get_training_roidb(imdb)
     output_dir = get_output_dir(imdb)
     print('Output will be saved to `{:s}`'.format(output_dir))
