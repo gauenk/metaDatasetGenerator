@@ -29,5 +29,5 @@ What questions do we aim to answer?
 
 # Directories
 
-[lib](./lib/datasets/README.md)
+## [./lib/datasets](./lib/datasets/)
 
