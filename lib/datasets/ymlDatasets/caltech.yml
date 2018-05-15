@@ -1,8 +1,8 @@
 EXP_DATASET: caltech_2009
-PATH_TO_IMAGES: /home/gauenk/Documents/data/pascal_voc/VOCdevkit/VOC2012/JPEGImages/
-PATH_TO_ANNOTATIONS: /home/gauenk/Documents/data/pascal_voc/VOCdevkit/VOC2012/Annotations
-PATH_TO_IMAGESETS: /home/gauenk/Documents/data/pascal_voc/VOCdevkit/VOC2012/ImageSets/Main/
-CLASSES: /home/gauenk/Documents/data/pascal_voc/VOCdevkit/VOC2012/classes.txt
-IMAGE_TYPE: jpeg
-PARSE_ANNOTATION: xml
-IMAGE_INDEX_TO_IMAGE_PATH: default
+PATH_TO_IMAGES: /home/gauenk/Documents/data/caltech_pedestrian/CAL2009/images
+PATH_TO_ANNOTATIONS: /home/gauenk/Documents/data/caltech_pedestrian/CAL2009/labels
+PATH_TO_IMAGESETS:/home/gauenk/Documents/data/caltech_pedestrian/CAL2009/ImageSets/Main/
+CLASSES: /home/gauenk/Documents/data/caltech_pedestrian/CAL2009/classes.txt
+IMAGE_TYPE: png
+PARSE_ANNOTATION: txt
+IMAGE_INDEX_TO_IMAGE_PATH: caltech
