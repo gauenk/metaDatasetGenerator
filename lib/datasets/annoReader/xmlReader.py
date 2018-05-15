@@ -82,5 +82,4 @@ class xmlReader(object):
                 'flipped' : False,
                 'seg_areas' : seg_areas,
                 'set': 1}
-    
                 #'set': self._datasetName}

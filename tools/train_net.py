@@ -12,7 +12,7 @@
 import _init_paths
 from core.train import get_training_roidb, train_net
 from core.config import cfg, cfg_from_file, cfg_from_list, get_output_dir
-from datasets.factory import get_imdb
+from datasets.factory import get_repo_imdb
 import datasets.imdb
 import caffe
 import argparse
@@ -57,23 +57,12 @@ def parse_args():
     args = parser.parse_args()
     return args
 
-def combined_roidb(imdb_names):
-    def get_roidb(imdb_name):
-        imdb = get_imdb(imdb_name)
-        print 'Loaded dataset `{:s}` for training'.format(imdb.name)
-        imdb.set_proposal_method(cfg.TRAIN.PROPOSAL_METHOD)
-        print 'Set proposal method: {:s}'.format(cfg.TRAIN.PROPOSAL_METHOD)
-        roidb = get_training_roidb(imdb)
-        return roidb
-
-    roidbs = [get_roidb(s) for s in imdb_names.split('+')]
-    roidb = roidbs[0]
-    if len(roidbs) > 1:
-        for r in roidbs[1:]:
-            roidb.extend(r)
-        imdb = datasets.imdb.imdb(imdb_names)
-    else:
-        imdb = get_imdb(imdb_names)
+def get_roidb(imdb_name):
+    imdb = get_repo_imdb(imdb_name)
+    print 'Loaded dataset `{:s}` for training'.format(imdb.name)
+    imdb.set_proposal_method(cfg.TRAIN.OBJ_DET.PROPOSAL_METHOD)
+    print 'Set proposal method: {:s}'.format(cfg.TRAIN.OBJ_DET.PROPOSAL_METHOD)
+    roidb = get_training_roidb(imdb)
     return imdb, roidb
 
 if __name__ == '__main__':
@@ -101,7 +90,7 @@ if __name__ == '__main__':
     caffe.set_mode_gpu()
     caffe.set_device(args.gpu_id)
 
-    imdb, roidb = combined_roidb(args.imdb_name)
+    imdb, roidb = get_roidb(args.imdb_name)
     print '{:d} roidb entries'.format(len(roidb))
 
     output_dir = get_output_dir(imdb)

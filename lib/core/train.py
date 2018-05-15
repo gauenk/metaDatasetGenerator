@@ -30,11 +30,11 @@ class SolverWrapper(object):
         """Initialize the SolverWrapper."""
         self.output_dir = output_dir
 
-        if (cfg.TRAIN.HAS_RPN and cfg.TRAIN.BBOX_REG and
-            cfg.TRAIN.BBOX_NORMALIZE_TARGETS):
+        if (cfg.TRAIN.OBJ_DET.HAS_RPN and cfg.TRAIN.OBJ_DET.BBOX_REG and
+            cfg.TRAIN.OBJ_DET.BBOX_NORMALIZE_TARGETS):
             # RPN can only use precomputed normalization because there are no
             # fixed statistics to compute a priori
-            assert cfg.TRAIN.BBOX_NORMALIZE_TARGETS_PRECOMPUTED
+            assert cfg.TRAIN.OBJ_DET.BBOX_NORMALIZE_TARGETS_PRECOMPUTED
 
         self.solver = caffe.SGDSolver(solver_prototxt)
         
@@ -59,8 +59,8 @@ class SolverWrapper(object):
         """
         net = self.solver.net
 
-        scale_bbox_params = (cfg.TRAIN.BBOX_REG and
-                             cfg.TRAIN.BBOX_NORMALIZE_TARGETS and
+        scale_bbox_params = (cfg.TRAIN.OBJ_DET.BBOX_REG and
+                             cfg.TRAIN.OBJ_DET.BBOX_NORMALIZE_TARGETS and
                              net.params.has_key('bbox_pred'))
 
         if scale_bbox_params:
@@ -145,10 +145,10 @@ def filter_roidb(roidb):
         #   (2) At least one background RoI
         overlaps = entry['max_overlaps']
         # find boxes with sufficient overlap
-        fg_inds = np.where(overlaps >= cfg.TRAIN.FG_THRESH)[0]
+        fg_inds = np.where(overlaps >= cfg.TRAIN.OBJ_DET.FG_THRESH)[0]
         # Select background RoIs as those within [BG_THRESH_LO, BG_THRESH_HI)
-        bg_inds = np.where((overlaps < cfg.TRAIN.BG_THRESH_HI) &
-                           (overlaps >= cfg.TRAIN.BG_THRESH_LO))[0]
+        bg_inds = np.where((overlaps < cfg.TRAIN.OBJ_DET.BG_THRESH_HI) &
+                           (overlaps >= cfg.TRAIN.OBJ_DET.BG_THRESH_LO))[0]
         # image is only valid if such boxes exist
         valid = len(fg_inds) > 0 or len(bg_inds) > 0
         return valid

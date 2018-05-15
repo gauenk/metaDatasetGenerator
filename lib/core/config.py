@@ -35,15 +35,15 @@ __C.TRAIN = edict()
 
 # Scales to use during training (can list multiple scales)
 # Each scale is the pixel size of an image's shortest side
-#__C.TRAIN.OBJ_DET.SCALES = (600,)
-__C.TRAIN.SCALES = (64,)
+__C.TRAIN.SCALES = (600,)
+#__C.TRAIN.SCALES = (64,)
 
 # Max pixel size of the longest side of a scaled input image
-#__C.TRAIN.OBJ_DET.MAX_SIZE = 1000
-__C.TRAIN.MAX_SIZE = 64
+__C.TRAIN.MAX_SIZE = 1000
+#__C.TRAIN.MAX_SIZE = 64
 
 # Images to use per minibatch
-__C.TRAIN.IMS_PER_BATCH = 100
+__C.TRAIN.IMS_PER_BATCH = 2
 
 # Use horizontally-flipped images during training?
 __C.TRAIN.USE_FLIPPED = True
@@ -71,7 +71,7 @@ __C.TRAIN.ASPECT_GROUPING = True
 __C.TRAIN.OBJ_DET = edict()
 
 # Minibatch size (number of regions of interest [ROIs])
-__C.TRAIN.OBJ_DET.BATCH_SIZE = 100
+__C.TRAIN.OBJ_DET.BATCH_SIZE = 128
 
 # Fraction of minibatch that is labeled foreground (i.e. class > 0)
 __C.TRAIN.OBJ_DET.FG_FRACTION = 0.25
@@ -105,7 +105,7 @@ __C.TRAIN.OBJ_DET.BBOX_NORMALIZE_STDS = (0.1, 0.1, 0.2, 0.2)
 __C.TRAIN.OBJ_DET.PROPOSAL_METHOD = 'gt'
 
 # Use RPN to detect objects
-__C.TRAIN.OBJ_DET.HAS_RPN = False
+__C.TRAIN.OBJ_DET.HAS_RPN = True
 # IOU >= thresh: positive example
 __C.TRAIN.OBJ_DET.RPN_POSITIVE_OVERLAP = 0.7
 # IOU < thresh: negative example
@@ -143,7 +143,7 @@ __C.TEST = edict()
 __C.TEST.SCALES = (600,)
 
 # Max pixel size of the longest side of a scaled input image
-__C.TEST.MAX_SIZE = 28
+__C.TEST.MAX_SIZE = 1000
 
 #
 # Testing options (object detection)
@@ -224,7 +224,7 @@ __C.OBJ_DET.DEDUP_BOXES = 1./16.
 __C.OBJ_DET.USE_GPU_NMS = True
 
 # How much information about the bounding boxes do we store in memory?
-__C.OBJ_DET.BBOX_VERBOSE = False
+__C.OBJ_DET.BBOX_VERBOSE = True
 
 
 def get_output_dir(imdb, net=None):

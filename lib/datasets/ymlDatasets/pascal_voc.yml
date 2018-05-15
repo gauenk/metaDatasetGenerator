@@ -8,4 +8,5 @@ CLASSES: /home/gauenk/Documents/data/pascal_voc/VOCdevkit/VOC0712/classes.txt
 COMPID: meaninglessPrefix
 IMAGE_TYPE: .jpg
 ANNOTATION_TYPE: xml
+PARSE_ANNOTATION_REGEX: None
 IMAGE_INDEX_TO_IMAGE_PATH: default

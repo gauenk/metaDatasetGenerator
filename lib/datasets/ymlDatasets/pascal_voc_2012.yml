@@ -1,10 +1,12 @@
 EXP_DATASET: pascal_voc_2012
+PATH_ROOT: /home/gauenk/Documents/data/pascal_voc/VOCdevkit/VOC2012/
 PATH_TO_IMAGES: /home/gauenk/Documents/data/pascal_voc/VOCdevkit/VOC2012/JPEGImages/
-PATH_TO_ANNOTATIONS: /home/gauenk/Documents/data/pascal_voc/VOCdevkit/VOC2012/Annotations
-PATH_TO_IMAGE_SETS: /home/gauenk/Documents/data/pascal_voc/VOCdevkit/VOC2012/ImageSets/Main/
-CLASSES: /home/gauenk/Documents/data/pascal_voc/VOCdevkit/VOC2012/classes.txt
-IMAGE_TYPE: jpeg
-ANNOTATION_TYPE: bbox
-PARSE_ANNOTATIONS_METHOD: xml
+PATH_TO_ANNOTATIONS: /home/gauenk/Documents/data/pascal_voc/VOCdevkit/VOC2012/Annotations/
+PATH_TO_IMAGESETS: /home/gauenk/Documents/data/pascal_voc/VOCdevkit/VOC2012/ImageSets/Main/
+PATH_TO_RESULTS: /home/gauenk/Documents/data/pascal_voc/VOCdevkit/VOC2012/results/
+CLASSES: /home/gauenk/Documents/data/pascal_voc/VOCdevkit/VOC0712/classes.txt
+COMPID: meaninglessPrefix
+IMAGE_TYPE: .jpg
+ANNOTATION_TYPE: xml
+PARSE_ANNOTATION_REGEX: None
 IMAGE_INDEX_TO_IMAGE_PATH: default
-

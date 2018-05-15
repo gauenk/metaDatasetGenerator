@@ -56,7 +56,7 @@ class RepoImdb(imdb):
 
         self.annoReader = self._createAnnoReader(yaml_cfg['PATH_TO_ANNOTATIONS'],
                                                  yaml_cfg['ANNOTATION_TYPE'],
-                                                 yml_cfg['PARSE_ANNOTATION_REGEX'])
+                                                 yaml_cfg['PARSE_ANNOTATION_REGEX'])
 
     def _setupConfig(self):
         fn = osp.join(self._local_path,"ymlConfigs" ,self._configName + ".yml")

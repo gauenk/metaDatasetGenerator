@@ -8,7 +8,7 @@ import os.path as osp
 import PIL
 import numpy as np
 import scipy.sparse
-from fast_rcnn.config import cfg
+from core.config import cfg
 from easydict import EasyDict as edict
 
 class bboxEvaluator(object):

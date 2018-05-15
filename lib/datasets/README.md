@@ -4,7 +4,7 @@
 
 ## imdb
 
-The "imdb" or "image database" object is the primary class for "pure" dataset. A "pure" dataset is a dataset which can handle only a single dataset repository. For example, an imdb can be for "coco" but not for "coco + cam2" data.
+The "imdb" or "image database" object is the primary class for a dataset, and provides the API for user programs to interact with. The imdb can create a "roidb" or "region of interest database", which is the actual object used in "core/train.py" for training object detection models.
 
 ## factory
 
@@ -22,14 +22,15 @@ The "ymlConfig/" directory contains information about loading information from *
 
 The "ymlConfig/" directory contains information about loading information from *a specific* dataset.
 
-## xmlimdb (poorly named)
+## repo_imdb 
 
-The "xmlimdb" or "xml imdb" is inherited from the "imdb" object. This is "poorly named" since it actually can load any dataset, not just an xml. Hopefully, this is changed soon.
+The "repo_imdb" is a "pure" imdb meaning that all the datums come from the same original dataset repository. For example, an RepoImdb can be "coco" data but not "coco + cam2" data.
 
-The xml object loads in image and annotations in a format specified in "ymlDatasets/". For example, a format could be "pascal_voc.yml" located. See the "ymlDatasets/" readme for more details. The "ymlDatasets/" defines information about how the dataset should be loaded.
+The RepoImdb object loads in image and annotations in a format specified in "ymlDatasets/". For example, a format could be "pascal_voc.yml" located. See the "ymlDatasets/" readme for more details. The "ymlDatasets/" defines information about how the dataset should be loaded.
 
+Data is loaded according to three more objects, each created inside of the RepoImdb object. Images are loaded according to readers in "imageReader/"; annotations are loaded according to readers "annoReader/"; and the evaluation of the detections is done based on the "evaluators/". Each of these is specified in the "ymlDatasets" config file.
 
-Data is loaded according to three more objects. Images are loaded according to readers in "imageReader/"; annotations are loaded according to readers "annoReader/"; and the evaluation of the detections is done based on the "evaluators/". Each of these is specified in the "ymlDatasets" config file.
+See "./tools/testing_repoImdb.py" for an example file of loading in an image repository.
 
 ## annoReader/
 
@@ -48,7 +49,6 @@ The evaluators/ directory holds different types of evaluation method. The main t
 # Sample Datasets
 
 This section is for information about a "sampleDataset" object which uses a list of imdbs for initialization of the class.
-
 
 
 
