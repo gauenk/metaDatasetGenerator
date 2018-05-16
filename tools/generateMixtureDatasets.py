@@ -17,7 +17,11 @@ import caffe
 import argparse
 import pprint
 import numpy as np
-import sys
+import sys,os
+import os.path as osp
+
+imdb_names = {}
+loadedRoidbs = []
 
 def parse_args():
     """
@@ -49,9 +53,17 @@ def parse_args():
     if len(sys.argv) == 1:
         parser.print_help()
         sys.exit(1)
-
+        
     args = parser.parse_args()
     return args
+
+def get_roidb(imdb_name):
+    imdb = get_repo_imdb(imdb_name)
+    print 'Loaded dataset `{:s}` for training'.format(imdb.name)
+    imdb.set_proposal_method(cfg.TRAIN.OBJ_DET.PROPOSAL_METHOD)
+    print 'Set proposal method: {:s}'.format(cfg.TRAIN.OBJ_DET.PROPOSAL_METHOD)
+    roidb = get_training_roidb(imdb)
+    return imdb, roidb
 
 def createListFromId(setNum):
     idList = []
@@ -60,6 +72,45 @@ def createListFromId(setNum):
         if strNum.count('1') == setNum:
             idList.append(strNum)
     return idList
+
+def createMixtureDataset(setID,size):
+    
+    roidbs = setID_to_roidb(setID)
+    assert len(roidbs) == setID.count('1')
+    
+    mixedRoidb = []
+    for roidb in roidbs:
+        sizedRoidb = get_roidb_sample_at_size(roidb,size)
+        mixedRoidb.append(sizedRoidb)
+    return mixedRoidb
+    
+def get_roidb_at_size(roidb,size):
+    pass
+
+def setID_to_roidb(setID):
+    roidb_list = []
+    for idx,char in enumerate(setID):
+        if char == '1':
+            # load imdb
+            roidb_list.append(loadedImdbs[idx])
+    return roidb_list
+    
+def loadImdbsToMemory():
+    
+    global loadedRoidbs = []
+    for idx in range(len(imdb_names)):
+        imdb, roidb = get_roidb(imdb_names[idx])
+        loadedRoidbs.append(roidb)
+
+def createPathSetID(setID):
+    return osp.join(cfg.PATH_MIXTURE_DATASETS,setID)
+
+def createPathRepeat(setID,r):
+    return osp.join(cfg.PATH_MIXTURE_DATASETS,setID,r)
+    
+def createFilenameID(setID,r,size)
+    return osp.join(cfg.PATH_MIXTURE_DATASETS,setID,r,size)
+
 
 if __name__ == '__main__':
     args = parse_args()
@@ -86,18 +137,30 @@ if __name__ == '__main__':
         print("ERROR: repeat is 0.")
         sys.exit()
 
+    loadImdbsToMemory()
+                              
     for setNum in range(range_start,range_end):
         # for each of the "ranges" we want
         for setID in createListFromId(setNum):
             # create setID folder
+            path_setID = createPathSetID(setID)
+            if osp.isdir(path_setID) == False:
+                os.makedirs(path_setID)
             for r in range(repeat):
                 # create the repeat folder
+                path_repeat = createPathRepeat(setID,r)
+                if osp.isdir(path_repeat) == False:
+                    os.makedirs(path_repeat)
                 for size in datasetSizes:
                     # create a file for each dataset size
-                    imdb = createMixtureDataset(setID,size)
-                    roidb = get_training_roidb(imdb)
-                    repo_imdbs = roidb_sortByRepo(roidb)
-                    for dataset, imdb in repo_imdbs:
+                    idlist_filename = createFilenameID(setID,r,size)
+                    f = open(idlist_filename,"w+")
+                    roidb = createMixtureDataset(setID,size)
+                    repo_roidbs = roidb_sortByRepo(roidb)
+                    for dataset, roidb in repo_roidbs:
                         # write the dataset name
-                        for image_id in imdb:
+                        f.write("DATASET: {}".format(dataset))
+                        for image_id in roidb:
                             # write the image id
+                            f.write("{}".format(roidb['image']))
+                    f.close()
