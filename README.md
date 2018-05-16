@@ -51,6 +51,13 @@ To verify the complete installation of the github repo type:
 ./experiments/scripts/verifyDatasetLoad.sh 0 pascal_voc_2007 train
 ```
 
+
+It may complain the filepath for pascal_voc_2007 is set incorrectly. You may need to modify the config file to tell to load `ymlDatasets/helps/` and not `ymlDatasets/username`. This is set at the top of `./lib/core/config.py` (around line #35). Make sure it reads:
+
+```Python
+__C.PATH_YMLDATASETS = "helps"
+```
+
 ## Summary
 
 This repo generates information about the paper written by the CAM2 team in 2018. The repo offers functionality for:
