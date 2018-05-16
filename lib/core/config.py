@@ -32,8 +32,8 @@ cfg = __C
 #
 
 __C.TRAIN = edict()
-__C.PATH_YMLDATASET = "helps"
-#__C.PATH_YMLDATASET = "gauenk"
+__C.PATH_YMLDATASETS = "helps"
+#__C.PATH_YMLDATASETS = "gauenk"
 
 # Scales to use during training (can list multiple scales)
 # Each scale is the pixel size of an image's shortest side
