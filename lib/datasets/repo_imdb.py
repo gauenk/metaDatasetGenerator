@@ -36,7 +36,7 @@ class RepoImdb(imdb):
     def _parseDatasetFile(self):
         self._setupConfig()
         fn = osp.join(self._local_path,
-                      cfg.PATH_YMLDATASETS,"ymlDatasets" ,
+                      "ymlDatasets", cfg.PATH_YMLDATASETS,
                       self._datasetName + ".yml")
         with open(fn, 'r') as f:
             yaml_cfg = edict(yaml.load(f))
