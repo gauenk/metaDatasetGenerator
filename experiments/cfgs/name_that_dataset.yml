@@ -1,0 +1,6 @@
+EXP_DIR: name_that_dataset
+OBJ_DET: None
+TRAIN:
+  OBJ_DET: None
+TEST:
+  OBJ_DET: None
