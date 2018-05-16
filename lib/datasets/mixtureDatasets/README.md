@@ -12,6 +12,7 @@ The "binary code" specifies which dataset is used in the mixture dataset where t
 
 An example is below:
 
+<pre>
 ./mixtureDatasets/
 	11111111/
 		1/
@@ -64,4 +65,4 @@ An example is below:
 			2000
 			5000
 			10000
-		
+</pre>
