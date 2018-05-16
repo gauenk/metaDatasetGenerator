@@ -1,5 +1,5 @@
 #!/bin/bash
-1;4205;0c# Usage:
+# Usage:
 # ./experiments/scripts/verifyDatasetLoad.sh GPU DATASET IMAGE_SET
 
 set -e
