@@ -5,7 +5,7 @@
 Add the following line to the bottom of your "~/.bashrc" file.
 
 ```Shell
-export PYTHONPATH="/opt/caffe-faster-rcnn/python"
+export PYTHONPATH="/opt/caffe-fast-rcnn/python"
 ```
 
 Then run:
