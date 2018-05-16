@@ -1,5 +1,5 @@
 #!/bin/bash
-# Usage:
+1;4205;0c# Usage:
 # ./experiments/scripts/verifyDatasetLoad.sh GPU DATASET IMAGE_SET
 
 set -e
@@ -23,6 +23,5 @@ fi
 
 time ./tools/train_net.py --gpu ${GPU_ID} \
   --solver models/${DATASET}/VGG16/faster_rcnn_end2end/solver.prototxt \
-  --weights /home/gauenk/Documents/other/py-faster-rcnn/data/faster_rcnn_models/downloaded_imagenet/VGG16.v2.caffemodel \
   --imdb ${DATASET}"-"${IMAGE_SET}"-default" \
   --cfg experiments/cfgs/faster_rcnn_end2end.yml
