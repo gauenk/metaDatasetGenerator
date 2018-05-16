@@ -35,7 +35,9 @@ class RepoImdb(imdb):
 
     def _parseDatasetFile(self):
         self._setupConfig()
-        fn = osp.join(self._local_path,"ymlDatasets" ,self._datasetName + ".yml")
+        fn = osp.join(self._local_path,
+                      cfg.PATH_YMLDATASETS,"ymlDatasets" ,
+                      self._datasetName + ".yml")
         with open(fn, 'r') as f:
             yaml_cfg = edict(yaml.load(f))
         assert self._datasetName == yaml_cfg['EXP_DATASET'], "dataset name is not correct."

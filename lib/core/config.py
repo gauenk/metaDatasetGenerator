@@ -1,5 +1,5 @@
 # --------------------------------------------------------
-# Fast R-CNN
+1;4205;0c# Fast R-CNN
 # Copyright (c) 2015 Microsoft
 # Licensed under The MIT License [see LICENSE for details]
 # Written by Ross Girshick
@@ -32,6 +32,8 @@ cfg = __C
 #
 
 __C.TRAIN = edict()
+__C.PATH_YMLDATASET = "helps"
+#__C.PATH_YMLDATASET = "gauenk"
 
 # Scales to use during training (can list multiple scales)
 # Each scale is the pixel size of an image's shortest side
