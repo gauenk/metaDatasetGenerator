@@ -16,6 +16,7 @@ from easydict import EasyDict as edict
 from datasets.evaluators.bboxEvaluator import bboxEvaluator
 from datasets.imageReader.rawReader import rawReader
 from datasets.annoReader.xmlReader import xmlReader
+from datasets.annoReader.txtReader import txtReader
 
 class RepoImdb(imdb):
     """Image database."""
@@ -51,12 +52,13 @@ class RepoImdb(imdb):
 
         self.evaluator = self._createEvaluator(yaml_cfg['COMPID'])
 
-        self.imgReader = self._createImgReader(yaml_cfg['PATH_TO_IMAGES'],
-                                                 yaml_cfg['IMAGE_TYPE'])
-
         self.annoReader = self._createAnnoReader(yaml_cfg['PATH_TO_ANNOTATIONS'],
                                                  yaml_cfg['ANNOTATION_TYPE'],
-                                                 yaml_cfg['PARSE_ANNOTATION_REGEX'])
+                                                 yaml_cfg['PARSE_ANNOTATION_REGEX'],
+                                                 yaml_cfg['CONVERT_TO_PERSON'])
+
+        self.imgReader = self._createImgReader(yaml_cfg['PATH_TO_IMAGES'],
+                                               yaml_cfg['IMAGE_TYPE'])
 
     def _setupConfig(self):
         fn = osp.join(self._local_path,"ymlConfigs" ,self._configName + ".yml")
@@ -85,10 +87,12 @@ class RepoImdb(imdb):
         print("-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-")
         return 0
 
-    def _createAnnoReader(self,annoPath,annoType,cleanRegex):
-        if annoType == "xml": return xmlReader(annoPath,self.classes,self._datasetName)
-        elif annoType == "txt": return xmlReader(annoPath,self.classes,\
-                                                 self._datasetName,cleanRegex=cleanRegex)
+    def _createAnnoReader(self,annoPath,annoType,cleanRegex,convertToPerson):
+        if annoType == "xml": return xmlReader(annoPath,self.classes,self._datasetName,
+                                               convertToPerson=convertToPerson)
+        elif annoType == "txt": return txtReader(annoPath,self.classes,\
+                                                 self._datasetName,cleanRegex=cleanRegex,
+                                                 convertToPerson=convertToPerson)
         
     def _createImgReader(self,imgPath,imgType):
         return rawReader(imgPath,imgType,self._image_index)

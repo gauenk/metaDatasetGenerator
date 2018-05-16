@@ -17,7 +17,7 @@ import xml.etree.ElementTree as ET
 class xmlReader(object):
     """Image database."""
 
-    def __init__(self, annoPath, classes , datasetName, bboxOffset = 0, useDiff = True):
+    def __init__(self, annoPath, classes , datasetName, bboxOffset = 0, useDiff = True, convertToPerson=False):
         """
         __init__ function for annoReader [annotationReader]
 

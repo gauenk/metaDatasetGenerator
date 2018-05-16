@@ -105,8 +105,8 @@ class imdb(object):
             boxes = self.roidb[i]['boxes'].copy()
             oldx1 = boxes[:, 0].copy()
             oldx2 = boxes[:, 2].copy()
-            boxes[:, 0] = widths[i] - oldx2# - 1
-            boxes[:, 2] = widths[i] - oldx1# - 1
+            boxes[:, 0] = widths[i] - oldx2
+            boxes[:, 2] = widths[i] - oldx1
 
             # if < 0, then let it be zero
             boxes[:, 0] = boxes[:, 0] * (boxes[:, 0] > 0)

@@ -1,12 +1,13 @@
-EXP_DATASET: caltech_2009
+EXP_DATASET: caltech
 PATH_ROOT: /home/gauenk/Documents/data/caltech_pedestrian/CAL2009/
 PATH_TO_IMAGES: /home/gauenk/Documents/data/caltech_pedestrian/CAL2009/images
 PATH_TO_ANNOTATIONS: /home/gauenk/Documents/data/caltech_pedestrian/CAL2009/labels
-PATH_TO_IMAGESETS:/home/gauenk/Documents/data/caltech_pedestrian/CAL2009/ImageSets/Main/
+PATH_TO_IMAGESETS: /home/gauenk/Documents/data/caltech_pedestrian/CAL2009/ImageSets/Main/
 PATH_TO_RESULTS: /home/gauenk/Documents/data/caltech_pedestrian/CAL2009/results
 CLASSES: /home/gauenk/Documents/data/caltech_pedestrian/CAL2009/classes.txt
 COMPID: meaninglessPrefix
 IMAGE_TYPE: .png
 ANNOTATION_TYPE: txt
-PARSE_ANNOTATION_REGEX: None
-IMAGE_INDEX_TO_IMAGE_PATH: caltech
+PARSE_ANNOTATION_REGEX:
+CONVERT_TO_PERSON:
+IMAGE_INDEX_TO_IMAGE_PATH: default
