@@ -2,7 +2,11 @@
 
 ## Install on HELPS computer
 
-Add the following line to the bottom of your "~/.bashrc" file.
+### Part 1: Linking with Caffe
+
+While not strictly required, this repo should work with caffe.
+
+First, add the following line to the bottom of your "~/.bashrc" file.
 
 ```Shell
 export PYTHONPATH="/opt/caffe-fast-rcnn/python"
@@ -12,6 +16,37 @@ Then run:
 
 ```Shell
 source ~/.bashrc
+```
+
+To install dependancies for caffe run:
+
+```Shell
+cd /opt/caffe-fast-rcnn/python
+cat requirements.txt | xargs pip install --user
+```
+
+You should check the caffe install by running the following in your shell:
+
+```Shell
+username@computerName:$ python
+>>> import caffe
+>>>
+```
+
+### Part 2: Linking the github repo
+
+Then run the following github information:
+
+```Shell
+git clone https://github.com/gauenk/metaDatasetGenerator.git
+cd ~/metaDatasetGenerator/lib
+make
+```
+
+To verify the complete installation of the github repo type:
+
+```Shell
+./experiments/scripts/verifyDatasetLoad.sh 0 pascal_voc_2007 train
 ```
 
 ## Summary
