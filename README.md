@@ -21,8 +21,9 @@ source ~/.bashrc
 To install dependancies for caffe run:
 
 ```Shell
+pip2 install --upgrade pip --user
 cd /opt/caffe-fast-rcnn/python
-cat requirements.txt | xargs pip install --user
+cat requirements.txt | xargs pip2 install --user
 ```
 
 You should check the caffe install by running the following in your shell:
