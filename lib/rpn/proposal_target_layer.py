@@ -116,14 +116,19 @@ def _get_bbox_regression_labels(bbox_target_data, num_classes):
         bbox_inside_weights (ndarray): N x 4K blob of loss weights
     """
 
+
     clss = bbox_target_data[:, 0]
+    print('clss',clss)
     bbox_targets = np.zeros((clss.size, 4 * num_classes), dtype=np.float32)
     bbox_inside_weights = np.zeros(bbox_targets.shape, dtype=np.float32)
+    print(bbox_target_data.shape)
+    print(bbox_targets.shape)
     inds = np.where(clss > 0)[0]
     for ind in inds:
         cls = clss[ind]
-        start = 4 * cls
+        start = int(4 * cls)
         end = start + 4
+        print(start,end,inds)
         bbox_targets[ind, start:end] = bbox_target_data[ind, 1:]
         bbox_inside_weights[ind, start:end] = cfg.TRAIN.OBJ_DET.BBOX_INSIDE_WEIGHTS
     return bbox_targets, bbox_inside_weights
@@ -157,7 +162,7 @@ def _sample_rois(all_rois, gt_boxes, fg_rois_per_image, rois_per_image, num_clas
     labels = gt_boxes[gt_assignment, 4]
 
     # Select foreground RoIs as those with >= FG_THRESH overlap
-    fg_inds = np.where(max_overlaps >= cfg.TRAIN.OBJ_DET.FG_THRESH)[0]
+    fg_inds = np.where(max_overlaps >= cfg.TRAIN.OBJ_DET.FG_THRESH)[0].astype(np.int)
     # Guard against the case when an image has fewer than fg_rois_per_image
     # foreground RoIs
     fg_rois_per_this_image = min(fg_rois_per_image, fg_inds.size)

@@ -1,6 +1,8 @@
-M1: 0.1,0.1,
-M1: 0.2
-M1: 0.2
-M1: 0.2
-M1: 0.2
-
+VOC
+ImageNet
+COCO
+CAM2
+Caltech
+INRIA
+SUN
+KITTI
