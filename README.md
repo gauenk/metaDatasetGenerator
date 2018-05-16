@@ -40,7 +40,7 @@ Then run the following github information:
 
 ```Shell
 git clone https://github.com/gauenk/metaDatasetGenerator.git
-cd ~/metaDatasetGenerator/lib
+cd ./metaDatasetGenerator/lib
 make
 ```
 
