@@ -42,6 +42,7 @@ Then run the following github information:
 git clone https://github.com/gauenk/metaDatasetGenerator.git
 cd ./metaDatasetGenerator/lib
 make
+cd ../
 ```
 
 To verify the complete installation of the github repo type:
