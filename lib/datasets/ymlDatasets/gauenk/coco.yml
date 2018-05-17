@@ -1,4 +1,4 @@
-EXP_DATASET: caltech
+EXP_DATASET: coco
 PATH_ROOT: /home/gauenk/Documents/data/caltech_pedestrian/CAL2009/
 PATH_TO_IMAGES: /home/gauenk/Documents/data/caltech_pedestrian/CAL2009/images
 PATH_TO_ANNOTATIONS: /home/gauenk/Documents/data/caltech_pedestrian/CAL2009/labels

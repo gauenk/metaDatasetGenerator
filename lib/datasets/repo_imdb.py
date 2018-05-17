@@ -11,7 +11,7 @@ import yaml,uuid
 import numpy as np
 from datasets.imdb import imdb
 import scipy.sparse
-from core.config import cfg
+from core.config import cfg,cfgData,cfgData_from_file
 from easydict import EasyDict as edict
 from datasets.evaluators.bboxEvaluator import bboxEvaluator
 from datasets.imageReader.rawReader import rawReader
@@ -28,52 +28,47 @@ class RepoImdb(imdb):
         self._configName = configName
         self._image_set = imageSet
         self._image_index = [] 
-        self._parseDatasetFile()
+        self._convertIdToCls = None
         self._obj_proposer = 'gt'
         self._roidb = None
         self._roidb_handler = self.gt_roidb
         self._roidbSize = []
-        self._convertIdToCls = None
+        self._parseDatasetFile()
 
     def _parseDatasetFile(self):
         self._setupConfig()
         fn = osp.join(self._local_path,
                       "ymlDatasets", cfg.PATH_YMLDATASETS,
                       self._datasetName + ".yml")
-        with open(fn, 'r') as f:
-            yaml_cfg = edict(yaml.load(f))
-        assert(self._datasetName == yaml_cfg['EXP_DATASET'], "dataset name is not correct.")
+        cfgData_from_file(fn)
+        assert(self._datasetName == cfgData['EXP_DATASET'], "dataset name is not correct.")
 
-        self._set_classes(yaml_cfg['CLASSES'],yaml_cfg['CONVERT_TO_PERSON'],yaml_cfg['ONLY_PERSON'])
+        self._set_classes(cfgData['CLASSES'],cfgData['CONVERT_TO_PERSON'],cfgData['ONLY_PERSON'])
         self._num_classes = len(self._classes)
-        self._path_root = yaml_cfg['PATH_ROOT']
+        self._path_root = cfgData['PATH_ROOT']
 
-        self._path_to_imageSets = yaml_cfg['PATH_TO_IMAGESETS']
+        self._path_to_imageSets = cfgData['PATH_TO_IMAGESETS']
         if not self._checkImageSet():
             raise ValueError("imageSet path {} doesn't exist")
 
         self._image_index = self._load_image_index()
 
-        self._set_id_to_cls(yaml_cfg)
+        self._set_id_to_cls()
 
-        self.evaluator = self._createEvaluator(yaml_cfg['COMPID'])
-
-
-        self.annoReader = self._createAnnoReader(yaml_cfg['PATH_TO_ANNOTATIONS'],
-                                                 yaml_cfg['ANNOTATION_TYPE'],
-                                                 yaml_cfg['PARSE_ANNOTATION_REGEX'],
-                                                 yaml_cfg['CONVERT_TO_PERSON'],
-                                                 yaml_cfg['USE_IMAGE_SET'],
+        self.evaluator = self._createEvaluator(cfgData['COMPID'])
+        self.annoReader = self._createAnnoReader(cfgData['PATH_TO_ANNOTATIONS'],
+                                                 cfgData['ANNOTATION_TYPE'],
+                                                 cfgData['PARSE_ANNOTATION_REGEX'],
+                                                 cfgData['CONVERT_TO_PERSON'],
+                                                 cfgData['USE_IMAGE_SET'],
+        )
+        self.imgReader = self._createImgReader(cfgData['PATH_TO_IMAGES'],
+                                               cfgData['IMAGE_TYPE'],
+                                               cfgData['USE_IMAGE_SET'],
         )
 
-
-        self.imgReader = self._createImgReader(yaml_cfg['PATH_TO_IMAGES'],
-                                               yaml_cfg['IMAGE_TYPE'],
-                                               yaml_cfg['USE_IMAGE_SET'],
-        )
-
-    def _set_id_to_cls(self,yaml_cfg):
-        convertIdtoCls_filename = yaml_cfg['CONVERT_ID_TO_CLS_FILE']
+    def _set_id_to_cls(self):
+        convertIdtoCls_filename = cfgData['CONVERT_ID_TO_CLS_FILE']
         if convertIdtoCls_filename is not None:
             path = osp.join(self._local_path,
                             "ymlDatasets",

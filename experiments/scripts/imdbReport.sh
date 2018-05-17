@@ -20,6 +20,6 @@ then
     exit 1
 fi
 
-time ./tools/createImdbReport.py \
+time ./tools/imdbReport.py \
   --imdb ${DATASET}"-"${IMAGE_SET}"-default" \
   --cfg experiments/cfgs/faster_rcnn_end2end.yml

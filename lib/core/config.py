@@ -28,6 +28,31 @@ __C = edict()
 cfg = __C
 
 #
+# Dataset options
+#
+__C.DATASETS = edict()
+cfgData = __C.DATASETS
+__C.DATASETS.EXP_DATASET = ""
+__C.DATASETS.PATH_ROOT = ""
+__C.DATASETS.PATH_TO_IMAGES = ""
+__C.DATASETS.PATH_TO_ANNOTATIONS = ""
+__C.DATASETS.PATH_TO_IMAGESETS = ""
+__C.DATASETS.PATH_TO_RESULTS = ""
+__C.DATASETS.CLASSES = ""
+__C.DATASETS.COMPID = "defaultCompID"
+__C.DATASETS.IMAGE_TYPE = ""
+__C.DATASETS.ANNOTATION_TYPE = ""
+__C.DATASETS.PARSE_ANNOTATION_REGEX = None
+__C.DATASETS.CONVERT_TO_PERSON = None
+__C.DATASETS.IMAGE_INDEX_TO_IMAGE_PATH = None
+__C.DATASETS.ONLY_PERSON = False
+__C.DATASETS.USE_IMAGE_SET = None
+__C.DATASETS.CONVERT_ID_TO_CLS_FILE = None
+__C.DATASETS.USE_IMAGE_SET = None
+__C.DATASETS.CONVERT_ID_TO_CLS_FILE = None
+__C.DATASETS.ONLY_PERSON = False
+
+#
 # Training options
 #
 
@@ -209,7 +234,7 @@ __C.SHUFFLE_DIR = osp.abspath(osp.join(__C.ROOT_DIR, 'output','shuffled_sets'))
 __C.MODELS_DIR = osp.abspath(osp.join(__C.ROOT_DIR, 'models', 'coco'))
 
 # Place outputs under an experiments directory
-__C.EXP_DIR = 'default'
+__C.EXP_DIR = "default"
 
 # Default GPU device id
 __C.GPU_ID = 0
@@ -257,8 +282,8 @@ def _merge_a_into_b(a, b):
             raise KeyError('{} is not a valid config key'.format(k))
 
         old_type = type(b[k])
-        # the types must match, too; unless old_type is edict
-        if old_type is not type(v) and old_type is not edict:
+        # the types must match, too; unless old_type is not edict and not None
+        if old_type is not type(v) and (old_type is edict and old_type is not type(None)):
             if isinstance(b[k], np.ndarray):
                 v = np.array(v, dtype=b[k].dtype)
             else:
@@ -284,6 +309,14 @@ def cfg_from_file(filename):
         yaml_cfg = edict(yaml.load(f))
 
     _merge_a_into_b(yaml_cfg, __C)
+
+def cfgData_from_file(filename):
+    """Load a config file and merge it into the default options."""
+    import yaml
+    with open(filename, 'r') as f:
+        yaml_cfg = edict(yaml.load(f))
+
+    _merge_a_into_b(yaml_cfg, __C.DATASETS)
 
 def cfg_from_list(cfg_list):
     """Set config keys via list (e.g., from command line)."""
