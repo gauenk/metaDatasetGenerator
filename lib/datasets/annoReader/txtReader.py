@@ -17,9 +17,9 @@ import xml.etree.ElementTree as ET
 class txtReader(object):
     """Image database."""
 
-    def __init__(self, annoPath, classes , datasetName, bboxOffset = 0,
-                 useDiff = True, cleanRegex = None, convertToPerson = False,
-                 onlyPerson = False):
+    def __init__(self, annoPath, classes , datasetName, setID,
+                 bboxOffset = 0,useDiff = True, cleanRegex = None,
+                 convertToPerson = None):
         """
         __init__ function for annoReader [annotationReader]
 
@@ -27,11 +27,11 @@ class txtReader(object):
         self._annoPath = annoPath
         self._bboxOffset = bboxOffset
         self._datasetName = datasetName
+        self._setID = setID
         self.num_classes = len(classes)
         self.useDiff = useDiff
         self._classToIndex = self._create_classToIndex(classes)
         self._convertToPerson = convertToPerson
-        self._onlyPerson = onlyPerson
         if cleanRegex is not None: self._cleanRegex = cleanRegex # used for INRIA
         else:
             self._cleanRegex = r"(?P<cls>[0-9]+) (?P<xmin>[0-9]*\.[0-9]+) (?P<ymin>[0-9]*\.[0-9]+) (?P<xmax>[0-9]*\.[0-9]+) (?P<ymax>[0-9]*\.[0-9]+)"
@@ -62,13 +62,11 @@ class txtReader(object):
             for idx,line in enumerate(annos):
                 m = re.match(self._cleanRegex,line)
                 if m is not None:
-                    num_objs += 1
+                    if self._find_cls(m.groupdict()) != -1:
+                        num_objs += 1
         else:
             num_objs = len(annos)
                     
-
-        
-
         # reformat into the dictionary
         boxes = np.zeros((num_objs, 4), dtype=np.int16)
         gt_classes = np.zeros((num_objs), dtype=np.int32)
@@ -85,24 +83,9 @@ class txtReader(object):
                 y1 = float(mgd['ymin'])
                 x2 = float(mgd['xmax'])
                 y2 = float(mgd['ymax'])
-
-                if "cls" in mgd.keys():
-                    cls = mgd['cls']
-                    if re.match(r"[0-9]+",cls) is None:
-                        cls = self._classToIndex[cls]
-                    else:
-                        cls = int(cls)
-                else:
-                    cls = self._classToIndex["person"]
-                
-                # check if we need to convert annotation class to "person"
-                if self._convertToPerson is not None:
-                    if cls in self._convertToPerson:
-                        cls = self._classToIndex["person"]
-                
-                if self._onlyPerson is True and\
-                   cls is not "person": continue
-
+                cls = self._find_cls(mgd)
+                if cls == -1:
+                    continue
                 boxes[ix, :] = [x1, y1, x2, y2]
                 gt_classes[ix] = cls
                 overlaps[ix, cls] = 1.0
@@ -117,12 +100,35 @@ class txtReader(object):
                     'gt_overlaps' : overlaps,
                     'flipped' : False,
                     'seg_areas' : seg_areas,
-                    'set':1}
+                    'set':self._setID}
         else:
             bbox = {'boxes' : boxes,
                     'gt_classes': gt_classes,
                     'flipped': False,
-                    'set':1}
+                    'set':self._setID}
         return bbox
 
+    def _find_cls(self,mgd):
+        if "cls" in mgd.keys():
+            cls = mgd['cls'].lower().strip()
+            if re.match(r"[0-9]+",cls) is None:
+                cls = self.mangle_cls(cls)
+            else:
+                cls = int(cls)
+                # remove the index if in class list
+                if cls not in self._classToIndex.values():
+                    cls = -1
+        else:
+            cls = self._classToIndex["person"]
+        return cls
 
+    def mangle_cls(self,cls):
+        # check if we need to convert annotation class to "person"
+        if self._convertToPerson is not None and cls in self._convertToPerson:
+            cls = self._classToIndex["person"]
+        # remove all not in classToIndex
+        elif cls in self._classToIndex.keys():
+            cls = self._classToIndex[cls]
+        else:
+            return -1
+        return cls

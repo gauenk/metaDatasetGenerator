@@ -9,6 +9,7 @@ import os
 import os.path as osp
 import PIL
 import numpy as np
+import numpy.random as npr
 import scipy.sparse
 from core.config import cfg
 
@@ -23,6 +24,7 @@ class imdb(object):
         self._obj_proposer = 'selective_search'
         self._roidb = None
         self._roidb_handler = self.default_roidb
+        self._roidbSize = []
         # Use this dict for storing dataset specific config options
         self.config = {}
 
@@ -54,6 +56,24 @@ class imdb(object):
         method = eval('self.' + method + '_roidb')
         self.roidb_handler = method
 
+    def _get_roidb_index_at_size(self,gsize):
+        for idx,rsize in enumerate(self.roidbSize):
+            if rsize >= gsize: return idx
+        return -1
+
+    def get_roidb_at_size(self,gsize):
+        rindex = self._get_roidb_index_at_size(gsize)
+        if rindex == -1:
+            print("\n\nWARNING: one of your datasets may be too small\n\n")
+        return self.roidb[:rindex],self.roidbSize[rindex]
+
+    def roidb_num_bboxes_at(self,index):
+        return self.roidbSize[index]
+
+    @property
+    def roidbSize(self):
+        return self._roidbSize
+
     @property
     def roidb(self):
         # A roidb is a list of dictionaries, each with the following keys:
@@ -64,6 +84,7 @@ class imdb(object):
         if self._roidb is not None:
             return self._roidb
         self._roidb = self.roidb_handler()
+        self.compute_size_along_roidb()
         return self._roidb
 
     @property
@@ -80,7 +101,24 @@ class imdb(object):
     def image_path_at(self, i):
         raise NotImplementedError
 
+    def count_bboxes_at(self, i):
+        raise NotImplementedError
+
+    def get_annotation_size(self, i):
+        raise NotImplementedError
+
     def default_roidb(self):
+        raise NotImplementedError
+
+    def shuffle_image_index(self):
+        if len(self._image_index) != 0:
+            npr.shuffle(self._image_index)
+
+    def shuffle_roidb(self):
+        if self._roidb is not None:
+            npr.shuffle(self._roidb)
+
+    def compute_size_along_roidb(self):
         raise NotImplementedError
 
     def evaluate_detections(self, all_boxes, output_dir=None):

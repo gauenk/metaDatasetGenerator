@@ -18,16 +18,9 @@ class rawReader(object):
        if you want multi yml files, then use sampleDataset object
     """
 
-    def __init__(self, imgPath, imgExt, image_index):
+    def __init__(self, imgPath, imgExt):
         self._imgPath = imgPath
         self._imgExt = imgExt
-        self._image_index = image_index
-
-    def image_path_at(self, i):
-        """
-        Return the absolute path to image i in the image sequence.
-        """
-        return self.image_path_from_index(self._image_index[i])
 
     def image_path_from_index(self, index):
         """

@@ -15,15 +15,15 @@ from datasets.repo_imdb import RepoImdb
 __sets.append("pascal_voc_2012")
 __sets.append("pascal_voc_2007")
 __sets.append("pascal_voc")
-# __sets.append("imagenet_2014")
-# __sets.append("coco_2014")
-# __sets.append("coco_2015")
-# __sets.append("coco_2015")
-# __sets.append("cam2_2017")
-# __sets.append("sun_2012")
+__sets.append("imagenet")
+__sets.append("cam2")
 __sets.append("caltech")
-__sets.append("kitti_2013")
+__sets.append("kitti")
 __sets.append("inria")
+
+#todo
+__sets.append("coco")
+__sets.append("sun")
 
 def get_repo_imdb(name):
     """Get an imdb (image database) by name."""

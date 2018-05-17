@@ -32,8 +32,9 @@ cfg = __C
 #
 
 __C.TRAIN = edict()
-__C.PATH_YMLDATASETS = "helps"
-#__C.PATH_YMLDATASETS = "gauenk"
+#__C.PATH_YMLDATASETS = "helps"
+__C.PATH_YMLDATASETS = "gauenk"
+__C.PATH_MIXTURE_DATASETS = "./lib/datasets/mixtureDatasets/"
 
 # Scales to use during training (can list multiple scales)
 # Each scale is the pixel size of an image's shortest side
@@ -305,3 +306,15 @@ def cfg_from_list(cfg_list):
             'type {} does not match original type {}'.format(
             type(value), type(d[subkey]))
         d[subkey] = value
+
+def createPathSetID(setID):
+    return osp.join(cfg.PATH_MIXTURE_DATASETS,setID)
+
+def createPathRepeat(setID,r):
+    return osp.join(cfg.PATH_MIXTURE_DATASETS,setID,r)
+    
+def createFilenameID(setID,r,size):
+    return osp.join(cfg.PATH_MIXTURE_DATASETS,setID,r,size)
+
+
+

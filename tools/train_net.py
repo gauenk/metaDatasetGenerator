@@ -92,6 +92,10 @@ if __name__ == '__main__':
 
     imdb, roidb = get_roidb(args.imdb_name)
     print '{:d} roidb entries'.format(len(roidb))
+    print("num_classes",imdb.num_classes)
+    print(imdb.roidb_num_bboxes_at(-1))
+    print(roidb[0])
+    sys.exit()
 
     output_dir = get_output_dir(imdb)
     print 'Output will be saved to `{:s}`'.format(output_dir)

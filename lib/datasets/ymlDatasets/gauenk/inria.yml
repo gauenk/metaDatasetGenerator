@@ -1,6 +1,6 @@
 EXP_DATASET: inria
 PATH_ROOT: /home/gauenk/Documents/data/inria/INRIAdevkit/INRIA2005/
-PATH_TO_IMAGES: /home/gauenk/Documents/data/inria/INRIAdevkit/INRIA2005/images/
+PATH_TO_IMAGES: /home/gauenk/Documents/data/inria/INRIAdevkit/INRIA2005/JPEGImages/
 PATH_TO_ANNOTATIONS: /home/gauenk/Documents/data/inria/INRIAdevkit/INRIA2005/Annotations/
 PATH_TO_IMAGESETS: /home/gauenk/Documents/data/inria/INRIAdevkit/INRIA2005/ImageSets/Main/
 PATH_TO_RESULTS: /home/gauenk/Documents/data/inria/INRIAdevkit/INRIA2005/results
@@ -8,5 +8,8 @@ CLASSES: /home/gauenk/Documents/data/inria/INRIAdevkit/INRIA2005/classes.txt
 COMPID: meaninglessPrefix
 IMAGE_TYPE: .jpg
 ANNOTATION_TYPE: txt
-PARSE_ANNOTATION_REGEX: "^Bounding.* : \((?P<xmin>[0-9]+), (?P<ymin>[0-9]+)\) - \((?P<xmax>[0-9]+), (?P<ymax>[0-9]+)\)"
+PARSE_ANNOTATION_REGEX: '^Bounding.* : \((?P<xmin>[0-9]+), (?P<ymin>[0-9]+)\) - \((?P<xmax>[0-9]+), (?P<ymax>[0-9]+)\)'
+CONVERT_TO_PERSON:
 IMAGE_INDEX_TO_IMAGE_PATH: default
+ONLY_PERSON: True
+USE_IMAGE_SET: 

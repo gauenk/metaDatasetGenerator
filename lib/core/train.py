@@ -162,7 +162,7 @@ def filter_roidb(roidb):
 
 def train_net(solver_prototxt, roidb, output_dir,
               pretrained_model=None, solver_state=None, max_iters=40000):
-    """Train a Fast R-CNN network."""
+    """Train *any* object detection network."""
 
     #roidb = filter_roidb(roidb)
     sw = SolverWrapper(solver_prototxt, roidb, output_dir,

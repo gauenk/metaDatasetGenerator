@@ -1,0 +1,25 @@
+EXP_DATASET: cam2
+PATH_ROOT: /home/gauenk/Documents/data/cam2/CAM2devkit/CAM2_2017/
+PATH_TO_IMAGES: /home/gauenk/Documents/data/cam2/CAM2devkit/CAM2_2017/JPGImages/
+PATH_TO_ANNOTATIONS: /home/gauenk/Documents/data/cam2/CAM2devkit/CAM2_2017/Annotations/
+PATH_TO_IMAGESETS: /home/gauenk/Documents/data/cam2/CAM2devkit/CAM2_2017/ImageSets/Main/
+PATH_TO_RESULTS: /home/gauenk/Documents/data/cam2/CAM2devkit/results
+CLASSES: /home/gauenk/Documents/data/cam2/CAM2devkit/CAM2_2017/classes.txt
+COMPID: meaninglessPrefix
+IMAGE_TYPE: .jpg
+ANNOTATION_TYPE: xml
+PARSE_ANNOTATION_REGEX:
+CONVERT_TO_PERSON:
+- person f
+- person l
+- person b
+- person r
+- person back
+- person rs
+- person ls
+- person partial
+- person bending over
+- person sitting down
+- person hard
+IMAGE_INDEX_TO_IMAGE_PATH: default
+ONLY_PERSON: True

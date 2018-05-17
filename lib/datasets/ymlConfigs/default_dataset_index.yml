@@ -1,0 +1,12 @@
+coco: 1
+pascal_voc: 2
+pascal_voc_2007: 2
+pascal_voc_2012: 2
+imagenet: 3
+cam2: 4
+inria: 5
+caltech: 6
+sun: 7
+kitti: 8
+
+
