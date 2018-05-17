@@ -17,7 +17,7 @@ EXTRA_ARGS_SLUG=${EXTRA_ARGS// /_}
 if [ "$GPU_ID" == "" ] || [ "$DATASET" == "" ] || [ "$IMAGE_SET" == "" ]
 then
     echo "Usage: ./experiments/scripts/verifyDatasetLoad.sh GPUID DATASET IMAGESET"
-    echo "example: ./experiments/scripts/verifyDatasetLoad.sh 0 caltech train"
+    echo "example: ./experiments/scripts/verifyDatasetLoad.sh 0 pascal_voc_2007 train"
     exit 1
 fi
 
