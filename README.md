@@ -58,7 +58,7 @@ It may complain the filepath for pascal_voc_2007 is set incorrectly. You may nee
 __C.PATH_YMLDATASETS = "helps"
 ```
 
-## Summary
+## Overview
 
 This repo generates information about the paper written by the CAM2 team in 2018. The repo offers functionality for:
 
@@ -106,3 +106,25 @@ What questions do we aim to answer?
 
 -> create modules (a folder in `./lib`) to compute testing information about a given ".caffemodel" file
 
+## Usage
+
+
+The first requirement is to generate the mixture datasets in the `./lib/datasets/mixtureDatasets/` folder. This can be done by running the `genMixData.sh` script. For example:
+```
+Usage: ./experiments/scripts/genMixData.sh START_INDEX END_INDEX REPEAT
+```
+
+An example useage is:
+```Shell
+./experiments/scripts/genMixData.sh 2 3 4
+```
+
+The "START" and "END" "_INDEX" indicates the range for how many datasets are mixed together. For example, if the numbers were "2" and "4" the script would generate all mixtures of 2, 3, and 4 datasets.
+
+## Misc
+
+To see information about an imdb such as number of annotations, number of images, and approx. memory usage use the script:
+
+```Shell
+experiments/scripts/imdbReport.sh pascal_voc_2007 train
+```
