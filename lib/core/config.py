@@ -57,8 +57,8 @@ __C.DATASETS.ONLY_PERSON = False
 #
 
 __C.TRAIN = edict()
-#__C.PATH_YMLDATASETS = "helps"
-__C.PATH_YMLDATASETS = "gauenk"
+__C.PATH_YMLDATASETS = "helps"
+#__C.PATH_YMLDATASETS = "gauenk"
 __C.PATH_MIXTURE_DATASETS = "./lib/datasets/mixtureDatasets/"
 
 # Scales to use during training (can list multiple scales)
@@ -238,6 +238,9 @@ __C.EXP_DIR = "default"
 
 # Default GPU device id
 __C.GPU_ID = 0
+
+# path to save information for imdb report
+__C.IMDB_REPORT_OUTPUT_PATH = "output/imdbReport/"
 
 # The mapping from image coordinates to feature map coordinates might cause
 # some boxes that are distinct in image space to become identical in feature
