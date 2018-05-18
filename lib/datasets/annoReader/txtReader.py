@@ -19,7 +19,7 @@ class txtReader(object):
 
     def __init__(self, annoPath, classes , datasetName, setID,
                  bboxOffset = 0,useDiff = True, cleanRegex = None,
-                 convertToPerson = None):
+                 convertToPerson = None, convertIdToCls = None):
         """
         __init__ function for annoReader [annotationReader]
 
@@ -31,6 +31,7 @@ class txtReader(object):
         self.num_classes = len(classes)
         self.useDiff = useDiff
         self._classToIndex = self._create_classToIndex(classes)
+        self._convertIdToCls = convertIdToCls
         self._convertToPerson = convertToPerson
         if cleanRegex is not None: self._cleanRegex = cleanRegex # used for INRIA
         else:
@@ -111,6 +112,7 @@ class txtReader(object):
     def _find_cls(self,mgd):
         if "cls" in mgd.keys():
             cls = mgd['cls'].lower().strip()
+
             if re.match(r"[0-9]+",cls) is None:
                 cls = self.mangle_cls(cls)
             else:
@@ -123,6 +125,7 @@ class txtReader(object):
         return cls
 
     def mangle_cls(self,cls):
+        if self._convertIdToCls is not None: cls = self._convertIdToCls[cls]
         # check if we need to convert annotation class to "person"
         if self._convertToPerson is not None and cls in self._convertToPerson:
             cls = self._classToIndex["person"]

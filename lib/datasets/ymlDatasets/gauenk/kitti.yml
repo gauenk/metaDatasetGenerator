@@ -14,4 +14,5 @@ CONVERT_TO_PERSON:
 - person_sitting
 - cyclist
 IMAGE_INDEX_TO_IMAGE_PATH: default
+USE_IMAGE_SET: False
 ONLY_PERSON: True

@@ -216,7 +216,8 @@ class RepoImdb(imdb):
         Return the database of ground-truth regions of interest.
         This function loads/saves from/to a cache file to speed up future calls.
         """
-        cache_file = osp.join(self.cache_path, self.name + '_gt_roidb.pkl')
+        cache_file = osp.join(self.cache_path,\
+                              '{}_{}_gt_roidb.pkl'.format(self.name,self._image_set))
         print(cache_file)
         if osp.exists(cache_file):
             with open(cache_file, 'rb') as fid:

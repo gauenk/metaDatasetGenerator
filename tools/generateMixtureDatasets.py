@@ -21,11 +21,11 @@ import numpy as np
 import sys,os,pickle
 import os.path as osp
 
-TESTING = True
+TESTING = False
 #imdb_names = {"coco":1,"pacsal_voc":2,"imagenet":3,"caltech":4,"cam2":5,"inria":6,"sun":7,"kitti":8}
-imdb_names = {"pascal_voc-medium-default":2,"caltech-medium-default":4}
+imdb_names = {"pascal_voc-train-default":2,"caltech-medium-default":4,"coco-minival-default":1,"cam2-train-default":5,"sun-train-default":7,"kitti-train-default":8,"imagenet-train2014-default":3,"inria-train-default":6}
 indexToImdbName = ['coco','pascal_voc','imagenet','cam2','caltech','kitti','sun','inria']
-datasetSizes = [10,50,100,500]
+datasetSizes = [10,50,100,250,500,1000]
 loadedRoidbs = {}
 loadedImdbs = {}
 
@@ -155,11 +155,11 @@ if __name__ == '__main__':
         sys.exit()
 
     loadDatasetsToMemory()
-                              
-    testingListFromId = ['01010101']
+    
+    
     for setNum in range(range_start,range_end+1):
         # for each of the "ranges" we want
-        for setID in testingListFromId:#createListFromId(setNum):
+        for setID in createListFromId(setNum):
             # create setID folder
             path_setID = createPathSetID(setID)
             if osp.isdir(path_setID) == False:
@@ -169,17 +169,20 @@ if __name__ == '__main__':
                 path_repeat = createPathRepeat(setID,str(r))
                 if osp.isdir(path_repeat) == False:
                     os.makedirs(path_repeat)
+                prevSize = 0
                 for size in datasetSizes:
                     # create a file for each dataset size
                     idlist_filename = createFilenameID(setID,str(r),str(size))
                     repo_roidbs = createMixtureDataset(setID,size)
-                    if TESTING and len(repo_roidbs) == 0:
-                        continue
-
+                    assert len(repo_roidbs) == setID.count('1')
                     # write pickle file of the roidb
-                    allRoidb = combined_roidb(repo_roidbs.keys())
-                    with open(idlist_filename + ".pkl","wb") as f:
-                        pickle.dump(allRoidb,f)
+                    allRoidb = combined_roidb(repo_roidbs.values())
+                    pklName = idlist_filename + ".pkl"
+                    if osp.exists(pklName) is False:
+                        with open(idlist_filename + ".pkl","wb") as f:
+                            pickle.dump(allRoidb[prevSize:size],f)
+                    else:
+                        print("{} exists".format(pklName))
 
                     # OLD: write just the image id's to file
                     f = open(idlist_filename + ".txt","w+")
@@ -192,3 +195,4 @@ if __name__ == '__main__':
 
                     print(idlist_filename)
                     f.close()
+                    prevSize = size

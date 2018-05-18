@@ -43,6 +43,7 @@ def _filter_crowd_proposals(roidb, crowd_thresh):
         roidb[ix]['gt_overlaps'] = scipy.sparse.csr_matrix(overlaps)
     return roidb
 
+
 class coco(imdb):
     def __init__(self, datasetName, imageSet, configName):
         imdb.__init__(self, datasetName)
@@ -61,7 +62,10 @@ class coco(imdb):
         # load COCO API, classes, class <-> id mappings
         self._COCO = COCO(self._get_ann_file())
         cats = self._COCO.loadCats(self._COCO.getCatIds())
-        self._classes = tuple(['__background__'] + [c['name'] for c in cats])
+        # TODO: better way of loading just person
+        #self._classes = tuple(['__background__'] + [c['name'] for c in cats])
+        self._classes = tuple(['__background__'] + [c['name'] for c in cats[:1]])
+
         self._class_to_ind = dict(zip(self.classes, xrange(self.num_classes)))
         self._class_to_coco_cat_id = dict(zip([c['name'] for c in cats],
                                               self._COCO.getCatIds()))
@@ -229,7 +233,9 @@ class coco(imdb):
         Return the database of ground-truth regions of interest.
         This function loads/saves from/to a cache file to speed up future calls.
         """
-        cache_file = osp.join(self.cache_path, self.name + '_gt_roidb.pkl')
+        cache_file = osp.join(self.cache_path,\
+                              '{}_{}_gt_roidb.pkl'.format(self.name,self._image_set))
+
         if osp.exists(cache_file):
             with open(cache_file, 'rb') as fid:
                 roidb = cPickle.load(fid)
@@ -263,7 +269,8 @@ class coco(imdb):
             y1 = np.max((0, obj['bbox'][1]))
             x2 = np.min((width - 1, x1 + np.max((0, obj['bbox'][2] - 1))))
             y2 = np.min((height - 1, y1 + np.max((0, obj['bbox'][3] - 1))))
-            if obj['area'] > 0 and x2 >= x1 and y2 >= y1:
+            ## TODO: better way to mask out "not person"
+            if obj['area'] > 0 and x2 >= x1 and y2 >= y1 and obj['category_id'] == 1:
                 obj['clean_bbox'] = [x1, y1, x2, y2]
                 valid_objs.append(obj)
         objs = valid_objs

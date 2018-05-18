@@ -99,15 +99,16 @@ class xmlReader(object):
 
     def _find_cls(self,obj):
         cls = obj.find('name').text.lower().strip()
-        if self._convertIdToCls is not None:
-            cls = self._convertIdToCls[cls]
+        #TODO: sun. "person model" is not accounted for (missing 17 annos)
+        # find out what is happening to them
 
-        if self._convertToPerson is not None:
-            if cls in self._convertToPerson:
-                cls = self._classToIndex["person"]
+        if self._convertIdToCls is not None: cls = self._convertIdToCls[cls]
+        # check if we need to convert annotation class to "person"
+        if self._convertToPerson is not None and cls in self._convertToPerson:
+            cls = self._classToIndex["person"]
         # remove all not in classToIndex
-        if cls not in self._classToIndex.keys():
-            return -1
-        else:
+        elif cls in self._classToIndex.keys():
             cls = self._classToIndex[cls]
+        else:
+            cls = -1
         return cls

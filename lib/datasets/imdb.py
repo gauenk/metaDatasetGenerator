@@ -57,17 +57,17 @@ class imdb(object):
         self.roidb_handler = method
 
     def _get_roidb_index_at_size(self,gsize):
-        print("roidb_size",self.roidbSize)
+        #print(self.name)
         for idx,rsize in enumerate(self.roidbSize):
-            print("idx,rsize,gsize",idx,rsize,gsize)
+            #print("idx,rsize,gsize",idx,rsize,gsize)
             if rsize >= gsize: return idx
         return -1
 
     def get_roidb_at_size(self,gsize):
-        print(imdb.name)
         rindex = self._get_roidb_index_at_size(gsize)
         if rindex == -1:
-            print("\n\nWARNING: imdb [{:s}] may be too small\n\n".format(self.name))
+            print("\n\nWARNING: imdb [{:s}] may be too small @ {}\n\n".\
+                  format(self.name,self.roidbSize[rindex]))
         return self.roidb[:rindex],self.roidbSize[rindex]
 
     def roidb_num_bboxes_at(self,index):

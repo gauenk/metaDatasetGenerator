@@ -39,3 +39,4 @@ def filter_small_boxes(boxes, min_size):
     h = boxes[:, 3] - boxes[:, 1]
     keep = np.where((w >= min_size) & (h > min_size))[0]
     return keep
+
