@@ -22,6 +22,7 @@ To install dependancies for caffe run:
 
 ```Shell
 pip2 install --upgrade pip --user
+pip2 install easydict --user
 cd /opt/caffe-fast-rcnn/python
 cat requirements.txt | xargs pip2 install --user
 ```
@@ -39,6 +40,7 @@ username@computerName:$ python
 Then run the following github information:
 
 ```Shell
+cd ~/
 git clone https://github.com/gauenk/metaDatasetGenerator.git
 cd ./metaDatasetGenerator/lib
 make
