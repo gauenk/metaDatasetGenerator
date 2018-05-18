@@ -48,7 +48,7 @@ cd ../
 To verify the complete installation of the github repo type:
 
 ```Shell
-./experiments/scripts/verifyDatasetLoad.sh 0 pascal_voc_2007 train
+./experiments/scripts/imdbReport.sh pascal_voc_2007 train
 ```
 
 
