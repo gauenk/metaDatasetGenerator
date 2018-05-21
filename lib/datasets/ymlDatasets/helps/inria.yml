@@ -1,0 +1,13 @@
+EXP_DATASET: inria
+PATH_ROOT: /srv/sdb1/image_team/inria/INRIAdevkit/INRIA2005/
+PATH_TO_IMAGES: /srv/sdb1/image_team/inria/INRIAdevkit/INRIA2005/JPEGImages/
+PATH_TO_ANNOTATIONS: /srv/sdb1/image_team/inria/INRIAdevkit/INRIA2005/Annotations/
+PATH_TO_IMAGESETS: /srv/sdb1/image_team/inria/INRIAdevkit/INRIA2005/ImageSets/Main/
+PATH_TO_RESULTS: /srv/sdb1/image_team/inria/INRIAdevkit/INRIA2005/results
+CLASSES: /srv/sdb1/image_team/inria/INRIAdevkit/INRIA2005/classes.txt
+COMPID: meaninglessPrefix
+IMAGE_TYPE: .jpg
+ANNOTATION_TYPE: txt
+PARSE_ANNOTATION_REGEX: '^Bounding.* : \((?P<xmin>[0-9]+), (?P<ymin>[0-9]+)\) - \((?P<xmax>[0-9]+), (?P<ymax>[0-9]+)\)'
+IMAGE_INDEX_TO_IMAGE_PATH: default
+ONLY_PERSON: True

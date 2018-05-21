@@ -1,0 +1,18 @@
+EXP_DATASET: kitti
+PATH_ROOT: /srv/sdb1/image_team/kitti/KITTIdevkit/KITTI2013/
+PATH_TO_IMAGES: /srv/sdb1/image_team/kitti/KITTIdevkit/KITTI2013/image_2/
+PATH_TO_ANNOTATIONS: /srv/sdb1/image_team/kitti/KITTIdevkit/KITTI2013/label_2/
+PATH_TO_IMAGESETS: /srv/sdb1/image_team/kitti/KITTIdevkit/KITTI2013/ImageSets/Main/
+PATH_TO_RESULTS: /srv/sdb1/image_team/kitti/KITTIdevkit/results
+CLASSES: /srv/sdb1/image_team/kitti/KITTIdevkit/KITTI2013/classes.txt
+COMPID: meaninglessPrefix
+IMAGE_TYPE: .png
+ANNOTATION_TYPE: txt
+PARSE_ANNOTATION_REGEX: '(?P<cls>^[A-Za-z]+) [0-9]?\.[0-9]+ [0-9] ?[+-]?[0-9]+\.[0-9]+ (?P<xmin>[0-9]+\.[0-9]+) (?P<ymin>[0-9]+\.[0-9]+) (?P<xmax>[0-9]+\.[0-9]+) (?P<ymax>[0-9]+\.[0-9]+)'
+CONVERT_TO_PERSON:
+- pedestrian
+- person_sitting
+- cyclist
+IMAGE_INDEX_TO_IMAGE_PATH: default
+USE_IMAGE_SET: False
+ONLY_PERSON: True
