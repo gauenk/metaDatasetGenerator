@@ -1,35 +1,63 @@
-def load_groundTruth(cachedir,imagesetfile,annopath):
-   # first load gt
-   if not osp.isdir(cachedir):
-       os.mkdir(cachedir)
-   cachefile = osp.join(cachedir, 'annots.pkl')
-   # read list of images
-   with open(imagesetfile, 'r') as f:
-       lines = f.readlines()
-   imagenames = [x.strip() for x in lines]
 
-   if not osp.isfile(cachefile):
-       # load annots
-       recs = {}
-       for i, imagename in enumerate(imagenames):
+import os.path as osp
+import cPickle
 
-           recs[imagename] = parse_rec(annopath.format(imagename))
-           if i % 100 == 0:
-               print 'Reading annotation for {:d}/{:d}'.format(
-                   i + 1, len(imagenames))
-       # save
-       print 'Saving cached annotations to {:s}'.format(cachefile)
-       with open(cachefile, 'w') as f:
-           cPickle.dump(recs, f)
-   else:
-       # load
-       with open(cachefile, 'r') as f:
-           recs = cPickle.load(f)
+import xml.etree.ElementTree as ET
+import numpy as np
 
-   return imagenames, recs
+def parse_rec(filename):
+    """ Parse a PASCAL VOC xml file """
+    tree = ET.parse(filename+".xml")
+    objects = []
+    for obj in tree.findall('object'):
+        obj_struct = {}
+        obj_struct['anno'] = filename
+        obj_struct['name'] = obj.find('name').text
+        obj_struct['pose'] = obj.find('pose').text
+        obj_struct['truncated'] = int(obj.find('truncated').text)
+        obj_struct['difficult'] = int(obj.find('difficult').text)
+        bbox = obj.find('bndbox')
+        obj_struct['bbox'] = [int(bbox.find('xmin').text),
+                              int(bbox.find('ymin').text),
+                              int(bbox.find('xmax').text),
+                              int(bbox.find('ymax').text)]
+        objects.append(obj_struct)
+
+    return objects
+
+def load_groundTruth(cachedir,imagesetfile,annopath,annoReader):
+    # first load gt
+    if not osp.isdir(cachedir):
+        os.mkdir(cachedir)
+    cachefile = osp.join(cachedir, 'annots.pkl')
+
+    # read list of images
+    with open(imagesetfile, 'r') as f:
+        lines = f.readlines()
+    imagenames = [x.strip() for x in lines]
+
+    if not osp.isfile(cachefile):
+        # load annots
+        recs = {}
+        for i, imagename in enumerate(imagenames):
+            recs[imagename] = parse_rec(annopath.format(imagename))
+            if i % 100 == 0:
+                print 'Reading annotation for {:d}/{:d}'.format(
+                    i + 1, len(imagenames))
+        # save
+        print 'Saving cached annotations to {:s}'.format(cachefile)
+        with open(cachefile, 'w') as f:
+            cPickle.dump(recs, f)
+    else:
+        # load
+        print("cachefile @ {:s}".format(cachefile))
+        with open(cachefile, 'r') as f:
+            recs = cPickle.load(f)
+
+    return imagenames, recs
 
 
-def load_groundTruth(cachedir,imagesetfile,annopath):
+def extractClassGroundTruth(imagenames,recs,classname):
     # extract gt objects for this class
     class_recs = {}
     npos = 0
@@ -42,7 +70,7 @@ def load_groundTruth(cachedir,imagesetfile,annopath):
         class_recs[imagename] = {'bbox': bbox,
                                  'difficult': difficult,
                                  'det': det}
-    return class_recs
+    return class_recs,npos
 
 def loadModelDets(detpath,classname):
     # read the file with the model detections
@@ -65,9 +93,9 @@ def loadModelDets(detpath,classname):
     BB = BB[sorted_ind, :]
     image_ids = [image_ids[x] for x in sorted_ind]
 
-    return image_ids, confidence, BB
+    return image_ids, BB
 
-def compute_TP_FP(ovthresh,image_ids,confidence,BB,class_recs):
+def compute_TP_FP(ovthresh,image_ids,BB,class_recs):
     nd = len(image_ids)
     tp = np.zeros((nd,len(ovthresh)))
     fp = np.zeros((nd,len(ovthresh)))
@@ -76,7 +104,7 @@ def compute_TP_FP(ovthresh,image_ids,confidence,BB,class_recs):
         bb = BB[d, :].astype(float)
         ovmax = -np.inf
         BBGT = R['bbox'].astype(float)
-
+        
         if BBGT.size > 0:
             # compute overlaps
             # intersection
@@ -119,6 +147,8 @@ def compute_TP_FP(ovthresh,image_ids,confidence,BB,class_recs):
             R['det'][jmax] = 1
 
 
+    return tp, fp
+
 def compute_REC_PREC_AP(tp,fp,npos,ovthresh,classname,use07=False,viz=False):
     rec = np.zeros((len(fp),len(ovthresh)))
     prec = np.zeros((len(fp),len(ovthresh)))
@@ -132,7 +162,8 @@ def compute_REC_PREC_AP(tp,fp,npos,ovthresh,classname,use07=False,viz=False):
         # ground truth
         prec[:,idx] = _tp / np.maximum(_tp + _fp, np.finfo(np.float64).eps)
         #ap = bbox_ap(rec, prec, use_07_metric)
-        ap[idx] = bbox_ap(rec[:,idx], prec[:,idx], classname, use07 = use07, viz=viz)
+        ap[idx] = bbox_ap(rec[:,idx], prec[:,idx], classname, use_07_metric = use07, viz=viz)
+    return rec, prec, ap
 
 def bbox_ap(rec, prec, clsnm,use_07_metric=False,viz=False):
     """ ap = bbox_ap(rec, prec, [use_07_metric])
@@ -185,4 +216,5 @@ def bbox_ap(rec, prec, clsnm,use_07_metric=False,viz=False):
             plt.savefig(clsnm + "_apPlt.png")        
 
     return ap
+
 

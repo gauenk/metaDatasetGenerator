@@ -22,6 +22,7 @@ To install dependancies for caffe run:
 
 ```Shell
 pip2 install --upgrade pip --user
+pip2 install easydict --user
 cd /opt/caffe-fast-rcnn/python
 cat requirements.txt | xargs pip2 install --user
 ```
@@ -39,6 +40,7 @@ username@computerName:$ python
 Then run the following github information:
 
 ```Shell
+cd ~/
 git clone https://github.com/gauenk/metaDatasetGenerator.git
 cd ./metaDatasetGenerator/lib
 make
@@ -48,15 +50,22 @@ cd ../
 To verify the complete installation of the github repo type:
 
 ```Shell
-./experiments/scripts/verifyDatasetLoad.sh 0 pascal_voc_2007 train
+./experiments/scripts/imdbReport.sh pascal_voc_2007 train
 ```
-
 
 It may complain the filepath for pascal_voc_2007 is set incorrectly. You may need to modify the config file to tell to load `ymlDatasets/helps/` and not `ymlDatasets/username`. This is set at the top of `./lib/core/config.py` (around line #35). Make sure it reads:
 
 ```Python
 __C.PATH_YMLDATASETS = "helps"
 ```
+
+### Part 3: Adding the COCO dataset
+
+```Shell
+mkdir data
+ln -s /srv/sdb1/image_team/coco ./data/
+```
+
 
 ## Overview
 

@@ -239,6 +239,9 @@ __C.EXP_DIR = "default"
 # Default GPU device id
 __C.GPU_ID = 0
 
+# path to save information for imdb report
+__C.IMDB_REPORT_OUTPUT_PATH = "output/imdbReport/"
+
 # The mapping from image coordinates to feature map coordinates might cause
 # some boxes that are distinct in image space to become identical in feature
 # coordinates. If DEDUP_BOXES > 0, then DEDUP_BOXES is used as the scale factor

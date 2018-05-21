@@ -3,32 +3,40 @@
 # Written by Kent Gauen
 # --------------------------------------------------------
 
-import os
+import os,sys
 import os.path as osp
 import PIL
 import numpy as np
 import scipy.sparse
 from core.config import cfg
 from easydict import EasyDict as edict
+from utils import *
 
 class bboxEvaluator(object):
     """Image database."""
 
-    def __init__(self, datasetName, classes, compID, salt, cacheDir, imageSetPath):
+    def __init__(self, datasetName, classes, compID, salt, cacheDir,
+                 imageSetPath, imageIndex, annoPath,annoReader):
         self._datasetName = datasetName
         self._classes = classes
         self._comp_id = compID
         self._salt = salt
         self._cachedir = cacheDir
+        self.image_index = imageIndex
+        self._annoPath = annoPath
+        self._annoReader = annoReader
         self._imageSetPath = imageSetPath
         self._imageSet = imageSetPath.split("/")[-1].split(".")[0] # "...asdf/imageSet.txt"
 
     def evaluate_detections(self, all_boxes, output_dir):
+        if self._classes != num_outputs:
+            raise ValueError("ERROR: the classes and output size don't match!")
+        self._pathResults = output_dir
         self._write_results_file(all_boxes)
         self._do_python_eval(output_dir)
 
     def _write_results_file(self, all_boxes):
-        for cls_ind, cls in enumerate(self.classes):
+        for cls_ind, cls in enumerate(self._classes):
             count = 0
             skip_count = 0
             det_count = 0
@@ -49,10 +57,10 @@ class bboxEvaluator(object):
                                        dets[k, 2] + 1, dets[k, 3] + 1))
 
     def _do_python_eval(self, output_dir = 'output'):
-        annopath = self._annoPath + "{:s}.xml"
+        annopath = self._annoPath + "/{:s}"
         aps = []
         # The PASCAL VOC metric changed in 2010
-        use_07_metric = True if int(self._year) < 2010 else False
+        use_07_metric = False
         print('VOC07 metric? ' + ('Yes' if use_07_metric else 'No'))
         if not osp.isdir(output_dir):
             os.mkdir(output_dir)
@@ -60,12 +68,12 @@ class bboxEvaluator(object):
             if cls == '__background__':
                 continue
             detfile = self._get_results_file_template().format(cls)
-            rec, prec, ap, ovthresh = bbox_eval(
+            rec, prec, ap, ovthresh = self.bbox_eval(
                 detfile, annopath, self._imageSetPath, cls, self._cachedir, ovthresh=0.5,
                 use_07_metric=use_07_metric)
             aps += [ap]
         aps = np.array(aps)
-        results_fd = open("./results_{}.txt".format(self._datasetName + "_" + self._salt),"w")
+        results_fd = open("./results_{}.txt".format(self._datasetName + self._salt),"w")
         for kdx in range(len(ovthresh)):
             #print('{0:.3f}@{1:.2f}'.format(ap[kdx],ovthresh[kdx]))
             print('Mean AP = {:.4f} @ {:.2f}'.format(np.mean(aps[:,kdx]),ovthresh[kdx]))
@@ -142,15 +150,17 @@ class bboxEvaluator(object):
 
 
         # first load gt
-        imagenames, recs = load_groundTruth(cachedir,imagesetfile,annopath)
+        imagenames, recs = load_groundTruth(cachedir,imagesetfile,annopath,self._annoReader)
         # extract gt objects for this class
-        class_recs = extractClassGroundTruth(imagenames,recs,classname)
+        class_recs, npos = extractClassGroundTruth(imagenames,recs,classname)
         # read dets from model
-        image_ids, confidence, BB = loadModelDets(detpath,classname)
+        image_ids, BB = loadModelDets(detpath,classname)
+
+        print(len(image_ids),len(BB))
 
         nd = len(image_ids)
         ovthresh = [0.5,0.75,0.95]
-        tp, fp = compute_TP_FP(ovthresh,image_ids,confidence,BB,class_recs)
+        tp, fp = compute_TP_FP(ovthresh,image_ids,BB,class_recs)
         rec, prec, ap = compute_REC_PREC_AP(tp,fp,npos,ovthresh,classname,False)
 
         #print(fp,tp,rec,prec,ap,npos)

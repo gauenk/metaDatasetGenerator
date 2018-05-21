@@ -46,6 +46,7 @@ class RepoImdb(imdb):
         self._set_classes(cfgData['CLASSES'],cfgData['CONVERT_TO_PERSON'],cfgData['ONLY_PERSON'])
         self._num_classes = len(self._classes)
         self._path_root = cfgData['PATH_ROOT']
+        self._compID = cfgData['COMPID']
 
         self._path_to_imageSets = cfgData['PATH_TO_IMAGESETS']
         if not self._checkImageSet():
@@ -55,13 +56,13 @@ class RepoImdb(imdb):
 
         self._set_id_to_cls()
 
-        self.evaluator = self._createEvaluator(cfgData['COMPID'])
         self.annoReader = self._createAnnoReader(cfgData['PATH_TO_ANNOTATIONS'],
                                                  cfgData['ANNOTATION_TYPE'],
                                                  cfgData['PARSE_ANNOTATION_REGEX'],
                                                  cfgData['CONVERT_TO_PERSON'],
                                                  cfgData['USE_IMAGE_SET'],
         )
+        self.evaluator = self._createEvaluator(cfgData['PATH_TO_ANNOTATIONS'])
         self.imgReader = self._createImgReader(cfgData['PATH_TO_IMAGES'],
                                                cfgData['IMAGE_TYPE'],
                                                cfgData['USE_IMAGE_SET'],
@@ -153,7 +154,7 @@ class RepoImdb(imdb):
             path = osp.join(path,self._image_set)
         return rawReader(path,imgType)
 
-    def _createEvaluator(self,compID):
+    def _createEvaluator(self,annoPath):
         if self.config['use_salt']: self._salt = str(uuid.uuid4())
         else: self._salt = None
         cachedir = os.path.join(self._path_root,\
@@ -162,8 +163,10 @@ class RepoImdb(imdb):
         if not osp.isdir(cachedir):
             os.makedirs(cachedir)
         return bboxEvaluator(self._datasetName,self.classes,
-                             compID, "_" + self._salt,
-                             cachedir, self._imageSetPath)
+                             self._compID, "_" + self._salt,
+                             cachedir, self._imageSetPath,
+                             self._image_index,annoPath,
+                             self.annoReader)
 
     def _update_image_index(self,newImageIndex):
         self._image_index = newImageIndex
@@ -203,13 +206,19 @@ class RepoImdb(imdb):
 
         all_boxes[class][image] = [] or np.array of shape #dets x 5
         """
-        self.evaluator.evaluate_detections(all_boxes)
+        self.evaluator.evaluate_detections(all_boxes,output_dir)
         if self.config['cleanup']:
             for cls in self._classes:
                 if cls == '__background__':
                     continue
-                filename = self._get_voc_results_file_template().format(cls)
+                filename = self._get_results_file_template().format(cls)
                 os.remove(filename)
+
+    def _get_results_file_template(self):
+        # example: VOCdevkit/results/VOC2007/Main/<comp_id>_det_test_aeroplane.txt
+        filename = self._compID + self._salt + '_det_' + self._image_set + '_{:s}.txt'
+        path = osp.join(self._pathResults,filename)
+        return path
 
     def gt_roidb(self):
         """
