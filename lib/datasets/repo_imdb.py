@@ -3,7 +3,7 @@
 # Written by Kent Gauen
 # --------------------------------------------------------
 
-import os
+import os,glob
 import os.path as osp
 import PIL
 import pickle
