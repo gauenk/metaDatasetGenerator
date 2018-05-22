@@ -21,13 +21,20 @@ class Corg(caffe.Layer):
         """Setup the RoIDataLayer."""
 
         # parse the layer parameter string, which must be valid YAML
-        layer_params = yaml.load(self.param_str_)
+        layer_params = yaml.load(self.param_str)
         
 
         self._norm = np.array(layer_params['norm'])
+        if 'ssd' in layer_params.keys():
+            self._ssd = layer_params['norm']
+        else:
+            self._ssd = False
+        print("ssd",self._ssd)
         self._prob_indicies = np.array(layer_params['indicies'])
         self._nclasses = layer_params.get('nclasses', len(self._prob_indicies))
         self._bbox_indicies = np.empty(len(self._prob_indicies)*4,dtype=np.int)
+        self._prob_dict = \
+            dict(zip(self._prob_indicies,range(len(self._prob_indicies))))
         
         # make the bbox indicies expand to capture 4 indicies
         #print(self._prob_indicies)
@@ -51,10 +58,41 @@ class Corg(caffe.Layer):
 
     def forward(self, bottom, top):
         """Get blobs and copy them into this layer's top blob vector."""
+        if self._ssd:
+            self.forward_ssd(bottom,top)
+        else:
+            self.forward_faster_rcnn(bottom,top)
+
+    def backward(self, top, propagate_down, bottom):
+        """This layer does not propagate gradients."""
+        pass
+
+    def reshape(self, bottom, top):
+        """Reshaping happens during the call to forward."""
+        pass
+
+    def forward_ssd(self,bottom,top):
+        """
+        forward_ssd
+
+        a forward pass for ssd model
+    
+        pick [0,0,*] because the first 
+        dim is 1 (setting), and batch size is 1
+
+        """
+        rois = bottom[0].data
+        classes = rois[0,0,:,1]
+        for idx,cls in enumerate(classes):
+            classes[idx] = self._prob_dict[cls]
+        rois[0,0,:,1] = classes
+        top[0].reshape(*rois.shape)
+        top[0].data[:,:,:,:] = rois
+
+    def forward_faster_rcnn(self,bottom,top):
 
         probs = bottom[0].data
         box_preds = bottom[1].data
-
 
         blob_box = box_preds[:,self._bbox_indicies]
         blob_probs = probs[:,self._prob_indicies]
@@ -67,13 +105,3 @@ class Corg(caffe.Layer):
 
         top[1].reshape(blob_box.shape[0],self._nclasses*4)
         top[1].data[0:blob_box.shape[0],0:blob_box.shape[1]] = blob_box
-
-
-    def backward(self, top, propagate_down, bottom):
-        """This layer does not propagate gradients."""
-        pass
-
-    def reshape(self, bottom, top):
-        """Reshaping happens during the call to forward."""
-        pass
-

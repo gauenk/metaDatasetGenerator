@@ -19,9 +19,7 @@ import cPickle
 from utils.blob import im_list_to_blob
 import os
 
-SSD_img_size= 300
-
-def _get_image_blob(im,SSD=False):
+def _get_image_blob(im):
     """Converts an image into a network input.
 
     Arguments:
@@ -50,13 +48,13 @@ def _get_image_blob(im,SSD=False):
             im_scale_x = float(cfg.TEST.MAX_SIZE) / float(im_size_max)
             im_scale_y = float(cfg.TEST.MAX_SIZE) / float(im_size_max)
 
-        if SSD == True:
-            im_scale_x = float(SSD_img_size) / float(im_shape[1])
-            im_scale_y = float(SSD_img_size) / float(im_shape[0])
+        if cfg.SSD == True:
+            im_scale_x = float(cfg.SSD_img_size) / float(im_shape[1])
+            im_scale_y = float(cfg.SSD_img_size) / float(im_shape[0])
 
         im = cv2.resize(im_orig, None, None, fx=im_scale_x, fy=im_scale_y,
                         interpolation=cv2.INTER_LINEAR)
-        if SSD == True:
+        if cfg.SSD == True:
             im_scale_factors.append([im_scale_x,im_scale_y])
         else:
             im_scale_factors.append(im_scale_x)
@@ -109,15 +107,15 @@ def _project_im_rois(im_rois, scales):
 
     return rois, levels
 
-def _get_blobs(im, rois,SSD=False):
+def _get_blobs(im, rois):
     """Convert an image and RoIs within that image into network inputs."""
     blobs = {'data' : None, 'rois' : None}
-    blobs['data'], im_scale_factors = _get_image_blob(im,SSD=SSD)
-    if not cfg.TEST.HAS_RPN:
+    blobs['data'], im_scale_factors = _get_image_blob(im)
+    if not cfg.TEST.OBJ_DET.HAS_RPN:
         blobs['rois'] = _get_rois_blob(rois, im_scale_factors)
     return blobs, im_scale_factors
 
-def im_detect(net, im, boxes=None,SSD=False):
+def im_detect(net, im, boxes=None):
     """Detect object classes in an image given object proposals.
 
     Arguments:
@@ -130,78 +128,78 @@ def im_detect(net, im, boxes=None,SSD=False):
             background as object category 0)
         boxes (ndarray): R x (4*K) array of predicted bounding boxes
     """
-    blobs, im_scales = _get_blobs(im, boxes,SSD=SSD)
+    blobs, im_scales = _get_blobs(im, boxes)
 
     # When mapping from image ROIs to feature map ROIs, there's some aliasing
     # (some distinct image ROIs get mapped to the same feature ROI).
     # Here, we identify duplicate feature ROIs, so we only compute features
     # on the unique subset.
-    if cfg.DEDUP_BOXES > 0 and not cfg.TEST.HAS_RPN:
+    if cfg.OBJ_DET.DEDUP_BOXES > 0 and not cfg.TEST.OBJ_DET.HAS_RPN:
         v = np.array([1, 1e3, 1e6, 1e9, 1e12])
-        hashes = np.round(blobs['rois'] * cfg.DEDUP_BOXES).dot(v)
+        hashes = np.round(blobs['rois'] * cfg.OBJ_DET.DEDUP_BOXES).dot(v)
         _, index, inv_index = np.unique(hashes, return_index=True,
                                         return_inverse=True)
         blobs['rois'] = blobs['rois'][index, :]
         boxes = boxes[index, :]
 
-    if cfg.TEST.HAS_RPN and SSD is False:
+    if cfg.TEST.OBJ_DET.HAS_RPN and cfg.SSD is False:
         im_blob = blobs['data']
         blobs['im_info'] = np.array(
             [[im_blob.shape[2], im_blob.shape[3], im_scales[0]]],
             dtype=np.float32)
 
     # reshape network inputs
-    if SSD is False:
+    if cfg.SSD is False:
         net.blobs['data'].reshape(*(blobs['data'].shape))
 
-    if cfg.TEST.HAS_RPN and SSD is False:
+    if cfg.TEST.OBJ_DET.HAS_RPN and cfg.SSD is False:
         net.blobs['im_info'].reshape(*(blobs['im_info'].shape))
-    elif SSD is False:
+    elif cfg.SSD is False:
         net.blobs['rois'].reshape(*(blobs['rois'].shape))
 
     # do forward
     forward_kwargs = {'data': blobs['data'].astype(np.float32, copy=False)}
-    if cfg.TEST.HAS_RPN and SSD is False:
+    if cfg.TEST.OBJ_DET.HAS_RPN and cfg.SSD is False:
         forward_kwargs['im_info'] = blobs['im_info'].astype(np.float32, copy=False)
-    elif SSD is False:
+    elif cfg.SSD is False:
         forward_kwargs['rois'] = blobs['rois'].astype(np.float32, copy=False)
 
     blobs_out = net.forward(**forward_kwargs)
 
-    if cfg.TEST.HAS_RPN and SSD is False:
+    if cfg.TEST.OBJ_DET.HAS_RPN and cfg.SSD is False:
         assert len(im_scales) == 1, "Only single-image batch implemented"
         rois = net.blobs['rois'].data.copy()
         # unscale back to raw image space
         boxes = rois[:, 1:5] / im_scales[0]
-    elif SSD is True:
+    elif cfg.SSD is True:
         #assert len(im_scales) == 1, "Only single-image batch implemented"
         rois = net.blobs['detection_out'].data.copy()
         # unscale back to raw image space
-        boxes = rois[0,0,:, 3:] * SSD_img_size
+        boxes = rois[0,0,:, 3:] * cfg.SSD_img_size
         boxes[:,0] = boxes[:,0] / im_scales[0][0]
         boxes[:,1] = boxes[:,1] / im_scales[0][1]
         boxes[:,2] = boxes[:,2] / im_scales[0][0]
         boxes[:,3] = boxes[:,3] / im_scales[0][1]
 
 
-    if cfg.TEST.SVM:
+    if cfg.TEST.OBJ_DET.SVM:
         # use the raw scores before softmax under the assumption they
         # were trained as linear SVMs
         scores = net.blobs['cls_score'].data
-    elif SSD is False:
+    elif cfg.SSD is False:
         # use softmax estimated probabilities
         scores = blobs_out['cls_prob']
-    elif SSD is True:
+    elif cfg.SSD is True:
         scores = np.zeros((len(boxes),201))
         for row in range(len(rois[0,0,:,2])):
             scores[row,rois[0,0,row, 1].astype(int)] = rois[0,0,row, 2]
 
-    if cfg.TEST.BBOX_REG and SSD is False:
+    if cfg.TEST.OBJ_DET.BBOX_REG and cfg.SSD is False:
         # Apply bounding-box regression deltas
         box_deltas = blobs_out['bbox_pred']
         pred_boxes = bbox_transform_inv(boxes, box_deltas)
         pred_boxes = clip_boxes(pred_boxes, im.shape)
-    elif SSD is True:
+    elif cfg.SSD is True:
         box_deltas = np.zeros((len(boxes),804)) ##CHANGE IF DIFF NUM OF CLASS
         pred_boxes = bbox_transform_inv(boxes, box_deltas)
         pred_boxes = clip_boxes(pred_boxes, im.shape)
@@ -209,7 +207,7 @@ def im_detect(net, im, boxes=None,SSD=False):
         # Simply repeat the boxes, once for each class
         pred_boxes = np.tile(boxes, (1, scores.shape[1]))
 
-    if cfg.DEDUP_BOXES > 0 and not cfg.TEST.HAS_RPN:
+    if cfg.OBJ_DET.DEDUP_BOXES > 0 and not cfg.TEST.OBJ_DET.HAS_RPN:
         # Map scores and predictions back to the original set of boxes
         scores = scores[inv_index, :]
         pred_boxes = pred_boxes[inv_index, :]
@@ -257,7 +255,7 @@ def apply_nms(all_boxes, thresh):
             nms_boxes[cls_ind][im_ind] = dets[keep, :].copy()
     return nms_boxes
 
-def test_net(net, imdb, max_per_image=100, thresh=1/80., vis=False,SSD=False):
+def test_net(net, imdb, max_per_image=100, thresh=1/80., vis=False):
     """Test a Fast R-CNN network on an image database."""
     num_images = len(imdb.image_index)
     # all detections are collected into:
@@ -271,12 +269,12 @@ def test_net(net, imdb, max_per_image=100, thresh=1/80., vis=False,SSD=False):
     # timers
     _t = {'im_detect' : Timer(), 'misc' : Timer()}
 
-    if not cfg.TEST.HAS_RPN:
+    if not cfg.TEST.OBJ_DET.HAS_RPN:
         roidb = imdb.roidb
 
     for i in xrange(num_images):
         # filter out any ground truth boxes
-        if cfg.TEST.HAS_RPN:
+        if cfg.TEST.OBJ_DET.HAS_RPN:
             box_proposals = None
         else:
             # The roidb may contain ground-truth rois (for example, if the roidb
@@ -288,7 +286,7 @@ def test_net(net, imdb, max_per_image=100, thresh=1/80., vis=False,SSD=False):
 
         im = cv2.imread(imdb.image_path_at(i))
         _t['im_detect'].tic()
-        scores, boxes = im_detect(net, im, box_proposals,SSD=SSD)
+        scores, boxes = im_detect(net, im, box_proposals)
         _t['im_detect'].toc()
 
         _t['misc'].tic()
@@ -299,7 +297,7 @@ def test_net(net, imdb, max_per_image=100, thresh=1/80., vis=False,SSD=False):
             cls_boxes = boxes[inds, j*4:(j+1)*4]
             cls_dets = np.hstack((cls_boxes, cls_scores[:, np.newaxis])) \
                 .astype(np.float32, copy=False)
-            keep = nms(cls_dets, cfg.TEST.NMS)
+            keep = nms(cls_dets, cfg.TEST.OBJ_DET.NMS)
             cls_dets = cls_dets[keep, :]
             if vis:
                 vis_detections(im, imdb.classes[j], cls_dets)
@@ -321,6 +319,7 @@ def test_net(net, imdb, max_per_image=100, thresh=1/80., vis=False,SSD=False):
                       _t['misc'].average_time)
 
     det_file = os.path.join(output_dir, 'detections.pkl')
+    print(det_file)
     with open(det_file, 'wb') as f:
         cPickle.dump(all_boxes, f, cPickle.HIGHEST_PROTOCOL)
 

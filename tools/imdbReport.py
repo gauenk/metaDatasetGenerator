@@ -13,11 +13,12 @@ import _init_paths
 from core.train import get_training_roidb
 from core.config import cfg, cfg_from_file, cfg_from_list, get_output_dir
 from datasets.factory import get_repo_imdb
+import os.path as osp
 import datasets.imdb
 import argparse
 import pprint
 import numpy as np
-import sys
+import sys,os
 
 def parse_args():
     """
@@ -49,6 +50,25 @@ def get_roidb(imdb_name):
     roidb = get_training_roidb(imdb)
     return imdb, roidb
 
+def get_bbox_info(roidb,size):
+    areas = np.zeros((size))
+    widths = np.zeros((size))
+    heights = np.zeros((size))
+    actualSize = 0
+    idx = 0
+    for image in roidb:
+        if image['flipped'] is True: continue
+        bbox = image['boxes']
+        for box in bbox:
+            actualSize += 1
+            widths[idx] = box[2] - box[0]
+            heights[idx] = box[3] - box[1]
+            assert widths[idx] >= 0,"widths[{}] = {}".format(idx,widths[idx])
+            assert heights[idx] >= 0
+            areas[idx] = widths[idx] * heights[idx]
+            idx += 1
+    return areas,widths,heights
+
 if __name__ == '__main__':
     args = parse_args()
 
@@ -65,11 +85,12 @@ if __name__ == '__main__':
         np.random.seed(cfg.RNG_SEED)
 
     imdb, roidb = get_roidb(args.imdb_name)
+    numAnnos = imdb.roidb_num_bboxes_at(-1)
     print("\n\n-=-=-=-=-=-=-=-=-\n\n")
     print("Report:\n\n")
     print("number of classes: {}".format(imdb.num_classes))
     print("number of images: {}".format(len(roidb)))
-    print("number of annotations: {}".format(imdb.roidb_num_bboxes_at(-1)))
+    print("number of annotations: {}".format(numAnnos))
     print("size of imdb in memory: {}kB".format(sys.getsizeof(imdb)/1024.))
     print("size of roidb in memory: {}kB".format(len(roidb) * sys.getsizeof(roidb[0])/1024.))
     print("example roidb:")
@@ -77,4 +98,23 @@ if __name__ == '__main__':
         print("\t==> {},{}".format(k,type(v)))
         print("\t\t{}".format(v))
 
-    
+    print("computing bbox info...")
+    areas, widths, heights = get_bbox_info(roidb,numAnnos)
+
+    print("ave area: {} | std. area: {}".format(np.mean(areas),np.std(areas,dtype=np.float64)))
+    print("ave width: {} | std. width: {}".format(np.mean(widths),np.std(widths,dtype=np.float64)))
+    print("ave height: {} | std. height: {}".format(np.mean(heights),np.std(heights,dtype=np.float64)))
+    prefix_path = cfg.IMDB_REPORT_OUTPUT_PATH
+    if osp.exists(prefix_path) is False:
+        os.makedirs(prefix_path)
+
+    # issue: we are getting zeros area for 5343 of bboxes for pascal_voc_2007
+
+    path = osp.join(prefix_path,"areas.dat")
+    np.savetxt(path,areas,fmt='%.18e',delimiter=' ')
+    path = osp.join(prefix_path,"widths.dat")
+    np.savetxt(path,widths,fmt='%.18e',delimiter=' ')
+    path = osp.join(prefix_path,"heights.dat")
+    np.savetxt(path,heights,fmt='%.18e',delimiter=' ')
+
+        
