@@ -1,3 +1,4 @@
 *~
 *pyc
-./data/mixtureDatasets/.*/
+./data/mixtureDatasets/*
+!./data/mixtureDatasets/*.*
