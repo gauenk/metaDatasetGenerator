@@ -50,7 +50,7 @@ class RepoImdb(imdb):
 
         self._path_to_imageSets = cfgData['PATH_TO_IMAGESETS']
         if not self._checkImageSet():
-            raise ValueError("imageSet path {} doesn't exist")
+            raise ValueError("imageSet path {} doesn't exist".format(self._imageSetPath))
 
         self._image_index = self._load_image_index()
 
