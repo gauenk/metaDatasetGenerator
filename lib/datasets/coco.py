@@ -108,6 +108,7 @@ class coco(imdb):
     def _get_ann_file(self):
         prefix = 'instances' if self._image_set.find('test') == -1 \
                              else 'image_info'
+        print(self._data_path)
         return osp.join(self._data_path, 'annotations',
                         prefix + '_' + self._image_set + self._year + '.json')
 

@@ -24,7 +24,7 @@ def parse_args():
     """
     Parse input arguments
     """
-    parser = argparse.ArgumentParser(description='Train a Fast R-CNN network')
+    parser = argparse.ArgumentParser(description='Generate an Imdb Report')
     parser.add_argument('--cfg', dest='cfg_file',
                         help='optional config file',
                         default=None, type=str)
