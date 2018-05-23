@@ -60,7 +60,6 @@ class ProposalLayer(caffe.Layer):
 
         assert bottom[0].data.shape[0] == 1, \
             'Only single item batches are supported'
-        print("rpn",bottom[0].data.shape)
 
         cfg_key = str(self.phase) # either 'TRAIN' or 'TEST'
         if cfg_key == 0:
@@ -158,7 +157,6 @@ class ProposalLayer(caffe.Layer):
         # batch inds are 0
         batch_inds = np.zeros((proposals.shape[0], 1), dtype=np.float32)
         blob = np.hstack((batch_inds, proposals.astype(np.float32, copy=False)))
-        print("rpn/blob.shape",blob.shape)
         top[0].reshape(*(blob.shape))
         top[0].data[...] = blob
 
