@@ -25,7 +25,7 @@ TESTING = False
 #imdb_names = {"coco":1,"pacsal_voc":2,"imagenet":3,"caltech":4,"cam2":5,"inria":6,"sun":7,"kitti":8}
 imdb_names = {"pascal_voc-train-default":2,"caltech-medium-default":4,"coco-minival-default":1,"cam2-train-default":5,"sun-train-default":7,"kitti-train-default":8,"imagenet-train2014-default":3,"inria-train-default":6}
 indexToImdbName = ['coco','pascal_voc','imagenet','cam2','caltech','kitti','sun','inria']
-datasetSizes = [10,50,100,250,500,1000]
+datasetSizes = [10,50,100,250,500,1000,2000,5000]
 loadedRoidbs = {}
 loadedImdbs = {}
 
@@ -147,7 +147,7 @@ if __name__ == '__main__':
         np.random.seed(cfg.RNG_SEED)
 
     range_start = args.datasetRangeStart
-    range_end = args.datasetRangeStart
+    range_end = args.datasetRangeEnd
     repeat = args.repeat
 
     if repeat == 0:

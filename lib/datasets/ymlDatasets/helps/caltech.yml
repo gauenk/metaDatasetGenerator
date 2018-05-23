@@ -7,8 +7,8 @@ PATH_TO_RESULTS: /srv/sdb1/image_team/caltech_pedestrian/CAL2009/results
 CLASSES: /srv/sdb1/image_team/caltech_pedestrian/CAL2009/classes.txt
 IMAGE_TYPE: .jpg
 ANNOTATION_TYPE: txt
-PARSE_ANNOTATION_REGEX:
 CONVERT_TO_PERSON:
+PARSE_ANNOTATION_REGEX: '(?P<cls>[0-9]+) (?P<center_x>[0-9]*\.[0-9]*) (?P<center_y>[0-9]*\.[0-9]*) (?P<width>[0-9]*\.[0-9]*) (?P<height>[0-9]*\.[0-9]*)'
 IMAGE_INDEX_TO_IMAGE_PATH: default
 ONLY_PERSON: True
 USE_IMAGE_SET: False

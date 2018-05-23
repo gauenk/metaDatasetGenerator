@@ -9,7 +9,7 @@ import os.path as osp
 import PIL
 import numpy as np
 import scipy.sparse
-from core.config import cfg
+from core.config import cfg,cfgData
 from easydict import EasyDict as edict
 import xml.etree.ElementTree as ET
 
@@ -80,10 +80,7 @@ class txtReader(object):
             m = re.match(self._cleanRegex,line)
             if m is not None:
                 mgd = m.groupdict()
-                x1 = float(mgd['xmin'])
-                y1 = float(mgd['ymin'])
-                x2 = float(mgd['xmax'])
-                y2 = float(mgd['ymax'])
+                x1,y1,x2,y2 = self._extract_bounding_box(mgd)
                 cls = self._find_cls(mgd)
                 if cls == -1:
                     continue
@@ -101,12 +98,12 @@ class txtReader(object):
                     'gt_overlaps' : overlaps,
                     'flipped' : False,
                     'seg_areas' : seg_areas,
-                    'set':self._setID}
+                    'set' : self._setID}
         else:
             bbox = {'boxes' : boxes,
                     'gt_classes': gt_classes,
                     'flipped': False,
-                    'set':self._setID}
+                    'set' : self._setID}
         return bbox
 
     def _find_cls(self,mgd):
@@ -138,3 +135,33 @@ class txtReader(object):
         else:
             return -1
         return cls
+
+    def _extract_bounding_box(self,mgd):
+        if 'xmin' in mgd:
+            x1 = float(mgd['xmin'])
+            y1 = float(mgd['ymin'])
+            x2 = float(mgd['xmax'])
+            y2 = float(mgd['ymax'])
+        elif 'center_x' in mgd:
+            w = float(mgd['width'])
+            h = float(mgd['height'])
+            cx = float(mgd['center_x'])
+            cy = float(mgd['center_y'])
+            x1 = cx - w/2
+            x2 = cx + w/2
+            y1 = cy - h/2
+            y2 = cy + h/2
+        else:
+            raise ValueError("extract bounding box fails!")
+        x1,y1,x2,y2 = self._handle_caltech_helps_vs_gauenk(*[x1, y1, x2, y2])
+        return x1,y1,x2,y2
+
+    def _handle_caltech_helps_vs_gauenk(self,x1,y1,x2,y2):
+        if "helps" in cfg.PATH_YMLDATASETS and "caltech" in cfgData.EXP_DATASET: 
+            x1 = x1 * 640
+            y1 = y1 * 480
+            x2 = x2 * 640
+            y2 = y2 * 480
+        return x1,y1,x2,y2
+        
+
