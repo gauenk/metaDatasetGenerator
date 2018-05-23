@@ -45,7 +45,7 @@ git clone https://github.com/gauenk/metaDatasetGenerator.git
 cd ./metaDatasetGenerator/lib
 make
 cd ../
-./add_helps_symlinks.sh
+./tools/add_helps_symlinks.sh
 ```
 
 To verify the complete installation of the github repo type:
