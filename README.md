@@ -66,6 +66,13 @@ mkdir data
 ln -s /srv/sdb1/image_team/coco ./data/
 ```
 
+### Part 4: Adding the cached roidbs
+
+To make loading faster, we cache the roidb files. To save space on HELPS, we share the same cache via symbolic links. To add the shared caches, run:
+
+```Shell
+ln -s /srv/sdb1/image_team/roidb_cache/ ./data/cache
+```
 
 ## Overview
 
