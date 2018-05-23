@@ -64,7 +64,7 @@ __C.PATH_YMLDATASETS = "helps"
 
 To save space on HELPS, we share large files via symbolic links. 
 
-### Adding the COCO dataset
+#### Adding the COCO dataset
 
 COCO is special, so we add it separately.
 
