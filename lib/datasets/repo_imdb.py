@@ -36,6 +36,7 @@ class RepoImdb(imdb):
         self._parseDatasetFile()
 
     def _parseDatasetFile(self):
+        self._resetDataConfig()
         self._setupConfig()
         fn = osp.join(self._local_path,
                       "ymlDatasets", cfg.PATH_YMLDATASETS,
@@ -68,6 +69,10 @@ class RepoImdb(imdb):
                                                cfgData['USE_IMAGE_SET'],
         )
 
+    def _resetDataConfig(self):
+        cfgData.CONVERT_ID_TO_CLS_FILE = None
+        cfgData.USE_IMAGE_SET = None
+        
     def _set_id_to_cls(self):
         convertIdtoCls_filename = cfgData['CONVERT_ID_TO_CLS_FILE']
         if convertIdtoCls_filename is not None:

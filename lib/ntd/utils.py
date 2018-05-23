@@ -1,5 +1,8 @@
 
 
+def roidb_element_to_cropped_images(datum):
+    cv2.load(datum['image'])
+
 def train_model(model, criterion, optimizer, scheduler, num_epochs=25):
     since = time.time()
 

@@ -1,0 +1,81 @@
+EXP_DATASET: sun
+PATH_ROOT: /srv/sdb1/image_team/sun/SUNdevkit/SUN2012/
+PATH_TO_IMAGES: /srv/sdb1/image_team/sun/SUNdevkit/SUN2012/Images/
+PATH_TO_ANNOTATIONS: /srv/sdb1/image_team/sun/SUNdevkit/SUN2012/Annotations/
+PATH_TO_IMAGESETS: /srv/sdb1/image_team/sun/SUNdevkit/SUN2012/ImageSets/Main/
+PATH_TO_RESULTS: /srv/sdb1/image_team/sun/SUNdevkit/SUN2012/results
+CLASSES: /srv/sdb1/image_team/sun/SUNdevkit/SUN2012/classes.txt
+IMAGE_TYPE: .jpg
+ANNOTATION_TYPE: xml
+IMAGE_INDEX_TO_IMAGE_PATH: default
+ONLY_PERSON: True
+CONVERT_TO_PERSON:
+- person occluded   
+- person sitting occluded   
+- person   
+- person standing   
+- person walking    
+- person crop    
+- person sitting    
+- person sitting crop    
+- person skating     
+- person standing occluded     
+- person player     
+- person walking occluded   
+- person skiing   
+- person standing   
+- person judoka occluded     
+- person standing crop   
+- person model   
+- person dancing   
+- person playing   
+- kneel person   
+- person swimming   
+- person running   
+- person walking crop   
+- person occluded   
+- person dancing occluded   
+- person squatting   
+- person batter   
+- person judoka   
+- person working   
+- person sitting   
+- person crop   
+- person dressed up   
+- person go down   
+- person go up   
+- person ride   
+- person ride occluded   
+- judge person   
+- person sitting occluded   
+- person dancing crop   
+- person dancing occlude   
+- person driver   
+- person lying   
+- person player occluded   
+- person porter   
+- person porter crop   
+- person riding   
+- climber person   
+- line persons   
+- person occluded   
+- person standing occluded   
+- person walking   
+- person bending over   
+- person ccop   
+- person cyclist   
+- person driving occluded   
+- person in blue jacket   
+- person in line   
+- person jumping   
+- person model occluded   
+- person occluded crop   
+- person playing crop   
+- person playing occluded   
+- person skiing crop   
+- person skiing occluded   
+- person working occluded   
+- skier person   
+- â´person occluded
+
+

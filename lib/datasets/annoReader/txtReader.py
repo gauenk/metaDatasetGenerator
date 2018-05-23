@@ -125,7 +125,10 @@ class txtReader(object):
         return cls
 
     def mangle_cls(self,cls):
+
+        # used for imagenet mapping
         if self._convertIdToCls is not None: cls = self._convertIdToCls[cls]
+
         # check if we need to convert annotation class to "person"
         if self._convertToPerson is not None and cls in self._convertToPerson:
             cls = self._classToIndex["person"]
