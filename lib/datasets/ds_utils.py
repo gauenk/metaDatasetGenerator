@@ -4,7 +4,16 @@
 # Written by Ross Girshick
 # --------------------------------------------------------
 
+
+# metaDatsetGen imports
+from core.config import cfg, createFilenameID
+
+# misc imports
+import pickle,cv2
+import os.path as osp
 import numpy as np
+
+
 
 def unique_boxes(boxes, scale=1.0):
     """Return indices of unique boxes."""
@@ -39,4 +48,43 @@ def filter_small_boxes(boxes, min_size):
     h = boxes[:, 3] - boxes[:, 1]
     keep = np.where((w >= min_size) & (h > min_size))[0]
     return keep
+
+def load_mixture_set(setID,repetition,final_size):
+
+    allRoidb = []
+    annoCounts = []
+    datasetSizes = cfg.MIXED_DATASET_SIZES
+    if final_size not in datasetSizes:
+        raise ValueError("size {} is not in cfg.MIXED_DATASET_SIZES".format(final_size))
+    sizeIndex = datasetSizes.index(final_size)
+    prevSize = 0
+    
+    for size in datasetSizes[:sizeIndex+1]:
+        # create a file for each dataset size
+        pklName =createFilenameID(setID,str(repetition),str(size)) + ".pkl"
+        # write pickle file of the roidb
+        print(pklName)
+        print(len(allRoidb))
+        if osp.exists(pklName) is True:
+            fid = open(pklName,"rb")
+            loaded = pickle.load(fid)
+            roidbs = loaded['allRoidb']
+            if size == final_size: # only save the last count
+                annoCounts = loaded['annoCounts']
+            print_each_size(roidbs)
+            allRoidb.extend(roidbs)
+            fid.close()
+        else:
+            raise ValueError("{} does not exists".format(pklName))
+        prevSize += len(loaded)
+    return allRoidb,annoCounts
+
+def print_each_size(roidb):
+    sizes = [0 for _ in range(8)]
+    for elem in roidb:
+        sizes[elem['set']-1] += 1
+    print(sizes)
+
+def roidb_element_to_cropped_images(datum):
+    cv2.load(datum['image'])
 

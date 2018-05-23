@@ -11,7 +11,7 @@
 import _init_paths
 from core.train import get_training_roidb, train_net
 from core.config import cfg, cfg_from_file, cfg_from_list, get_output_dir, createFilenameID, createPathRepeat, createPathSetID
-from ntd.utils import print_each_size
+from dataset.ds_utils import print_each_size
 from datasets.factory import get_repo_imdb
 import datasets.imdb
 import numpy as np

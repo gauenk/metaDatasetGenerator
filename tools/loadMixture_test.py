@@ -13,7 +13,7 @@ import _init_paths
 from core.train import get_training_roidb
 from core.config import cfg, cfg_from_file, cfg_from_list, get_output_dir
 from datasets.factory import get_repo_imdb
-from ntd.utils import load_mixture_set,print_each_size
+from datasets.ds_utils import load_mixture_set,print_each_size
 import os.path as osp
 import datasets.imdb
 import argparse

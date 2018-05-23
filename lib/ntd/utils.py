@@ -9,45 +9,6 @@ import numpy as np
 import numpy.random as npr
 import os.path as osp
 
-def load_mixture_set(setID,repetition,final_size):
-
-    allRoidb = []
-    annoCounts = []
-    datasetSizes = cfg.MIXED_DATASET_SIZES
-    if final_size not in datasetSizes:
-        raise ValueError("size {} is not in cfg.MIXED_DATASET_SIZES".format(final_size))
-    sizeIndex = datasetSizes.index(final_size)
-    prevSize = 0
-    
-    for size in datasetSizes[:sizeIndex+1]:
-        # create a file for each dataset size
-        pklName =createFilenameID(setID,str(repetition),str(size)) + ".pkl"
-        # write pickle file of the roidb
-        print(pklName)
-        print(len(allRoidb))
-        if osp.exists(pklName) is True:
-            fid = open(pklName,"rb")
-            loaded = pickle.load(fid)
-            roidbs = loaded['allRoidb']
-            if size == final_size: # only save the last count
-                annoCounts = loaded['annoCounts']
-            print_each_size(roidbs)
-            allRoidb.extend(roidbs)
-            fid.close()
-        else:
-            raise ValueError("{} does not exists".format(pklName))
-        prevSize += len(loaded)
-    return allRoidb,annoCounts
-
-def print_each_size(roidb):
-    sizes = [0 for _ in range(8)]
-    for elem in roidb:
-        sizes[elem['set']-1] += 1
-    print(sizes)
-
-def roidb_element_to_cropped_images(datum):
-    cv2.load(datum['image'])
-
 def train_model(model, criterion, optimizer, scheduler, num_epochs=25):
     since = time.time()
 
