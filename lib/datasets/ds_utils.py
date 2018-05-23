@@ -88,3 +88,9 @@ def print_each_size(roidb):
 def roidb_element_to_cropped_images(datum):
     cv2.load(datum['image'])
 
+def computeTotalAnnosFromAnnoCount(annoCount):
+    size = 0
+    for cnt in annoCount.values():
+        size += cnt
+    return size
+
