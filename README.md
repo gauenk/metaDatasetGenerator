@@ -45,6 +45,7 @@ git clone https://github.com/gauenk/metaDatasetGenerator.git
 cd ./metaDatasetGenerator/lib
 make
 cd ../
+./add_helps_symlinks.sh
 ```
 
 To verify the complete installation of the github repo type:
@@ -57,36 +58,6 @@ It may complain the filepath for pascal_voc_2007 is set incorrectly. You may nee
 
 ```Python
 __C.PATH_YMLDATASETS = "helps"
-```
-
-
-### Part 3: Sharing Files
-
-To save space on HELPS, we share large files via symbolic links. 
-
-#### Adding the COCO dataset
-
-COCO is special, so we add it separately.
-
-```Shell
-mkdir data
-ln -s /srv/sdb1/image_team/coco ./data/
-```
-
-#### Adding the cached roidbs
-
-To make loading faster, the program caches the roidb files. To add the shared caches, run:
-
-```Shell
-ln -s /srv/sdb1/image_team/roidb_cache/ ./data/cache
-```
-
-#### Adding the mixture datasets
-
-We all need access to the same mixture datasets.
-
-```Shell
-ln -s /srv/sdb1/image_team/mixtureDatasets/ ./data/
 ```
 
 ## Overview
