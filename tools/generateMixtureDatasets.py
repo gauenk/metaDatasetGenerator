@@ -11,6 +11,7 @@
 import _init_paths
 from core.train import get_training_roidb, train_net
 from core.config import cfg, cfg_from_file, cfg_from_list, get_output_dir, createFilenameID, createPathRepeat, createPathSetID
+from ntd.utils import print_each_size
 from datasets.factory import get_repo_imdb
 import datasets.imdb
 import numpy as np
@@ -25,7 +26,7 @@ TESTING = False
 #imdb_names = {"coco":1,"pacsal_voc":2,"imagenet":3,"caltech":4,"cam2":5,"inria":6,"sun":7,"kitti":8}
 imdb_names = {"pascal_voc-train-default":2,"caltech-medium-default":4,"coco-minival-default":1,"cam2-train-default":5,"sun-train-default":7,"kitti-train-default":8,"imagenet-train2014-default":3,"inria-train-default":6}
 indexToImdbName = ['coco','pascal_voc','imagenet','cam2','caltech','kitti','sun','inria']
-datasetSizes = [10,50,100,250,500,1000,2000,5000]
+datasetSizes = cfg.MIXED_DATASET_SIZES
 loadedRoidbs = {}
 loadedImdbs = {}
 
@@ -63,6 +64,11 @@ def parse_args():
     args = parser.parse_args()
     return args
 
+def shuffle_imdbs():
+    for imdb in loadedImdbs.values():
+        imdb.shuffle_image_index()
+        imdb.shuffle_roidb()
+
 def get_roidb(imdb_name):
     imdb = get_repo_imdb(imdb_name)
     print 'Loaded dataset `{:s}` for training'.format(imdb.name)
@@ -93,11 +99,15 @@ def createMixtureDataset(setID,size):
     imdbSize = size / len(imdbs)
     
     mixedRoidb = {}
+    actualSizes = {}
     for imdb in imdbs:
+        print(imdb.name)
         imdb = loadedImdbs[imdb.name]
         sizedRoidb,actualSize = imdb.get_roidb_at_size(size)
         mixedRoidb[imdb.name] = sizedRoidb
-    return mixedRoidb
+        actualSizes[imdb.name] = actualSize
+    return mixedRoidb,actualSizes
+
 
 def filterForTesting(idx):
     if indexToImdbName[idx] in loadedImdbs.keys():
@@ -130,6 +140,8 @@ def combined_roidb(roidbs):
     for r in roidbs[1:]:
         roidb.extend(r)
     return roidb
+
+
 
 if __name__ == '__main__':
     args = parse_args()
@@ -169,18 +181,24 @@ if __name__ == '__main__':
                 path_repeat = createPathRepeat(setID,str(r))
                 if osp.isdir(path_repeat) == False:
                     os.makedirs(path_repeat)
+                # shuffle imdbs
+                shuffle_imdbs()
                 prevSize = 0
                 for size in datasetSizes:
                     # create a file for each dataset size
                     idlist_filename = createFilenameID(setID,str(r),str(size))
-                    repo_roidbs = createMixtureDataset(setID,size)
+                    repo_roidbs,roidbs_anno_counts = createMixtureDataset(setID,size)
                     assert len(repo_roidbs) == setID.count('1')
                     # write pickle file of the roidb
                     allRoidb = combined_roidb(repo_roidbs.values())
                     pklName = idlist_filename + ".pkl"
+                    print(pklName,roidbs_anno_counts,prevSize,size)
+                    print_each_size(allRoidb)
+                    print_each_size(allRoidb[prevSize:])
+                    saveInfo = {"allRoidb":allRoidb[prevSize:],"annoCounts":roidbs_anno_counts}
                     if osp.exists(pklName) is False:
-                        with open(idlist_filename + ".pkl","wb") as f:
-                            pickle.dump(allRoidb[prevSize:size],f)
+                        with open(pklName,"wb") as f:
+                            pickle.dump(saveInfo,f)
                     else:
                         print("{} exists".format(pklName))
 
@@ -195,4 +213,4 @@ if __name__ == '__main__':
 
                     print(idlist_filename)
                     f.close()
-                    prevSize = size
+                    prevSize += len(allRoidb[prevSize:])

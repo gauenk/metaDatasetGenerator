@@ -1,7 +1,7 @@
 from __future__ import print_function, division
 
 # metaDatasetGenerator imports
-from core.config import cfg,cfgData
+from core.config import cfg, cfgData, createFilenameID, createPathRepeat, createPathSetID
 from datasets.imdb import imdb
 
 # 'other' imports

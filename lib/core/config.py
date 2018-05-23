@@ -263,6 +263,9 @@ __C.OBJ_DET.USE_GPU_NMS = True
 # How much information about the bounding boxes do we store in memory?
 __C.OBJ_DET.BBOX_VERBOSE = True
 
+# The sizes used for creating the mixture datasets
+__C.MIXED_DATASET_SIZES = [10,50,100,250,500,1000,2000,5000]
+
 
 def get_output_dir(imdb, net=None):
     """Return the directory where experimental artifacts are placed.
