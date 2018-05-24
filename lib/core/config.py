@@ -266,6 +266,12 @@ __C.OBJ_DET.BBOX_VERBOSE = True
 # The sizes used for creating the mixture datasets
 __C.MIXED_DATASET_SIZES = [10,50,100,250,500,1000,2000,5000]
 
+# The size of the input for images cropped to their annotations
+__C.CROPPED_IMAGE_SIZE = 100
+
+# the size of the 
+__C.CONFIG_DATASET_INDEX_DICTIONARY_PATH = "default_dataset_index.yml"
+
 
 def get_output_dir(imdb, net=None):
     """Return the directory where experimental artifacts are placed.
@@ -360,6 +366,17 @@ def createPathRepeat(setID,r):
     
 def createFilenameID(setID,r,size):
     return osp.join(cfg.PATH_MIXTURE_DATASETS,setID,r,size)
+
+def loadDatasetIndexDict():
+    fn = osp.join(__C.ROOT_DIR,"./lib/datasets/ymlConfigs",cfg.CONFIG_DATASET_INDEX_DICTIONARY_PATH)
+    import yaml
+    with open(fn, 'r') as f:
+        yaml_cfg = edict(yaml.load(f))
+    indToCls = [None for _ in range(len(yaml_cfg))]
+    for k,v in yaml_cfg.items():
+        indToCls[v] = k
+    print(indToCls)
+    return indToCls
 
 
 

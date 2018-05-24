@@ -9,6 +9,9 @@
 
 """Train an Img2Vec network on a "region of interest" database."""
 
+import matplotlib
+matplotlib.use('Agg')
+import matplotlib.pyplot as plt
 import _init_paths
 from core.train import get_training_roidb
 from core.config import cfg, cfg_from_file, cfg_from_list, get_output_dir
@@ -18,7 +21,8 @@ import datasets.imdb
 import argparse
 import pprint
 import numpy as np
-import sys,os
+import sys,os,cv2,uuid
+
 
 def parse_args():
     """
@@ -33,6 +37,9 @@ def parse_args():
                         default='voc_2007_trainval', type=str)
     parser.add_argument('--rand', dest='randomize',
                         help='randomize (do not use a fixed seed)',
+                        action='store_true')
+    parser.add_argument('--save', dest='save',
+                        help='save some samples with bboxes visualized?',
                         action='store_true')
 
     if len(sys.argv) == 1:
@@ -68,6 +75,49 @@ def get_bbox_info(roidb,size):
             areas[idx] = widths[idx] * heights[idx]
             idx += 1
     return areas,widths,heights
+
+def vis_dets(im, class_names, dets, _idx_, fn=None, thresh=0.5):
+    """Draw detected bounding boxes."""
+    im = im[:, :, (2, 1, 0)]
+    fig, ax = plt.subplots(figsize=(12, 12))
+    ax.imshow(im, aspect='equal')
+    for i in range(len(dets)):
+        bbox = dets[i, :4]
+        
+        
+        ax.add_patch(
+            plt.Rectangle((bbox[0], bbox[1]),
+                          bbox[2] - bbox[0],
+                          bbox[3] - bbox[1], fill=False,
+                          edgecolor='red', linewidth=3.5)
+        )
+        
+        # if dets.shape[1] == 5:
+        #     score = dets[i, -1]
+        #     ax.text(bbox[0], bbox[1] - 2,
+        #             '{:s} {:.3f}'.format(class_name, score),
+        #             bbox=dict(facecolor='blue', alpha=0.5),
+        #             fontsize=14, color='white')
+        #     ax.set_title(('{} detections with '
+        #                   'p({} | box) >= {:.1f}').format(class_name, class_name,
+        #                                                   thresh),
+        #                  fontsize=14)
+        # else:
+        #     ax.text(bbox[0], bbox[1] - 2,
+        #             '{:s}'.format(class_name),
+        #             bbox=dict(facecolor='blue', alpha=0.5),
+        #             fontsize=14, color='white')
+        #     ax.set_title(('{} groundtruth detections').format(class_name, class_name,
+        #                                                   thresh),
+        #                  fontsize=14)
+        
+    plt.axis('off')
+    plt.tight_layout()
+    plt.draw()
+    if fn is None:
+        plt.savefig("img_{}_{}.png".format(_idx_,str(uuid.uuid4())))
+    else:
+        plt.savefig(fn.format(_idx_,str(uuid.uuid4())))
 
 if __name__ == '__main__':
     args = parse_args()
@@ -117,4 +167,17 @@ if __name__ == '__main__':
     path = osp.join(prefix_path,"heights.dat")
     np.savetxt(path,heights,fmt='%.18e',delimiter=' ')
 
-        
+    if args.save:
+        index = imdb._get_roidb_index_at_size(30)
+        print("saving 30 imdb annotations to output folder...")        
+        print(prefix_path)
+        for i in range(index):
+            boxes = roidb[i]['boxes']
+            if len(boxes) == 0: continue
+            im = cv2.imread(roidb[i]['image'])
+            if roidb[i]['flipped']:
+                im = im[:, ::-1, :]
+            cls = roidb[i]['gt_classes']
+            fn = osp.join(prefix_path,"{}_{}.png".format(imdb.name,i))
+            print(fn)
+            vis_dets(im,cls,boxes,i,fn=fn)

@@ -1,7 +1,8 @@
 from __future__ import print_function, division
 
 # metaDatasetGenerator imports
-from core.config import cfg, cfgData, createFilenameID, createPathRepeat, createPathSetID
+from core.config import cfg, cfgData
+from datasets.ds_utils import load_mixture_set,computeTotalAnnosFromAnnoCount
 from datasets.imdb import imdb
 
 # 'other' imports
@@ -27,6 +28,10 @@ plt.ion()   # interactive mode
 # -=-=-=-=-=-=-
 # Load Data
 # -=-=-=-=-=-=-
+setID = '11111111'
+repeat = '1'
+size = 1000
+roidb, annoCount = load_mixture_set(setID,repeat,size)
 
 data_transforms = {
     'train': transforms.Compose([

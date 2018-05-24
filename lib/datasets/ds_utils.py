@@ -13,8 +13,6 @@ import pickle,cv2
 import os.path as osp
 import numpy as np
 
-
-
 def unique_boxes(boxes, scale=1.0):
     """Return indices of unique boxes."""
     v = np.array([1, 1e3, 1e6, 1e9])
@@ -61,17 +59,14 @@ def load_mixture_set(setID,repetition,final_size):
     
     for size in datasetSizes[:sizeIndex+1]:
         # create a file for each dataset size
-        pklName =createFilenameID(setID,str(repetition),str(size)) + ".pkl"
+        pklName = createFilenameID(setID,str(repetition),str(size)) + ".pkl"
         # write pickle file of the roidb
-        print(pklName)
-        print(len(allRoidb))
         if osp.exists(pklName) is True:
             fid = open(pklName,"rb")
             loaded = pickle.load(fid)
             roidbs = loaded['allRoidb']
             if size == final_size: # only save the last count
                 annoCounts = loaded['annoCounts']
-            print_each_size(roidbs)
             allRoidb.extend(roidbs)
             fid.close()
         else:
@@ -85,8 +80,21 @@ def print_each_size(roidb):
         sizes[elem['set']-1] += 1
     print(sizes)
 
-def roidb_element_to_cropped_images(datum):
-    cv2.load(datum['image'])
+def cropImageToAnnoRegion(im_orig,box):
+    x1 = box[0]
+    y1 = box[1]
+    x2 = box[2]
+    y2 = box[3]
+    return scaleImage(im_orig[y1:y2, x1:x2])
+    
+def scaleImage(im_orig):
+    target_size = cfg.CROPPED_IMAGE_SIZE 
+    x_size,y_size = im_orig.shape[0:2]
+    im_scale_x = float(target_size) / x_size
+    im_scale_y = float(target_size) / y_size
+    im = cv2.resize(im_orig, (target_size,target_size),
+                    interpolation=cv2.INTER_CUBIC)
+    return im
 
 def computeTotalAnnosFromAnnoCount(annoCount):
     size = 0
@@ -94,3 +102,12 @@ def computeTotalAnnosFromAnnoCount(annoCount):
         size += cnt
     return size
 
+def compute_size_along_roidb(roidb):
+    _roidbSize = []
+    if roidb is None:
+        raise ValueError("roidb must be loaded before 'compute_size_along_roidb' can be run")
+    _roidbSize.append(len(roidb[0]['boxes']))
+    for image in roidb[1:]:
+        newSize = _roidbSize[-1] + len(image['boxes'])
+        _roidbSize.append(newSize)
+    return _roidbSize

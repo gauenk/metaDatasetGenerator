@@ -86,7 +86,8 @@ class RepoImdb(imdb):
         fn = osp.join(self._local_path,"ymlConfigs" ,self._configName + ".yml")
         with open(fn, 'r') as f:
             yaml_cfg = edict(yaml.load(f))
-        fn = osp.join(self._local_path,"ymlConfigs" ,yaml_cfg['CONFIG_DATASET_INDEX_DICTIONARY'])
+        fn = osp.join(self._local_path,"ymlConfigs" ,
+                      yaml_cfg['CONFIG_DATASET_INDEX_DICTIONARY_PATH'])
         with open(fn, 'r') as f:
             setID = edict(yaml.load(f))[self._datasetName]
         self.config = {'cleanup'     : yaml_cfg['CONFIG_CLEANUP'],

@@ -11,15 +11,19 @@
 
 import _init_paths
 from core.train import get_training_roidb
-from core.config import cfg, cfg_from_file, cfg_from_list, get_output_dir
+from core.config import cfg, cfg_from_file, cfg_from_list, get_output_dir, loadDatasetIndexDict
 from datasets.factory import get_repo_imdb
-from datasets.ds_utils import load_mixture_set,print_each_size,computeTotalAnnosFromAnnoCount
+from datasets.ds_utils import load_mixture_set,print_each_size,computeTotalAnnosFromAnnoCount,cropImageToAnnoRegion
 import os.path as osp
 import datasets.imdb
 import argparse
 import pprint
 import numpy as np
-import sys,os
+import sys,os,cv2
+
+# pytorch imports
+from datasets.pytorch_roidb_loader import RoidbDataset
+
 
 def parse_args():
     """
@@ -38,6 +42,9 @@ def parse_args():
     parser.add_argument('--size', dest='size',
                         help='which size to read from',
                         default=1000, type=int)
+    parser.add_argument('--save', dest='save',
+                        help='save some samples with bboxes visualized?',
+                        action='store_true')
     parser.add_argument('--rand', dest='randomize',
                         help='randomize (do not use a fixed seed)',
                         action='store_true')
@@ -128,3 +135,26 @@ if __name__ == '__main__':
     np.savetxt(path,heights,fmt='%.18e',delimiter=' ')
 
         
+    print("-=-=-=-=-=-")
+
+    clsToSet = loadDatasetIndexDict()
+
+    print("as pytorch friendly ")
+
+    pyroidb = RoidbDataset(roidb,["__background__","person"],loader=cv2.imread,transform=cropImageToAnnoRegion)
+
+    if args.save:
+       print("save 30 cropped annos in output folder.")
+       saveDir = "./output/mixedDataReport/"
+       if not osp.exists(saveDir):
+           print("making directory: {}".format(saveDir))
+           os.makedirs(saveDir)
+
+       for i in range(30):
+           cls = roidb[i]['set']
+           ds = clsToSet[cls]
+           fn = osp.join(saveDir,"{}_{}.jpg".format(i,ds))
+           print(fn)
+           cv2.imwrite(fn,pyroidb[i][0])
+
+    
