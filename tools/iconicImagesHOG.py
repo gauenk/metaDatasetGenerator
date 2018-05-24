@@ -20,7 +20,7 @@ import sys,os,cv2
 # pytorch imports
 from datasets.pytorch_roidb_loader import RoidbDataset
 
-# from ntd.adasdf import svm,extract
+# from ntd.hog_svm import plot_confusion_matrix, extract_features
 
 
 def parse_args():
@@ -133,6 +133,21 @@ if __name__ == '__main__':
     print("as pytorch friendly ")
 
     pyroidb = RoidbDataset(roidb,[1,2,3,4,5,6,7,8],loader=cv2.imread,transform=cropImageToAnnoRegion)
+    print('fdsggrfdsgsdfgdsgdsfgdsgfdsgfsdgdfsgsgsd')
+    
+    print(type(pyroidb))
+    print(type(pyroidb[0]))
+    print(type(pyroidb[0][0]))
+    print(type(pyroidb[0][1]))
+
+    print(pyroidb.__len__())
+
+    print(pyroidb.roidb[872])
+    print(pyroidb[872])
+
+    # for i in range(pyroidb.__len__()):
+    #     print(i)
+    #     print(pyroidb[i][1])
 
     if args.save:
        print("save 30 cropped annos in output folder.")
@@ -148,4 +163,4 @@ if __name__ == '__main__':
            print(fn)
            cv2.imwrite(fn,pyroidb[i][0])
 
-    print(pyroidb)
+
