@@ -1,0 +1,3 @@
+EXP_DIR: yoloEval
+DATASETS:
+  MODEL: "yolo"

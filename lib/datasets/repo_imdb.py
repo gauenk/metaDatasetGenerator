@@ -43,11 +43,13 @@ class RepoImdb(imdb):
                       self._datasetName + ".yml")
         cfgData_from_file(fn)
         assert(self._datasetName == cfgData['EXP_DATASET'], "dataset name is not correct.")
-
         self._set_classes(cfgData['CLASSES'],cfgData['CONVERT_TO_PERSON'],cfgData['ONLY_PERSON'])
         self._num_classes = len(self._classes)
         self._path_root = cfgData['PATH_ROOT']
         self._compID = cfgData['COMPID']
+        self._cachedir = os.path.join(self._path_root,\
+                            'annotations_cache',\
+                                self._image_set)
 
         self._path_to_imageSets = cfgData['PATH_TO_IMAGESETS']
         if not self._checkImageSet():
@@ -163,9 +165,7 @@ class RepoImdb(imdb):
     def _createEvaluator(self,annoPath):
         if self.config['use_salt']: self._salt = str(uuid.uuid4())
         else: self._salt = None
-        cachedir = os.path.join(self._path_root,\
-                            'annotations_cache',\
-                                self._image_set)
+        cachedir = self._cachedir
         if not osp.isdir(cachedir):
             os.makedirs(cachedir)
         return bboxEvaluator(self._datasetName,self.classes,
