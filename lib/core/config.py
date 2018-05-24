@@ -272,8 +272,12 @@ __C.CROPPED_IMAGE_SIZE = 100
 # the size of the 
 __C.CONFIG_DATASET_INDEX_DICTIONARY_PATH = "default_dataset_index.yml"
 
-# the size of the 
+# name that dataset! output
 __C.PATH_TO_NTD_OUTPUT = "./output/ntd/"
+
+# output for annotation analysis
+__C.PATH_TO_ANNO_ANALYSIS_OUTPUT = "./output/annoAnalysis/"
+
 
 def get_output_dir(imdb, net=None):
     """Return the directory where experimental artifacts are placed.
@@ -302,8 +306,10 @@ def _merge_a_into_b(a, b):
             raise KeyError('{} is not a valid config key'.format(k))
 
         old_type = type(b[k])
-        # the types must match, too; unless old_type is not edict and not None
-        if old_type is not type(v) and (old_type is edict and old_type is not type(None)):
+        # the types must match, too; unless old_type is not edict and not None; and new_type is not None
+        if old_type is not type(v) and \
+        (old_type is edict and old_type is not type(None))\
+        and type(v) is not type(None):
             if isinstance(b[k], np.ndarray):
                 v = np.array(v, dtype=b[k].dtype)
             else:

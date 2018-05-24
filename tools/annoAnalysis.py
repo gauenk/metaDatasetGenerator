@@ -1,3 +1,5 @@
+#!/usr/bin/env python
+
 """
 Run the annotation analysis on a mixed dataset
 """
@@ -8,11 +10,10 @@ from core.train import get_training_roidb
 from core.config import cfg, cfg_from_file, cfg_from_list, get_output_dir, loadDatasetIndexDict
 from datasets.factory import get_repo_imdb
 from datasets.ds_utils import load_mixture_set,print_each_size,computeTotalAnnosFromAnnoCount,cropImageToAnnoRegion
-
+from anno_analysis.metrics import annotationDensityPlot
 
 # pytorch imports
 from datasets.pytorch_roidb_loader import RoidbDataset
-
 
 # misc imports
 import sys,os,cv2,argparse,pprint
@@ -82,6 +83,7 @@ if __name__ == '__main__':
 
 
     roidb,annoCount = load_mixture_set(setID,repetition,size)
+    print(annoCount)
     numAnnos = computeTotalAnnosFromAnnoCount(annoCount)
     clsToSet = loadDatasetIndexDict()
     pyroidb = RoidbDataset(roidb,[1,2,3,4,5,6,7,8],
@@ -89,5 +91,12 @@ if __name__ == '__main__':
                            transform=cropImageToAnnoRegion,
                            returnBox=True)
 
-    
+    annoMaps = annotationDensityPlot(pyroidb)
+    saveDir = cfg.PATH_TO_ANNO_ANALYSIS_OUTPUT
+    if not osp.exists(saveDir):
+        os.makedirs(saveDir)
+    fn = osp.join(saveDir,"density_plot_{}.jpg") 
+    for idx,annoMap in enumerate(annoMaps):
+        if np.all(annoMap < 0.01): continue
+        cv2.imwrite(fn.format(clsToSet[idx+1]),annoMap*255)
 
