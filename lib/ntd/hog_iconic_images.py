@@ -219,7 +219,6 @@ def get_bbox_info(roidb,size):
     return areas,widths,heights
 
 
-
 if __name__ == '__main__':
     args = parse_args()
 
@@ -294,196 +293,196 @@ if __name__ == '__main__':
            print(fn)
            cv2.imwrite(fn,pyroidb[i][0])
 
-    
+    print(pyroidb) 
 
 
 
 
 
-#LOAD IN DATA for Helps computer
-train_cam = '/home/party/labeling-party/xa/'
-train_COCO = '/var/data/coco/images/train2014/'
-train_INRIA = '/var/data/inria/INRIAPerson/Train/'
-train_caltech = '/var/data/caltech_pedestrian/CAL2009/images/'
-train_ImageNet = '/var/data/ilsvrc/ILSVRC/ILSVRC13/ILSVRC_DET_train/'
-train_Pascal = '/var/data/pascal_voc/VOCdevkit/VOC2012/JPEGImages/'
-train_Sun = '/var/data/sun/SUN2012/Images/'
-train_kitti = '/srv/sdb1/image_team/kitti/KITTIdevkit/KITTI2013/image_2/'
+# #LOAD IN DATA for Helps computer
+# train_cam = '/home/party/labeling-party/xa/'
+# train_COCO = '/var/data/coco/images/train2014/'
+# train_INRIA = '/var/data/inria/INRIAPerson/Train/'
+# train_caltech = '/var/data/caltech_pedestrian/CAL2009/images/'
+# train_ImageNet = '/var/data/ilsvrc/ILSVRC/ILSVRC13/ILSVRC_DET_train/'
+# train_Pascal = '/var/data/pascal_voc/VOCdevkit/VOC2012/JPEGImages/'
+# train_Sun = '/var/data/sun/SUN2012/Images/'
+# train_kitti = '/srv/sdb1/image_team/kitti/KITTIdevkit/KITTI2013/image_2/'
 
 
-#for helps computer
-coco = glob.glob(train_COCO + '/**/*.png', recursive = True) + (glob.glob(train_COCO + '/**/*.jpg', recursive = True))#+ (glob.glob(train_COCO + '/**/*.bmp', recursive = True))
-caltech = glob.glob(train_caltech + '/**/*.png', recursive = True) + (glob.glob(train_caltech + '/**/*.jpg', recursive = True))#+ (glob.glob(train_caltech + '/**/*.bmp', recursive = True))
-imagenet = glob.glob(train_ImageNet + '/**/*.JPEG', recursive = True) + (glob.glob(train_ImageNet + '/**/*.jpg', recursive = True))#+ (glob.glob(train_ImageNet + '/**/*.bmp', recursive = True))
-pascal = glob.glob(train_Pascal + '/**/*.png', recursive = True) + (glob.glob(train_Pascal + '/**/*.jpg', recursive = True))#+ (glob.glob(train_Pascal + '/**/*.bmp', recursive = True))
+# #for helps computer
+# coco = glob.glob(train_COCO + '/**/*.png', recursive = True) + (glob.glob(train_COCO + '/**/*.jpg', recursive = True))#+ (glob.glob(train_COCO + '/**/*.bmp', recursive = True))
+# caltech = glob.glob(train_caltech + '/**/*.png', recursive = True) + (glob.glob(train_caltech + '/**/*.jpg', recursive = True))#+ (glob.glob(train_caltech + '/**/*.bmp', recursive = True))
+# imagenet = glob.glob(train_ImageNet + '/**/*.JPEG', recursive = True) + (glob.glob(train_ImageNet + '/**/*.jpg', recursive = True))#+ (glob.glob(train_ImageNet + '/**/*.bmp', recursive = True))
+# pascal = glob.glob(train_Pascal + '/**/*.png', recursive = True) + (glob.glob(train_Pascal + '/**/*.jpg', recursive = True))#+ (glob.glob(train_Pascal + '/**/*.bmp', recursive = True))
 
-cam2_temp = glob.glob(train_cam + '/**/*.png', recursive = True)
-cam2 = [f for f,j in zip(cam2_temp, range(len(cam2_temp))) if (j%100)==0]
-inria = glob.glob(train_INRIA + '/**/*.png', recursive = True) + (glob.glob(train_INRIA + '/**/*.jpg', recursive = True))
-sun = glob.glob(train_Sun + '/**/*.jpg', recursive = True)
-kitti = glob.glob(train_kitti + '/**/*.png', recursive = True)
-#'gray', 'color',
-model = ['gray', 'color','hog']
-results = []
-for j in model:
-   # for i in range(10):
-    t3 = time.time()
-    shuffle(coco)
-    shuffle(caltech)
-    shuffle(imagenet)
-    shuffle(pascal)
-    shuffle(cam2)
-    shuffle(inria)
-    shuffle(sun)
-    shuffle(kitti)
+# cam2_temp = glob.glob(train_cam + '/**/*.png', recursive = True)
+# cam2 = [f for f,j in zip(cam2_temp, range(len(cam2_temp))) if (j%100)==0]
+# inria = glob.glob(train_INRIA + '/**/*.png', recursive = True) + (glob.glob(train_INRIA + '/**/*.jpg', recursive = True))
+# sun = glob.glob(train_Sun + '/**/*.jpg', recursive = True)
+# kitti = glob.glob(train_kitti + '/**/*.png', recursive = True)
+# #'gray', 'color',
+# model = ['gray', 'color','hog']
+# results = []
+# for j in model:
+#    # for i in range(10):
+#     t3 = time.time()
+#     shuffle(coco)
+#     shuffle(caltech)
+#     shuffle(imagenet)
+#     shuffle(pascal)
+#     shuffle(cam2)
+#     shuffle(inria)
+#     shuffle(sun)
+#     shuffle(kitti)
     
-    print('len of coco', len(coco))
-    print('len of caltech', len(caltech))
-    print('len of imagenet', len(imagenet))
-    print('len of pascal' ,len(pascal))
-    print('len of cam2', len(cam2))
-    print('len of inria', len(inria))
-    print('len of sun', len(sun))
-    print('len of kitti', len(kitti))
+#     print('len of coco', len(coco))
+#     print('len of caltech', len(caltech))
+#     print('len of imagenet', len(imagenet))
+#     print('len of pascal' ,len(pascal))
+#     print('len of cam2', len(cam2))
+#     print('len of inria', len(inria))
+#     print('len of sun', len(sun))
+#     print('len of kitti', len(kitti))
     
-    dataset_size_train = 1000
-    dataset_size_test = 300
-    dataset_total = dataset_size_train+dataset_size_test
-    mix_size_train = math.floor(dataset_size_train/8)
-    mix_size_test = math.floor(dataset_size_test/8)
-    dataset_total2 = dataset_total + mix_size_train
-    
-    
-    coco1 = coco[0:(dataset_size_train+dataset_size_test)]
-    caltech1 = caltech[0:(dataset_size_train+dataset_size_test)]
-    imagenet1 = imagenet[0:(dataset_size_train+dataset_size_test)]
-    pascal1 = pascal[0:(dataset_size_train+dataset_size_test)]
-    cam21 = cam2[0:(dataset_size_train+dataset_size_test)]
-    inria1 = inria[0:(dataset_size_train+dataset_size_test)]
-    sun1 = sun[0:(dataset_size_train+dataset_size_test)]
-    kitti1 = kitti[0:(dataset_size_train+dataset_size_test)]
-    mix1_train_images = coco[(dataset_total):(dataset_total+ mix_size_train)] +caltech[(dataset_total):(dataset_total+ mix_size_train)] +imagenet[(dataset_total):(dataset_total+ mix_size_train)] +pascal[(dataset_total):(dataset_total+ mix_size_train)] + cam2[(dataset_total):(dataset_total+ mix_size_train)] + inria[(dataset_total):(dataset_total+ mix_size_train)] + sun[(dataset_total):(dataset_total+ mix_size_train)] + kitti[(dataset_total):(dataset_total+ mix_size_train)]
-    mix1_test_images = coco[(dataset_total2):(dataset_total2+ mix_size_test)] +caltech[(dataset_total2):(dataset_total2+ mix_size_test)] +imagenet[(dataset_total2):(dataset_total2+ mix_size_test)] +pascal[(dataset_total2):(dataset_total2+ mix_size_test)] + cam2[(dataset_total2):(dataset_total2+ mix_size_test)] + inria[(dataset_total2):(dataset_total2+ mix_size_test)] + sun[(dataset_total2):(dataset_total2+ mix_size_test)] + kitti[(dataset_total2):(dataset_total2+ mix_size_test)]
-    
-    print('len after cut')
-    print('len of coco', len(coco1))
-    print('len of caltech', len(caltech1))
-    print('len of imagenet', len(imagenet1))
-    print('len of pascal' ,len(pascal1))
-    print('len of cam2', len(cam21))
-    print('len of inria', len(inria1))
-    print('len of sun', len(sun1))
-    print('len of kitti', len(kitti1))
-    
-    orient = 8  # HOG orientations
-    pix_per_cell = 8 # HOG pixels per cell
-    cell_per_block = 2 # HOG cells per block
-    hog_channel = 0 # Can be 0, 1, 2, or "ALL"
-    spatial_size = (16, 16) # Spatial binning dimensions
-    hist_bins = 32    # Number of histogram bins
-    
-    coco_feat = extract_features(coco1, j,spatial_size=spatial_size, hist_bins=hist_bins, orient=orient, pix_per_cell=pix_per_cell, cell_per_block=cell_per_block, hog_channel=hog_channel)
-    caltech_feat = extract_features(caltech1, j,spatial_size=spatial_size, hist_bins=hist_bins, orient=orient, pix_per_cell=pix_per_cell, cell_per_block=cell_per_block, hog_channel=hog_channel)
-    imagenet_feat = extract_features(imagenet1, j,spatial_size=spatial_size, hist_bins=hist_bins, orient=orient, pix_per_cell=pix_per_cell, cell_per_block=cell_per_block, hog_channel=hog_channel) 
-    pascal_feat = extract_features(pascal1, j,spatial_size=spatial_size, hist_bins=hist_bins, orient=orient, pix_per_cell=pix_per_cell, cell_per_block=cell_per_block, hog_channel=hog_channel)
-    cam2_feat = extract_features(cam21, j,spatial_size=spatial_size, hist_bins=hist_bins, orient=orient, pix_per_cell=pix_per_cell, cell_per_block=cell_per_block, hog_channel=hog_channel)
-    inria_feat = extract_features(inria1, j,spatial_size=spatial_size, hist_bins=hist_bins, orient=orient, pix_per_cell=pix_per_cell, cell_per_block=cell_per_block, hog_channel=hog_channel)
-    sun_feat = extract_features(sun1, j,spatial_size=spatial_size, hist_bins=hist_bins, orient=orient, pix_per_cell=pix_per_cell, cell_per_block=cell_per_block, hog_channel=hog_channel)
-    kitti_feat = extract_features(kitti1, j,spatial_size=spatial_size, hist_bins=hist_bins, orient=orient, pix_per_cell=pix_per_cell, cell_per_block=cell_per_block, hog_channel=hog_channel)
-    mix_train = extract_features(mix1_train_images, j,spatial_size=spatial_size, hist_bins=hist_bins, orient=orient, pix_per_cell=pix_per_cell, cell_per_block=cell_per_block, hog_channel=hog_channel)
-    mix_test = extract_features(mix1_test_images, j,spatial_size=spatial_size, hist_bins=hist_bins, orient=orient, pix_per_cell=pix_per_cell, cell_per_block=cell_per_block, hog_channel=hog_channel)
+#     dataset_size_train = 1000
+#     dataset_size_test = 300
+#     dataset_total = dataset_size_train+dataset_size_test
+#     mix_size_train = math.floor(dataset_size_train/8)
+#     mix_size_test = math.floor(dataset_size_test/8)
+#     dataset_total2 = dataset_total + mix_size_train
     
     
-    coco_train = coco_feat[0:dataset_size_train]
-    coco_test = coco_feat[dataset_size_train:(dataset_size_train+dataset_size_test)]
-    caltech_train = caltech_feat[0:dataset_size_train]
-    caltech_test = caltech_feat[dataset_size_train:(dataset_size_train+dataset_size_test)]
-    imagenet_train = imagenet_feat[0:dataset_size_train]
-    imagenet_test = imagenet_feat[dataset_size_train:(dataset_size_train+dataset_size_test)]
-    pascal_train = pascal_feat[0:dataset_size_train]
-    pascal_test = pascal_feat[dataset_size_train:(dataset_size_train+dataset_size_test)]
-    cam2_train = cam2_feat[0:dataset_size_train]
-    cam2_test = cam2_feat[dataset_size_train:(dataset_size_train+dataset_size_test)]
-    inria_train = inria_feat[0:dataset_size_train]
-    inria_test = inria_feat[dataset_size_train:(dataset_size_train+dataset_size_test)]
-    sun_train = sun_feat[0:dataset_size_train]
-    sun_test = sun_feat[dataset_size_train:(dataset_size_train+dataset_size_test)]
-    kitti_train = kitti_feat[0:dataset_size_train]
-    kitti_test = kitti_feat[dataset_size_train:(dataset_size_train+dataset_size_test)]
+#     coco1 = coco[0:(dataset_size_train+dataset_size_test)]
+#     caltech1 = caltech[0:(dataset_size_train+dataset_size_test)]
+#     imagenet1 = imagenet[0:(dataset_size_train+dataset_size_test)]
+#     pascal1 = pascal[0:(dataset_size_train+dataset_size_test)]
+#     cam21 = cam2[0:(dataset_size_train+dataset_size_test)]
+#     inria1 = inria[0:(dataset_size_train+dataset_size_test)]
+#     sun1 = sun[0:(dataset_size_train+dataset_size_test)]
+#     kitti1 = kitti[0:(dataset_size_train+dataset_size_test)]
+#     mix1_train_images = coco[(dataset_total):(dataset_total+ mix_size_train)] +caltech[(dataset_total):(dataset_total+ mix_size_train)] +imagenet[(dataset_total):(dataset_total+ mix_size_train)] +pascal[(dataset_total):(dataset_total+ mix_size_train)] + cam2[(dataset_total):(dataset_total+ mix_size_train)] + inria[(dataset_total):(dataset_total+ mix_size_train)] + sun[(dataset_total):(dataset_total+ mix_size_train)] + kitti[(dataset_total):(dataset_total+ mix_size_train)]
+#     mix1_test_images = coco[(dataset_total2):(dataset_total2+ mix_size_test)] +caltech[(dataset_total2):(dataset_total2+ mix_size_test)] +imagenet[(dataset_total2):(dataset_total2+ mix_size_test)] +pascal[(dataset_total2):(dataset_total2+ mix_size_test)] + cam2[(dataset_total2):(dataset_total2+ mix_size_test)] + inria[(dataset_total2):(dataset_total2+ mix_size_test)] + sun[(dataset_total2):(dataset_total2+ mix_size_test)] + kitti[(dataset_total2):(dataset_total2+ mix_size_test)]
+    
+#     print('len after cut')
+#     print('len of coco', len(coco1))
+#     print('len of caltech', len(caltech1))
+#     print('len of imagenet', len(imagenet1))
+#     print('len of pascal' ,len(pascal1))
+#     print('len of cam2', len(cam21))
+#     print('len of inria', len(inria1))
+#     print('len of sun', len(sun1))
+#     print('len of kitti', len(kitti1))
+    
+#     orient = 8  # HOG orientations
+#     pix_per_cell = 8 # HOG pixels per cell
+#     cell_per_block = 2 # HOG cells per block
+#     hog_channel = 0 # Can be 0, 1, 2, or "ALL"
+#     spatial_size = (16, 16) # Spatial binning dimensions
+#     hist_bins = 32    # Number of histogram bins
+    
+#     coco_feat = extract_features(coco1, j,spatial_size=spatial_size, hist_bins=hist_bins, orient=orient, pix_per_cell=pix_per_cell, cell_per_block=cell_per_block, hog_channel=hog_channel)
+#     caltech_feat = extract_features(caltech1, j,spatial_size=spatial_size, hist_bins=hist_bins, orient=orient, pix_per_cell=pix_per_cell, cell_per_block=cell_per_block, hog_channel=hog_channel)
+#     imagenet_feat = extract_features(imagenet1, j,spatial_size=spatial_size, hist_bins=hist_bins, orient=orient, pix_per_cell=pix_per_cell, cell_per_block=cell_per_block, hog_channel=hog_channel) 
+#     pascal_feat = extract_features(pascal1, j,spatial_size=spatial_size, hist_bins=hist_bins, orient=orient, pix_per_cell=pix_per_cell, cell_per_block=cell_per_block, hog_channel=hog_channel)
+#     cam2_feat = extract_features(cam21, j,spatial_size=spatial_size, hist_bins=hist_bins, orient=orient, pix_per_cell=pix_per_cell, cell_per_block=cell_per_block, hog_channel=hog_channel)
+#     inria_feat = extract_features(inria1, j,spatial_size=spatial_size, hist_bins=hist_bins, orient=orient, pix_per_cell=pix_per_cell, cell_per_block=cell_per_block, hog_channel=hog_channel)
+#     sun_feat = extract_features(sun1, j,spatial_size=spatial_size, hist_bins=hist_bins, orient=orient, pix_per_cell=pix_per_cell, cell_per_block=cell_per_block, hog_channel=hog_channel)
+#     kitti_feat = extract_features(kitti1, j,spatial_size=spatial_size, hist_bins=hist_bins, orient=orient, pix_per_cell=pix_per_cell, cell_per_block=cell_per_block, hog_channel=hog_channel)
+#     mix_train = extract_features(mix1_train_images, j,spatial_size=spatial_size, hist_bins=hist_bins, orient=orient, pix_per_cell=pix_per_cell, cell_per_block=cell_per_block, hog_channel=hog_channel)
+#     mix_test = extract_features(mix1_test_images, j,spatial_size=spatial_size, hist_bins=hist_bins, orient=orient, pix_per_cell=pix_per_cell, cell_per_block=cell_per_block, hog_channel=hog_channel)
     
     
-    print('len after feat extract and cut')
-    print('len of coco', len(coco_train), len(coco_test))
-    print('len of caltech', len(caltech_train), len(caltech_test))
-    print('len of imagenet', len(imagenet_train), len(imagenet_test))
-    print('len of pascal' ,len(pascal_train), len(pascal_test))
-    print('len of cam2', len(cam2_train), len(cam2_test))
-    print('len of inria', len(inria_train), len(inria_test))
-    print('len of sun', len(sun_train), len(sun_test))
-    print('len of kitti', len(kitti_train), len(kitti_test))
-    print('len of mix', len(mix_train), len(mix_test))
-    X_train_m = np.vstack((coco_train, caltech_train, imagenet_train, pascal_train, cam2_train, inria_train, sun_train, kitti_train, mix_train)).astype(np.float64)
-    X_test_m = np.vstack((coco_test, caltech_test, imagenet_test, pascal_test, cam2_test, inria_test, sun_test, kitti_test, mix_test)).astype(np.float64)
-    X_train_scaler = StandardScaler().fit(X_train_m)
-    X_test_scaler = StandardScaler().fit(X_test_m)
+#     coco_train = coco_feat[0:dataset_size_train]
+#     coco_test = coco_feat[dataset_size_train:(dataset_size_train+dataset_size_test)]
+#     caltech_train = caltech_feat[0:dataset_size_train]
+#     caltech_test = caltech_feat[dataset_size_train:(dataset_size_train+dataset_size_test)]
+#     imagenet_train = imagenet_feat[0:dataset_size_train]
+#     imagenet_test = imagenet_feat[dataset_size_train:(dataset_size_train+dataset_size_test)]
+#     pascal_train = pascal_feat[0:dataset_size_train]
+#     pascal_test = pascal_feat[dataset_size_train:(dataset_size_train+dataset_size_test)]
+#     cam2_train = cam2_feat[0:dataset_size_train]
+#     cam2_test = cam2_feat[dataset_size_train:(dataset_size_train+dataset_size_test)]
+#     inria_train = inria_feat[0:dataset_size_train]
+#     inria_test = inria_feat[dataset_size_train:(dataset_size_train+dataset_size_test)]
+#     sun_train = sun_feat[0:dataset_size_train]
+#     sun_test = sun_feat[dataset_size_train:(dataset_size_train+dataset_size_test)]
+#     kitti_train = kitti_feat[0:dataset_size_train]
+#     kitti_test = kitti_feat[dataset_size_train:(dataset_size_train+dataset_size_test)]
     
     
-    X_train_scaled = X_train_scaler.transform(X_train_m)
-    X_test_scaled = X_test_scaler.transform(X_test_m)
+#     print('len after feat extract and cut')
+#     print('len of coco', len(coco_train), len(coco_test))
+#     print('len of caltech', len(caltech_train), len(caltech_test))
+#     print('len of imagenet', len(imagenet_train), len(imagenet_test))
+#     print('len of pascal' ,len(pascal_train), len(pascal_test))
+#     print('len of cam2', len(cam2_train), len(cam2_test))
+#     print('len of inria', len(inria_train), len(inria_test))
+#     print('len of sun', len(sun_train), len(sun_test))
+#     print('len of kitti', len(kitti_train), len(kitti_test))
+#     print('len of mix', len(mix_train), len(mix_test))
+#     X_train_m = np.vstack((coco_train, caltech_train, imagenet_train, pascal_train, cam2_train, inria_train, sun_train, kitti_train, mix_train)).astype(np.float64)
+#     X_test_m = np.vstack((coco_test, caltech_test, imagenet_test, pascal_test, cam2_test, inria_test, sun_test, kitti_test, mix_test)).astype(np.float64)
+#     X_train_scaler = StandardScaler().fit(X_train_m)
+#     X_test_scaler = StandardScaler().fit(X_test_m)
     
-    y_train = np.hstack((np.ones(len(coco_train)), np.full(len(caltech_train), 2), np.full(len(imagenet_train), 3), np.full(len(pascal_train), 4), np.full(len(cam2_train), 5), np.full(len(inria_train), 6), np.full(len(sun_train), 7), np.full(len(kitti_train), 8), np.full(len(mix_train), 9)))
-    y_test = np.hstack((np.ones(len(coco_test)), np.full(len(caltech_test), 2), np.full(len(imagenet_test), 3), np.full(len(pascal_test), 4), np.full(len(cam2_test), 5), np.full(len(inria_test), 6), np.full(len(sun_test), 7), np.full(len(kitti_test), 8), np.full(len(mix_test), 9)))
+    
+#     X_train_scaled = X_train_scaler.transform(X_train_m)
+#     X_test_scaled = X_test_scaler.transform(X_test_m)
+    
+#     y_train = np.hstack((np.ones(len(coco_train)), np.full(len(caltech_train), 2), np.full(len(imagenet_train), 3), np.full(len(pascal_train), 4), np.full(len(cam2_train), 5), np.full(len(inria_train), 6), np.full(len(sun_train), 7), np.full(len(kitti_train), 8), np.full(len(mix_train), 9)))
+#     y_test = np.hstack((np.ones(len(coco_test)), np.full(len(caltech_test), 2), np.full(len(imagenet_test), 3), np.full(len(pascal_test), 4), np.full(len(cam2_test), 5), np.full(len(inria_test), 6), np.full(len(sun_test), 7), np.full(len(kitti_test), 8), np.full(len(mix_test), 9)))
     
     
-    print('Using:',orient,'orientations', pix_per_cell, 'pixels per cell and', cell_per_block,'cells per block')
-    print('Feature vector length:', len(X_train_scaled[0]))
-    svc = LinearSVC(loss='hinge', multi_class = 'ovr') # Use a linear SVC 
-    t=time.time() # Check the training time for the SVC
-#        n_estimators = 10
-    print('start train')
-#        model = BaggingClassifier(svc, max_samples=1.0 / n_estimators, n_estimators=n_estimators) # Train the classifier
-    model_fit = svc.fit(X_train_scaled, y_train)
-    t2 = time.time()
-    print(round(t2-t, 2), 'Seconds to train SVC...')
-    print('Test Accuracy of SVC = ', round(model_fit.score(X_test_scaled, y_test), 4)) # Check the score of the SVC
-    results.append(round(model_fit.score(X_test_scaled, y_test), 4))
+#     print('Using:',orient,'orientations', pix_per_cell, 'pixels per cell and', cell_per_block,'cells per block')
+#     print('Feature vector length:', len(X_train_scaled[0]))
+#     svc = LinearSVC(loss='hinge', multi_class = 'ovr') # Use a linear SVC 
+#     t=time.time() # Check the training time for the SVC
+# #        n_estimators = 10
+#     print('start train')
+# #        model = BaggingClassifier(svc, max_samples=1.0 / n_estimators, n_estimators=n_estimators) # Train the classifier
+#     model_fit = svc.fit(X_train_scaled, y_train)
+#     t2 = time.time()
+#     print(round(t2-t, 2), 'Seconds to train SVC...')
+#     print('Test Accuracy of SVC = ', round(model_fit.score(X_test_scaled, y_test), 4)) # Check the score of the SVC
+#     results.append(round(model_fit.score(X_test_scaled, y_test), 4))
    
-    t4 = time.time()
-    print(round(t4-t3, 2), 'Seconds to run')
+#     t4 = time.time()
+#     print(round(t4-t3, 2), 'Seconds to run')
 
-    # if i == 0:
+#     # if i == 0:
                         
-    #     ############# FOR CONFUSION MATRIX #################################
+#     #     ############# FOR CONFUSION MATRIX #################################
         
-    #     y_pred = model_fit.predict(X_test_scaled)
+#     #     y_pred = model_fit.predict(X_test_scaled)
         
-    #     # Compute confusion matrix
-    #     cnf_matrix = confusion_matrix(y_test, y_pred)
-    #     np.set_printoptions(precision=2)
+#     #     # Compute confusion matrix
+#     #     cnf_matrix = confusion_matrix(y_test, y_pred)
+#     #     np.set_printoptions(precision=2)
         
-    #     # Plot normalized confusion matrix
-    #     class_names = ('COCO', 'Caltech', 'ImageNet', 'Pascal', 'Cam2', 'INRIA', 'Sun', 'Kitti', 'Mixed')
-    #     plt.figure()
-    #     plot_confusion_matrix(cnf_matrix, classes=class_names, normalize=True, title='Normalized confusion matrix')
+#     #     # Plot normalized confusion matrix
+#     #     class_names = ('COCO', 'Caltech', 'ImageNet', 'Pascal', 'Cam2', 'INRIA', 'Sun', 'Kitti', 'Mixed')
+#     #     plt.figure()
+#     #     plot_confusion_matrix(cnf_matrix, classes=class_names, normalize=True, title='Normalized confusion matrix')
         
-    #     plt.show()
+#     #     plt.show()
         
-print('results are', results)
-input()
-#    
-############## FOR CONFUSION MATRIX #################################
-#
-#y_pred = model_fit.predict(X_test_scaled)
-#
-## Compute confusion matrix
-#cnf_matrix = confusion_matrix(y_test, y_pred)
-#np.set_printoptions(precision=2)
-#
-## Plot normalized confusion matrix
-#class_names = ('COCO', 'Caltech', 'ImageNet', 'Pascal', 'Cam2', 'INRIA', 'Sun')
-#plt.figure()
-#plot_confusion_matrix(cnf_matrix, classes=class_names, normalize=True,
-#                      title='Normalized confusion matrix')
-#
-#plt.show()
-#input("Press enter to continue")
+# print('results are', results)
+# input()
+# #    
+# ############## FOR CONFUSION MATRIX #################################
+# #
+# #y_pred = model_fit.predict(X_test_scaled)
+# #
+# ## Compute confusion matrix
+# #cnf_matrix = confusion_matrix(y_test, y_pred)
+# #np.set_printoptions(precision=2)
+# #
+# ## Plot normalized confusion matrix
+# #class_names = ('COCO', 'Caltech', 'ImageNet', 'Pascal', 'Cam2', 'INRIA', 'Sun')
+# #plt.figure()
+# #plot_confusion_matrix(cnf_matrix, classes=class_names, normalize=True,
+# #                      title='Normalized confusion matrix')
+# #
+# #plt.show()
+# #input("Press enter to continue")
