@@ -4,3 +4,4 @@ TRAIN:
   OBJ_DET: None
 TEST:
   OBJ_DET: None
+EXP_OUTPUT_DIR: 'output/ntd'
