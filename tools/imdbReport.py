@@ -21,6 +21,7 @@ import datasets.imdb
 import argparse
 import pprint
 import numpy as np
+import numpy.random as npr
 import sys,os,cv2,uuid
 
 
