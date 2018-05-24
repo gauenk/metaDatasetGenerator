@@ -19,11 +19,11 @@ import datasets.imdb
 import argparse
 import pprint
 import numpy as np
+import numpy.random as npr
 import sys,os,cv2
 
 # pytorch imports
 from datasets.pytorch_roidb_loader import RoidbDataset
-
 
 def parse_args():
     """
@@ -55,14 +55,6 @@ def parse_args():
 
     args = parser.parse_args()
     return args
-
-def get_roidb(imdb_name):
-    imdb = get_repo_imdb(imdb_name)
-    print 'Loaded dataset `{:s}` for training'.format(imdb.name)
-    imdb.set_proposal_method(cfg.TRAIN.OBJ_DET.PROPOSAL_METHOD)
-    print 'Set proposal method: {:s}'.format(cfg.TRAIN.OBJ_DET.PROPOSAL_METHOD)
-    roidb = get_training_roidb(imdb)
-    return imdb, roidb
 
 def get_bbox_info(roidb,size):
     areas = np.zeros((size))
@@ -133,7 +125,6 @@ if __name__ == '__main__':
     np.savetxt(path,widths,fmt='%.18e',delimiter=' ')
     path = osp.join(prefix_path,"heights.dat")
     np.savetxt(path,heights,fmt='%.18e',delimiter=' ')
-
         
     print("-=-=-=-=-=-")
 
@@ -141,20 +132,22 @@ if __name__ == '__main__':
 
     print("as pytorch friendly ")
 
-    pyroidb = RoidbDataset(roidb,["__background__","person"],loader=cv2.imread,transform=cropImageToAnnoRegion)
+    pyroidb = RoidbDataset(roidb,[0,1,2,3,4,5,6,7],loader=cv2.imread,transform=cropImageToAnnoRegion)
 
     if args.save:
-       print("save 30 cropped annos in output folder.")
-       saveDir = "./output/mixedDataReport/"
-       if not osp.exists(saveDir):
-           print("making directory: {}".format(saveDir))
-           os.makedirs(saveDir)
-
-       for i in range(30):
-           cls = roidb[i]['set']
-           ds = clsToSet[cls]
-           fn = osp.join(saveDir,"{}_{}.jpg".format(i,ds))
-           print(fn)
-           cv2.imwrite(fn,pyroidb[i][0])
+        print("save 30 cropped annos in output folder.")
+        saveDir = "./output/mixedDataReport/"
+        if not osp.exists(saveDir):
+            print("making directory: {}".format(saveDir))
+            os.makedirs(saveDir)
+           
+        print("proidb length: {}".format(len(pyroidb)))
+        randIdx = npr.permutation(len(pyroidb))
+        for i in range(30):
+            img, cls = pyroidb[randIdx[i]]
+            ds = clsToSet[cls]
+            fn = osp.join(saveDir,"{}_{}.jpg".format(randIdx[i],ds))
+            print(fn)
+            cv2.imwrite(fn,img)
 
     

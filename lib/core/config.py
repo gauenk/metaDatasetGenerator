@@ -272,6 +272,8 @@ __C.CROPPED_IMAGE_SIZE = 100
 # the size of the 
 __C.CONFIG_DATASET_INDEX_DICTIONARY_PATH = "default_dataset_index.yml"
 
+# the size of the 
+__C.PATH_TO_NTD_OUTPUT = "./output/ntd/"
 
 def get_output_dir(imdb, net=None):
     """Return the directory where experimental artifacts are placed.

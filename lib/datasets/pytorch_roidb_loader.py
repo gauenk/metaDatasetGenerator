@@ -22,7 +22,7 @@ from torchvision.datasets.folder import IMG_EXTENSIONS,default_loader
 class RoidbDataset(data.Dataset):
 
     def __init__(self, roidb, classes, transform=None, target_transform=None,
-                 loader=default_loader):
+                 loader=default_loader, returnBox=False):
 
         self.roidb = roidb
         self.classes = classes
@@ -33,6 +33,7 @@ class RoidbDataset(data.Dataset):
         self.transform = transform
         self.target_transform = target_transform
         self.loader = loader
+        self._returnBox = returnBox
 
     # re-defitinion of the index function 
     def __getitem__(self, index):
@@ -45,9 +46,6 @@ class RoidbDataset(data.Dataset):
         """
         sampleIndex = np.argwhere(self.roidbSizes > index)[0][0]
         sample = self.roidb[sampleIndex]
-        img = self.loader(sample['image'])
-        if sample['flipped']:
-            img = img[:, ::-1, :]
         target = sample['set']
 
         # which box to load
@@ -58,6 +56,15 @@ class RoidbDataset(data.Dataset):
 
         box = sample['boxes'][annoIndex]
 
+        # only return box if set
+        if self._returnBox:
+            return box, target
+
+        # load the image
+        img = self.loader(sample['image'])
+        if sample['flipped']:
+            img = img[:, ::-1, :]
+
         # transform image or target
         if self.transform is not None:
             img = self.transform(img,box)
@@ -65,6 +72,7 @@ class RoidbDataset(data.Dataset):
             target = self.target_transform(target)
 
         return img, target
+            
                 
     def __len__(self):
         return self.roidbSizes[-1]
