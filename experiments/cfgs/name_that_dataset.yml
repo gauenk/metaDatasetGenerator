@@ -1,6 +1,6 @@
 EXP_DIR: name_that_dataset
-OBJ_DET: None
+OBJ_DET:
 TRAIN:
-  OBJ_DET: None
+  OBJ_DET:
 TEST:
-  OBJ_DET: None
+  OBJ_DET:
