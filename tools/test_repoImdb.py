@@ -1,3 +1,5 @@
+#!/usr/bin/env python
+
 import _init_paths
 import argparse
 import pprint
@@ -6,7 +8,7 @@ import os,sys
 import os.path as osp
 from core.train import get_training_roidb, train_net
 from core.config import cfg, cfg_from_file, cfg_from_list, get_output_dir
-from datasets.repo_imdb import ReopImdb
+from datasets.repo_imdb import RepoImdb
 import caffe
 
 def parse_args():
@@ -76,6 +78,7 @@ if __name__ == "__main__":
     print("testing_repoImdb")
     imdb = RepoImdb("pascal_voc", "train", "default")
     roidb = get_training_roidb(imdb)
+    print(roidb[1])
     output_dir = get_output_dir(imdb)
     print('Output will be saved to `{:s}`'.format(output_dir))
 

@@ -9,37 +9,44 @@
 
 """Train an Img2Vec network on a "region of interest" database."""
 
-import matplotlib
-matplotlib.use('Agg')
-import matplotlib.pyplot as plt
 import _init_paths
 from core.train import get_training_roidb
-from core.config import cfg, cfg_from_file, cfg_from_list, get_output_dir
+from core.config import cfg, cfg_from_file, cfg_from_list, get_output_dir, loadDatasetIndexDict
 from datasets.factory import get_repo_imdb
+from datasets.ds_utils import load_mixture_set,print_each_size,computeTotalAnnosFromAnnoCount,cropImageToAnnoRegion
 import os.path as osp
 import datasets.imdb
 import argparse
 import pprint
 import numpy as np
-import sys,os,cv2,uuid
+import sys,os,cv2
+
+# pytorch imports
+from datasets.pytorch_roidb_loader import RoidbDataset
 
 
 def parse_args():
     """
     Parse input arguments
     """
-    parser = argparse.ArgumentParser(description='Generate an Imdb Report')
+    parser = argparse.ArgumentParser(description='Test loading a mixture dataset')
     parser.add_argument('--cfg', dest='cfg_file',
                         help='optional config file',
                         default=None, type=str)
-    parser.add_argument('--imdb', dest='imdb_name',
-                        help='dataset to train on',
-                        default='voc_2007_trainval', type=str)
-    parser.add_argument('--rand', dest='randomize',
-                        help='randomize (do not use a fixed seed)',
-                        action='store_true')
+    parser.add_argument('--setID', dest='setID',
+                        help='which 8 digit ID to read from',
+                        default='11111111', type=str)
+    parser.add_argument('--repetition', dest='repetition',
+                        help='which repetition to read from',
+                        default='1', type=str)
+    parser.add_argument('--size', dest='size',
+                        help='which size to read from',
+                        default=1000, type=int)
     parser.add_argument('--save', dest='save',
                         help='save some samples with bboxes visualized?',
+                        action='store_true')
+    parser.add_argument('--rand', dest='randomize',
+                        help='randomize (do not use a fixed seed)',
                         action='store_true')
 
     if len(sys.argv) == 1:
@@ -76,49 +83,6 @@ def get_bbox_info(roidb,size):
             idx += 1
     return areas,widths,heights
 
-def vis_dets(im, class_names, dets, _idx_, fn=None, thresh=0.5):
-    """Draw detected bounding boxes."""
-    im = im[:, :, (2, 1, 0)]
-    fig, ax = plt.subplots(figsize=(12, 12))
-    ax.imshow(im, aspect='equal')
-    for i in range(len(dets)):
-        bbox = dets[i, :4]
-        
-        
-        ax.add_patch(
-            plt.Rectangle((bbox[0], bbox[1]),
-                          bbox[2] - bbox[0],
-                          bbox[3] - bbox[1], fill=False,
-                          edgecolor='red', linewidth=3.5)
-        )
-        
-        # if dets.shape[1] == 5:
-        #     score = dets[i, -1]
-        #     ax.text(bbox[0], bbox[1] - 2,
-        #             '{:s} {:.3f}'.format(class_name, score),
-        #             bbox=dict(facecolor='blue', alpha=0.5),
-        #             fontsize=14, color='white')
-        #     ax.set_title(('{} detections with '
-        #                   'p({} | box) >= {:.1f}').format(class_name, class_name,
-        #                                                   thresh),
-        #                  fontsize=14)
-        # else:
-        #     ax.text(bbox[0], bbox[1] - 2,
-        #             '{:s}'.format(class_name),
-        #             bbox=dict(facecolor='blue', alpha=0.5),
-        #             fontsize=14, color='white')
-        #     ax.set_title(('{} groundtruth detections').format(class_name, class_name,
-        #                                                   thresh),
-        #                  fontsize=14)
-        
-    plt.axis('off')
-    plt.tight_layout()
-    plt.draw()
-    if fn is None:
-        plt.savefig("img_{}_{}.png".format(_idx_,str(uuid.uuid4())))
-    else:
-        plt.savefig(fn.format(_idx_,str(uuid.uuid4())))
-
 if __name__ == '__main__':
     args = parse_args()
 
@@ -134,14 +98,19 @@ if __name__ == '__main__':
     if not args.randomize:
         np.random.seed(cfg.RNG_SEED)
 
-    imdb, roidb = get_roidb(args.imdb_name)
-    numAnnos = imdb.roidb_num_bboxes_at(-1)
+    setID = args.setID
+    repetition = args.repetition
+    size = args.size
+    
+    roidb,annoCount = load_mixture_set(setID,repetition,size)
+    numAnnos = computeTotalAnnosFromAnnoCount(annoCount)
+
     print("\n\n-=-=-=-=-=-=-=-=-\n\n")
     print("Report:\n\n")
-    print("number of classes: {}".format(imdb.num_classes))
+    print("Mixture Dataset: {} {} {}\n\n".format(setID,repetition,size))
+
     print("number of images: {}".format(len(roidb)))
     print("number of annotations: {}".format(numAnnos))
-    print("size of imdb in memory: {}kB".format(sys.getsizeof(imdb)/1024.))
     print("size of roidb in memory: {}kB".format(len(roidb) * sys.getsizeof(roidb[0])/1024.))
     print("example roidb:")
     for k,v in roidb[0].items():
@@ -158,8 +127,6 @@ if __name__ == '__main__':
     if osp.exists(prefix_path) is False:
         os.makedirs(prefix_path)
 
-    # issue: we are getting zeros area for 5343 of bboxes for pascal_voc_2007
-
     path = osp.join(prefix_path,"areas.dat")
     np.savetxt(path,areas,fmt='%.18e',delimiter=' ')
     path = osp.join(prefix_path,"widths.dat")
@@ -167,17 +134,27 @@ if __name__ == '__main__':
     path = osp.join(prefix_path,"heights.dat")
     np.savetxt(path,heights,fmt='%.18e',delimiter=' ')
 
+        
+    print("-=-=-=-=-=-")
+
+    clsToSet = loadDatasetIndexDict()
+
+    print("as pytorch friendly ")
+
+    pyroidb = RoidbDataset(roidb,["__background__","person"],loader=cv2.imread,transform=cropImageToAnnoRegion)
+
     if args.save:
-        index = imdb._get_roidb_index_at_size(30)
-        print("saving 30 imdb annotations to output folder...")        
-        print(prefix_path)
-        for i in range(index):
-            boxes = roidb[i]['boxes']
-            if len(boxes) == 0: continue
-            im = cv2.imread(roidb[i]['image'])
-            if roidb[i]['flipped']:
-                im = im[:, ::-1, :]
-            cls = roidb[i]['gt_classes']
-            fn = osp.join(prefix_path,"{}_{}.png".format(imdb.name,i))
-            print(fn)
-            vis_dets(im,cls,boxes,i,fn=fn)
+       print("save 30 cropped annos in output folder.")
+       saveDir = "./output/mixedDataReport/"
+       if not osp.exists(saveDir):
+           print("making directory: {}".format(saveDir))
+           os.makedirs(saveDir)
+
+       for i in range(30):
+           cls = roidb[i]['set']
+           ds = clsToSet[cls]
+           fn = osp.join(saveDir,"{}_{}.jpg".format(i,ds))
+           print(fn)
+           cv2.imwrite(fn,pyroidb[i][0])
+
+    

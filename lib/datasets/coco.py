@@ -95,7 +95,8 @@ class coco(imdb):
         fn = osp.join(self._local_path,"ymlConfigs" ,self._configName + ".yml")
         with open(fn, 'r') as f:
             yaml_cfg = edict(yaml.load(f))
-        fn = osp.join(self._local_path,"ymlConfigs" ,yaml_cfg['CONFIG_DATASET_INDEX_DICTIONARY'])
+        fn = osp.join(self._local_path,"ymlConfigs" ,
+                      yaml_cfg['CONFIG_DATASET_INDEX_DICTIONARY_PATH'])
         with open(fn, 'r') as f:
             setID = edict(yaml.load(f))[self._datasetName]
         self.config = {'cleanup'     : yaml_cfg['CONFIG_CLEANUP'],
@@ -108,6 +109,7 @@ class coco(imdb):
     def _get_ann_file(self):
         prefix = 'instances' if self._image_set.find('test') == -1 \
                              else 'image_info'
+        print(self._data_path)
         return osp.join(self._data_path, 'annotations',
                         prefix + '_' + self._image_set + self._year + '.json')
 

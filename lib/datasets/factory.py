@@ -26,9 +26,10 @@ __sets.append("sun")
 
 def get_repo_imdb(name):
     """Get an imdb (image database) by name."""
+    print(name)
     di = name.split("-")
-    if len(di) < 3:
-        raise KeyError('Dataset name [{}] is not long enough'.format(name))
+    if len(di) != 3:
+        raise KeyError('Dataset name [{}] is not correct length'.format(name))
     for __set in __sets:
         if di[0] == __set:
             if __set == "coco":

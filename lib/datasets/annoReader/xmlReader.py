@@ -9,7 +9,7 @@ import os.path as osp
 import PIL
 import numpy as np
 import scipy.sparse
-from core.config import cfg
+from core.config import cfg,cfgData
 from easydict import EasyDict as edict
 import xml.etree.ElementTree as ET
 
@@ -79,6 +79,8 @@ class xmlReader(object):
             y1 = float(bbox.find('ymin').text) - self._bboxOffset
             x2 = float(bbox.find('xmax').text) - self._bboxOffset
             y2 = float(bbox.find('ymax').text) - self._bboxOffset
+            # handle scaling caltech; annos were modified for YOLO
+            x1,y1,x2,y2 = self._handle_caltech_helps_vs_gauenk(*[x1, y1, x2, y2])
             boxes[ix, :] = [x1, y1, x2, y2]
             gt_classes[ix] = cls
             overlaps[ix, cls] = 1.0
@@ -112,3 +114,12 @@ class xmlReader(object):
         else:
             cls = -1
         return cls
+
+    def _handle_caltech_helps_vs_gauenk(self,x1,y1,x2,y2):
+        if "helps" in cfg.PATH_YMLDATASETS and "caltech" in cfgData.EXP_DATASET: 
+            x1 = x1 * 640
+            y1 = y1 * 480
+            x2 = x2 * 640
+            y2 = y2 * 480
+        return x1,y1,x2,y2
+        

@@ -3,7 +3,7 @@
 # Written by Kent Gauen
 # --------------------------------------------------------
 
-import os
+import os,glob
 import os.path as osp
 import PIL
 import pickle
@@ -36,6 +36,7 @@ class RepoImdb(imdb):
         self._parseDatasetFile()
 
     def _parseDatasetFile(self):
+        self._resetDataConfig()
         self._setupConfig()
         fn = osp.join(self._local_path,
                       "ymlDatasets", cfg.PATH_YMLDATASETS,
@@ -50,7 +51,7 @@ class RepoImdb(imdb):
 
         self._path_to_imageSets = cfgData['PATH_TO_IMAGESETS']
         if not self._checkImageSet():
-            raise ValueError("imageSet path {} doesn't exist")
+            raise ValueError("imageSet path {} doesn't exist".format(self._imageSetPath))
 
         self._image_index = self._load_image_index()
 
@@ -68,6 +69,10 @@ class RepoImdb(imdb):
                                                cfgData['USE_IMAGE_SET'],
         )
 
+    def _resetDataConfig(self):
+        cfgData.CONVERT_ID_TO_CLS_FILE = None
+        cfgData.USE_IMAGE_SET = None
+        
     def _set_id_to_cls(self):
         convertIdtoCls_filename = cfgData['CONVERT_ID_TO_CLS_FILE']
         if convertIdtoCls_filename is not None:
@@ -81,7 +86,8 @@ class RepoImdb(imdb):
         fn = osp.join(self._local_path,"ymlConfigs" ,self._configName + ".yml")
         with open(fn, 'r') as f:
             yaml_cfg = edict(yaml.load(f))
-        fn = osp.join(self._local_path,"ymlConfigs" ,yaml_cfg['CONFIG_DATASET_INDEX_DICTIONARY'])
+        fn = osp.join(self._local_path,"ymlConfigs" ,
+                      yaml_cfg['CONFIG_DATASET_INDEX_DICTIONARY_PATH'])
         with open(fn, 'r') as f:
             setID = edict(yaml.load(f))[self._datasetName]
         self.config = {'cleanup'     : yaml_cfg['CONFIG_CLEANUP'],

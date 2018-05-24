@@ -8,7 +8,7 @@ import os.path as osp
 import PIL
 import numpy as np
 import scipy.sparse
-from core.config import cfg
+from core.config import cfg,cfgData
 from easydict import EasyDict as edict
 from utils import *
 
@@ -73,7 +73,11 @@ class bboxEvaluator(object):
                 use_07_metric=use_07_metric)
             aps += [ap]
         aps = np.array(aps)
-        results_fd = open("./results_{}.txt".format(self._datasetName + self._salt),"w")
+        infix = "faster-rcnn"
+        if cfgData.SSD:
+            infix = "ssd"
+            
+        results_fd = open("./results_{}_{}.txt".format(infix,self._datasetName + self._salt),"w")
         for kdx in range(len(ovthresh)):
             #print('{0:.3f}@{1:.2f}'.format(ap[kdx],ovthresh[kdx]))
             print('Mean AP = {:.4f} @ {:.2f}'.format(np.mean(aps[:,kdx]),ovthresh[kdx]))

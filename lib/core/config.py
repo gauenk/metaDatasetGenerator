@@ -59,7 +59,7 @@ __C.DATASETS.ONLY_PERSON = False
 __C.TRAIN = edict()
 __C.PATH_YMLDATASETS = "helps"
 #__C.PATH_YMLDATASETS = "gauenk"
-__C.PATH_MIXTURE_DATASETS = "./lib/datasets/mixtureDatasets/"
+__C.PATH_MIXTURE_DATASETS = "./data/mixtureDatasets/"
 
 # Scales to use during training (can list multiple scales)
 # Each scale is the pixel size of an image's shortest side
@@ -242,6 +242,12 @@ __C.GPU_ID = 0
 # path to save information for imdb report
 __C.IMDB_REPORT_OUTPUT_PATH = "output/imdbReport/"
 
+# is it ssd?
+__C.SSD = False
+
+# input size of an ssd image
+__C.SSD_img_size= 300
+
 # The mapping from image coordinates to feature map coordinates might cause
 # some boxes that are distinct in image space to become identical in feature
 # coordinates. If DEDUP_BOXES > 0, then DEDUP_BOXES is used as the scale factor
@@ -256,6 +262,15 @@ __C.OBJ_DET.USE_GPU_NMS = True
 
 # How much information about the bounding boxes do we store in memory?
 __C.OBJ_DET.BBOX_VERBOSE = True
+
+# The sizes used for creating the mixture datasets
+__C.MIXED_DATASET_SIZES = [10,50,100,250,500,1000,2000,5000]
+
+# The size of the input for images cropped to their annotations
+__C.CROPPED_IMAGE_SIZE = 100
+
+# the size of the 
+__C.CONFIG_DATASET_INDEX_DICTIONARY_PATH = "default_dataset_index.yml"
 
 
 def get_output_dir(imdb, net=None):
@@ -351,6 +366,17 @@ def createPathRepeat(setID,r):
     
 def createFilenameID(setID,r,size):
     return osp.join(cfg.PATH_MIXTURE_DATASETS,setID,r,size)
+
+def loadDatasetIndexDict():
+    fn = osp.join(__C.ROOT_DIR,"./lib/datasets/ymlConfigs",cfg.CONFIG_DATASET_INDEX_DICTIONARY_PATH)
+    import yaml
+    with open(fn, 'r') as f:
+        yaml_cfg = edict(yaml.load(f))
+    indToCls = [None for _ in range(len(yaml_cfg))]
+    for k,v in yaml_cfg.items():
+        indToCls[v] = k
+    print(indToCls)
+    return indToCls
 
 
 

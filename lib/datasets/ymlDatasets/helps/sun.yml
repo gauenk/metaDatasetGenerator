@@ -1,10 +1,10 @@
 EXP_DATASET: sun
-PATH_ROOT: /srv/sdb1/image_team/sun/SUN2012/
-PATH_TO_IMAGES: /srv/sdb1/image_team/sun/SUN2012/Images/
-PATH_TO_ANNOTATIONS: /srv/sdb1/image_team/sun/SUN2012/Annotations/
-PATH_TO_IMAGESETS: /srv/sdb1/image_team/sun/SUN2012/ImageSets/Main/
-PATH_TO_RESULTS: /srv/sdb1/image_team/sun/SUN2012/results
-CLASSES: /srv/sdb1/image_team/sun/SUN2012/classes.txt
+PATH_ROOT: /srv/sdb1/image_team/sun/SUNdevkit/SUN2012/
+PATH_TO_IMAGES: /srv/sdb1/image_team/sun/SUNdevkit/SUN2012/Images/
+PATH_TO_ANNOTATIONS: /srv/sdb1/image_team/sun/SUNdevkit/SUN2012/Annotations/
+PATH_TO_IMAGESETS: /srv/sdb1/image_team/sun/SUNdevkit/SUN2012/ImageSets/Main/
+PATH_TO_RESULTS: /srv/sdb1/image_team/sun/SUNdevkit/SUN2012/results
+CLASSES: /srv/sdb1/image_team/sun/SUNdevkit/SUN2012/classes.txt
 IMAGE_TYPE: .jpg
 ANNOTATION_TYPE: xml
 IMAGE_INDEX_TO_IMAGE_PATH: default
@@ -79,5 +79,8 @@ CONVERT_TO_PERSON:
 - â´person occluded
 
 
+<<<<<<< HEAD
 
 
+=======
+>>>>>>> 7d7d5018c4e86d882d461bb9fd21ee05f92707e2
