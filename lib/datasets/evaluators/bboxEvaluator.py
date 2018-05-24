@@ -74,9 +74,9 @@ class bboxEvaluator(object):
             aps += [ap]
         aps = np.array(aps)
         infix = "faster-rcnn"
-        if cfgData.SSD:
-            infix = "ssd"
-            
+        if cfgData.MODEL:
+            infix = cfgData.MODEL
+
         results_fd = open("./results_{}_{}.txt".format(infix,self._datasetName + self._salt),"w")
         for kdx in range(len(ovthresh)):
             #print('{0:.3f}@{1:.2f}'.format(ap[kdx],ovthresh[kdx]))
