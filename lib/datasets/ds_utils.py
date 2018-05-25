@@ -78,7 +78,6 @@ def print_each_size(roidb):
     sizes = [0 for _ in range(8)]
     for elem in roidb:
         sizes[elem['set']-1] += 1
-    print(sizes)
 
 def cropImageToAnnoRegion(im_orig,box):
     x1 = box[0]
@@ -90,8 +89,6 @@ def cropImageToAnnoRegion(im_orig,box):
 def scaleImage(im_orig):
     target_size = cfg.CROPPED_IMAGE_SIZE 
     x_size,y_size = im_orig.shape[0:2]
-    assert x_size > 0, "x size is 0"
-    assert y_size > 0, "y size is 0"
     im_scale_x = float(target_size) / x_size
     im_scale_y = float(target_size) / y_size
     im = cv2.resize(im_orig, (target_size,target_size),

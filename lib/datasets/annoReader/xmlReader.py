@@ -6,7 +6,6 @@
 
 import os
 import os.path as osp
-import PIL
 import numpy as np
 import scipy.sparse
 from core.config import cfg,cfgData

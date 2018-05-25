@@ -8,7 +8,7 @@
 # --------------------------------------------------------
 
 """
-Given an imdb object and yolo output detections,
+Given an imdb object and text output detections,
 compute the AP
 """
 
@@ -17,7 +17,7 @@ matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 import _init_paths
 from core.train import get_training_roidb
-from core.config import cfg, cfg_from_file, cfg_from_list, get_output_dir
+from core.config import cfg, cfgData, cfg_from_file, cfg_from_list, get_output_dir
 from datasets.factory import get_repo_imdb
 from datasets.evaluators.bboxEvaluator import bboxEvaluator
 import os.path as osp
@@ -43,13 +43,12 @@ def parse_args():
     parser.add_argument('--rand', dest='randomize',
                         help='randomize (do not use a fixed seed)',
                         action='store_true')
-    parser.add_argument('--yoloDets', dest='yoloFilename',
+    parser.add_argument('--txtDets', dest='txtFilename',
                         help='detections to be evaluated',
-                        action=None)
+                        action=None,required=True)
     parser.add_argument('--save', dest='save',
                         help='save some samples with bboxes visualized?',
                         action='store_true')
-
 
     if len(sys.argv) == 1:
         parser.print_help()
@@ -85,8 +84,8 @@ def get_bbox_info(roidb,size):
             idx += 1
     return areas,widths,heights
 
-def getResultsFileFormatFromFilename(yoloFilename):
-    base = yoloFilename.split("/")[-1]
+def getResultsFileFormatFromFilename(txtFilename):
+    base = txtFilename.split("/")[-1]
     rstr = "(?P<compID>[^_]+)(_(?P<salt>[^_]+))?_det_(?P<imgSet>[^_]+)_(?P<cls>[^_]+)\.txt"
     mgd = re.match(rstr,base).groupdict()
 
@@ -112,7 +111,7 @@ if __name__ == '__main__':
     if not args.randomize:
         np.random.seed(cfg.RNG_SEED)
 
-    yoloFilename = args.yoloFilename
+    txtFilename = args.txtFilename
     imdb, roidb = get_roidb(args.imdb_name)
     numAnnos = imdb.roidb_num_bboxes_at(-1)
     print("\n\n-=-=-=-=-=-=-=-=-\n\n")
@@ -146,13 +145,17 @@ if __name__ == '__main__':
     path = osp.join(prefix_path,"heights.dat")
     np.savetxt(path,heights,fmt='%.18e',delimiter=' ')
 
-    yolo_compID,yolo_salt,yolo_imageSet,cls = getResultsFileFormatFromFilename(yoloFilename)
-    print(yolo_compID,yolo_salt,yolo_imageSet,cls)
-    bbEval = bboxEvaluator(imdb.name,imdb.classes,yolo_compID,yolo_salt,
+    _compID,_salt,_imageSet,cls = getResultsFileFormatFromFilename(txtFilename)
+    print(_compID,_salt,_imageSet,cls)
+    print(imdb._image_index[:10])
+    print(imdb.name)
+    print(imdb._cachedir)
+    bbEval = bboxEvaluator(imdb.name,imdb.classes,_compID,_salt,
                            imdb._cachedir,imdb._imageSetPath,
-                           imdb._image_index,imdb.annoReader._annoPath,
-                           imdb.annoReader)
-    bbEval._pathResults = '/'.join(yoloFilename.split("/")[:-1])+"/"
-    bbEval._do_python_eval("./output/yoloEval/")
+                           imdb._image_index,cfgData['PATH_TO_ANNOTATIONS'],
+                           imdb.load_annotation,onlyCls=cls)
+    bbEval._pathResults = '/'.join(txtFilename.split("/")[:-1])+"/"
+    bbEval._imageSet = _imageSet
+    bbEval._do_python_eval("./output/txtEval/")
 
 

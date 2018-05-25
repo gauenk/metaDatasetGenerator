@@ -1,31 +1,31 @@
-
+import pickle,utils,os,re
 import os.path as osp
-import cPickle
-
 import xml.etree.ElementTree as ET
 import numpy as np
 
-def parse_rec(filename):
-    """ Parse a PASCAL VOC xml file """
-    tree = ET.parse(filename+".xml")
+def parse_rec(filename,load_annotation,classes):
+    if "COCO" in filename:
+        index = int(re.match(".*(?P<id>[0-9]{12})",filename).groupdict()['id'])
+    else:
+        index = filename
+
+    recs = load_annotation(index)
     objects = []
-    for obj in tree.findall('object'):
+    for idx,bbox in enumerate(recs['boxes']):
         obj_struct = {}
         obj_struct['anno'] = filename
-        obj_struct['name'] = obj.find('name').text
-        obj_struct['pose'] = obj.find('pose').text
-        obj_struct['truncated'] = int(obj.find('truncated').text)
-        obj_struct['difficult'] = int(obj.find('difficult').text)
-        bbox = obj.find('bndbox')
-        obj_struct['bbox'] = [int(bbox.find('xmin').text),
-                              int(bbox.find('ymin').text),
-                              int(bbox.find('xmax').text),
-                              int(bbox.find('ymax').text)]
+        obj_struct['name'] = recs['gt_classes'][idx]
+        try:
+            if int(obj_struct['name']) is not None:
+                obj_struct['name'] = classes[obj_struct['name']]
+        except:
+            pass
+        obj_struct['difficult'] = 0
+        obj_struct['bbox'] = bbox
         objects.append(obj_struct)
-
     return objects
 
-def load_groundTruth(cachedir,imagesetfile,annopath,annoReader):
+def load_groundTruth(cachedir,imagesetfile,annopath,annoReader,indexToCls):
     # first load gt
     if not osp.isdir(cachedir):
         os.mkdir(cachedir)
@@ -40,19 +40,19 @@ def load_groundTruth(cachedir,imagesetfile,annopath,annoReader):
         # load annots
         recs = {}
         for i, imagename in enumerate(imagenames):
-            recs[imagename] = parse_rec(annopath.format(imagename))
+            recs[imagename] = parse_rec(imagename,annoReader,indexToCls)
             if i % 100 == 0:
                 print 'Reading annotation for {:d}/{:d}'.format(
                     i + 1, len(imagenames))
         # save
         print 'Saving cached annotations to {:s}'.format(cachefile)
         with open(cachefile, 'w') as f:
-            cPickle.dump(recs, f)
+            pickle.dump(recs, f)
     else:
         # load
         print("cachefile @ {:s}".format(cachefile))
         with open(cachefile, 'r') as f:
-            recs = cPickle.load(f)
+            recs = pickle.load(f)
 
     return imagenames, recs
 

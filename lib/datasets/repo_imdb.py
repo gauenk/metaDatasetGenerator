@@ -42,7 +42,7 @@ class RepoImdb(imdb):
                       "ymlDatasets", cfg.PATH_YMLDATASETS,
                       self._datasetName + ".yml")
         cfgData_from_file(fn)
-        assert(self._datasetName == cfgData['EXP_DATASET'], "dataset name is not correct.")
+        assert self._datasetName == cfgData['EXP_DATASET'], "dataset name is not correct."
         self._set_classes(cfgData['CLASSES'],cfgData['CONVERT_TO_PERSON'],cfgData['ONLY_PERSON'])
         self._num_classes = len(self._classes)
         self._path_root = cfgData['PATH_ROOT']
@@ -131,18 +131,6 @@ class RepoImdb(imdb):
 
         self._classes = _classes        
 
-
-    def _checkImageSet(self):
-        self._imageSetPath = osp.join(self._path_to_imageSets, self._image_set + ".txt")
-        if osp.exists(self._imageSetPath) == True:
-            return 1
-        print("-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-")
-        print("imageSet error:")
-        for imageset in glob.glob(self._path_to_imageSets):
-            print(imageset)
-        print("-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-")
-        return 0
-
     def _createAnnoReader(self,annoPath,annoType,cleanRegex,convertToPerson,useImageSet):
         path = annoPath
         if useImageSet:
@@ -172,7 +160,7 @@ class RepoImdb(imdb):
                              self._compID, "_" + self._salt,
                              cachedir, self._imageSetPath,
                              self._image_index,annoPath,
-                             self.annoReader)
+                             self.load_annotation)
 
     def _update_image_index(self,newImageIndex):
         self._image_index = newImageIndex
@@ -240,12 +228,15 @@ class RepoImdb(imdb):
             print('{} gt roidb loaded from {}'.format(self.name, cache_file))
             return roidb
 
-        gt_roidb = [self.annoReader.load_annotation(index)
+        gt_roidb = [self.load_annotation(index)
                     for index in self._image_index]
         with open(cache_file, 'wb') as fid:
             pickle.dump(gt_roidb, fid)
         print('wrote gt roidb to {}'.format(cache_file))
         return gt_roidb
+
+    def load_annotation(self,index):
+        return self.annoReader.load_annotation(index)
 
     def competition_mode(self, on):
         if on:
