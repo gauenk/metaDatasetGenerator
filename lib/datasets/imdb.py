@@ -5,7 +5,7 @@
 # Written by Ross Girshick
 # --------------------------------------------------------
 
-import os
+import os,glob
 import os.path as osp
 import PIL
 import numpy as np
@@ -21,6 +21,7 @@ class imdb(object):
         self._num_classes = 0
         self._classes = []
         self._image_index = []
+        self._cachedir = "./data/annotation_cache/"
         self._obj_proposer = 'selective_search'
         self._roidb = None
         self._roidb_handler = self.default_roidb
@@ -111,6 +112,9 @@ class imdb(object):
         raise NotImplementedError
 
     def default_roidb(self):
+        raise NotImplementedError
+
+    def load_annotation(self,i):
         raise NotImplementedError
 
     def shuffle_image_index(self):
@@ -300,3 +304,15 @@ class imdb(object):
     def competition_mode(self, on):
         """Turn competition mode on or off."""
         pass
+
+
+    def _checkImageSet(self,year=""):
+        self._imageSetPath = osp.join(self._path_to_imageSets, self._image_set + year + ".txt")
+        if osp.exists(self._imageSetPath) == True:
+            return 1
+        print("-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-")
+        print("imageSet error:")
+        for imageset in glob.glob(self._path_to_imageSets):
+            print(imageset)
+        print("-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-")
+        return 0
