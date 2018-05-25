@@ -53,6 +53,9 @@ def load_mixture_set(setID,repetition,final_size):
     annoCounts = []
     datasetSizes = cfg.MIXED_DATASET_SIZES
     if final_size not in datasetSizes:
+        print("invalid dataset size")
+        print("valid option sizes include:")
+        print(datasetSizes)
         raise ValueError("size {} is not in cfg.MIXED_DATASET_SIZES".format(final_size))
     sizeIndex = datasetSizes.index(final_size)
     prevSize = 0

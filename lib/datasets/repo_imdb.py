@@ -17,6 +17,7 @@ from datasets.evaluators.bboxEvaluator import bboxEvaluator
 from datasets.imageReader.rawReader import rawReader
 from datasets.annoReader.xmlReader import xmlReader
 from datasets.annoReader.txtReader import txtReader
+from datasets.annoReader.jsonReader import jsonReader
 
 class RepoImdb(imdb):
     """Image database."""
@@ -143,7 +144,11 @@ class RepoImdb(imdb):
                                                  self.config['setID'],cleanRegex=cleanRegex,
                                                  convertToPerson=convertToPerson,
                                                  convertIdToCls = self._convertIdToCls)
-        
+        elif annoType == "json": return jsonReader(path,self.classes,self._datasetName,
+                                                   self.config['setID'],self._image_set,
+                                                   convertToPerson=convertToPerson,
+                                                   convertIdToCls = self._convertIdToCls)
+
     def _createImgReader(self,imgPath,imgType,useImageSet):
         path = imgPath
         if useImageSet:

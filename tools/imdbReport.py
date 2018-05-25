@@ -93,25 +93,6 @@ def vis_dets(im, class_names, dets, _idx_, fn=None, thresh=0.5):
                           edgecolor='red', linewidth=3.5)
         )
         
-        # if dets.shape[1] == 5:
-        #     score = dets[i, -1]
-        #     ax.text(bbox[0], bbox[1] - 2,
-        #             '{:s} {:.3f}'.format(class_name, score),
-        #             bbox=dict(facecolor='blue', alpha=0.5),
-        #             fontsize=14, color='white')
-        #     ax.set_title(('{} detections with '
-        #                   'p({} | box) >= {:.1f}').format(class_name, class_name,
-        #                                                   thresh),
-        #                  fontsize=14)
-        # else:
-        #     ax.text(bbox[0], bbox[1] - 2,
-        #             '{:s}'.format(class_name),
-        #             bbox=dict(facecolor='blue', alpha=0.5),
-        #             fontsize=14, color='white')
-        #     ax.set_title(('{} groundtruth detections').format(class_name, class_name,
-        #                                                   thresh),
-        #                  fontsize=14)
-        
     plt.axis('off')
     plt.tight_layout()
     plt.draw()
@@ -138,6 +119,7 @@ if __name__ == '__main__':
     imdb, roidb = get_roidb(args.imdb_name)
     numAnnos = imdb.roidb_num_bboxes_at(-1)
     print("\n\n-=-=-=-=-=-=-=-=-\n\n")
+
     print("Report:\n\n")
     print("number of classes: {}".format(imdb.num_classes))
     print("number of images: {}".format(len(roidb)))
