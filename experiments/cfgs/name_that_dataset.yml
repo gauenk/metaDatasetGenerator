@@ -3,5 +3,5 @@ OBJ_DET:
 TRAIN:
   OBJ_DET:
 TEST:
-  OBJ_DET: None
-EXP_OUTPUT_DIR: 'output/ntd'
+  OBJ_DET:
+
