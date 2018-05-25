@@ -148,6 +148,7 @@ if __name__ == '__main__':
 
     yolo_compID,yolo_salt,yolo_imageSet,cls = getResultsFileFormatFromFilename(yoloFilename)
     print(yolo_compID,yolo_salt,yolo_imageSet,cls)
+    print(imdb._image_index[:10])
     bbEval = bboxEvaluator(imdb.name,imdb.classes,yolo_compID,yolo_salt,
                            imdb._cachedir,imdb._imageSetPath,
                            imdb._image_index,imdb.annoReader._annoPath,
