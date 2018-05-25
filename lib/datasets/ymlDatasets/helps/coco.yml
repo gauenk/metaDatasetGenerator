@@ -1,0 +1,13 @@
+EXP_DATASET: coco
+PATH_ROOT: /srv/sdb1/image_team/coco/
+PATH_TO_IMAGES: /srv/sdb1/image_team/coco/images/
+PATH_TO_ANNOTATIONS: /home/gauenk/Documents/data/caltech_pedestrian/CAL2009/labels
+PATH_TO_IMAGESETS: /srv/sdb1/image_team/coco/ImageSets/ImageSets/
+PATH_TO_RESULTS: /srv/sdb1/image_team/coco/coco/results
+CLASSES: /home/gauenk/Documents/data/caltech_pedestrian/CAL2009/classes.txt
+IMAGE_TYPE: .jpg
+ANNOTATION_TYPE: txt
+PARSE_ANNOTATION_REGEX:
+CONVERT_TO_PERSON:
+IMAGE_INDEX_TO_IMAGE_PATH: default
+ONLY_PERSON: True
