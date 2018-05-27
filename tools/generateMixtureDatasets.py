@@ -11,7 +11,7 @@
 import _init_paths
 from core.train import get_training_roidb, train_net
 from core.config import cfg, cfg_from_file, cfg_from_list, get_output_dir, createFilenameID, createPathRepeat, createPathSetID
-from dataset.ds_utils import print_each_size
+from datasets.ds_utils import print_each_size
 from datasets.factory import get_repo_imdb
 import datasets.imdb
 import numpy as np
@@ -22,9 +22,9 @@ import numpy as np
 import sys,os,pickle
 import os.path as osp
 
-TESTING = False
+DEBUG = False
 #imdb_names = {"coco":1,"pacsal_voc":2,"imagenet":3,"caltech":4,"cam2":5,"inria":6,"sun":7,"kitti":8}
-imdb_names = {"pascal_voc-train-default":2,"caltech-medium-default":4,"coco-minival-default":1,"cam2-train-default":5,"sun-train-default":7,"kitti-train-default":8,"imagenet-train2014-default":3,"inria-train-default":6}
+imdb_names = {"pascal_voc-train-default":2,"caltech-medium-default":4,"coco-minival2014-default":1,"cam2-train-default":5,"sun-train-default":7,"kitti-train-default":8,"imagenet-train2014-default":3,"inria-train-default":6}
 indexToImdbName = ['coco','pascal_voc','imagenet','cam2','caltech','kitti','sun','inria']
 datasetSizes = cfg.MIXED_DATASET_SIZES
 loadedRoidbs = {}
@@ -90,8 +90,8 @@ def createMixtureDataset(setID,size):
     
     imdbs = setID_to_imdbs(setID)
 
-    # remove ONLY FOR TESTING
-    if TESTING:
+    # remove ONLY FOR DEBUG
+    if DEBUG:
         if len(imdbs) == 0: return []
     else:
         assert len(imdbs) == setID.count('1')
