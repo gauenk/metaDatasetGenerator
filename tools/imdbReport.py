@@ -16,6 +16,7 @@ import _init_paths
 from core.train import get_training_roidb
 from core.config import cfg, cfg_from_file, cfg_from_list, get_output_dir
 from datasets.factory import get_repo_imdb
+from datasets.ds_utils import load_mixture_set,print_each_size
 import os.path as osp
 import datasets.imdb
 import argparse
@@ -140,6 +141,16 @@ if __name__ == '__main__':
     prefix_path = cfg.IMDB_REPORT_OUTPUT_PATH
     if osp.exists(prefix_path) is False:
         os.makedirs(prefix_path)
+
+    print("-="*50)
+    print(imdb.roidbSize)
+    print("mixed datasets roidbsize")
+    for size in [50,100,500,1000]:
+       sizedRoidb,actualSize = imdb.get_roidb_at_size(size)
+       print("size: {}".format(size))
+       print_each_size(sizedRoidb)
+    print("-="*50)
+
 
     # issue: we are getting zeros area for 5343 of bboxes for pascal_voc_2007
 

@@ -107,11 +107,6 @@ class RepoImdb(imdb):
         index = self._image_index[i]
         return self.imgReader.image_path_from_index(index)
 
-    def get_roidb_sized_at(self, size):
-        self._sizedRoidb = []
-        
-        return sizedRoidb
-
     def _set_classes(self,classFilename,convertToPerson,onlyPerson):
         _classes = self._load_classes(classFilename)
         assert _classes[0] == "__background__","Background class must be first index"
@@ -254,7 +249,8 @@ class RepoImdb(imdb):
     def compute_size_along_roidb(self):
         if self.roidb is None:
             raise ValueError("roidb must be loaded before 'compute_size_along_roidb' can be run")
-        self._roidbSize.append(len(self.roidb[0]['boxes']))
+        self._roidbSize.append(sum(self.roidb[0]['gt_classes'] \
+                                   == self.classes.index("person")))
         for image in self.roidb[1:]:
-            newSize = self._roidbSize[-1] + len(image['boxes'])
+            newSize = self._roidbSize[-1] + sum(image['gt_classes'] == self.classes.index("person"))
             self._roidbSize.append(newSize)

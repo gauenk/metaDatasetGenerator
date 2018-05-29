@@ -22,7 +22,7 @@ class imdb(object):
         self._classes = []
         self._image_index = []
         self._cachedir = "./data/annotation_cache/"
-        self._obj_proposer = 'selective_search'
+        self._obj_proposer = 'gt'
         self._roidb = None
         self._roidb_handler = self.default_roidb
         self._roidbSize = []
@@ -69,7 +69,7 @@ class imdb(object):
         if rindex == -1:
             print("\n\nWARNING: imdb [{:s}] may be too small @ {}\n\n".\
                   format(self.name,self.roidbSize[rindex]))
-        return self.roidb[:rindex],self.roidbSize[rindex]
+        return self.roidb[:rindex+1],self.roidbSize[rindex]
 
     def roidb_num_bboxes_at(self,index):
         return self.roidbSize[index]
@@ -124,6 +124,8 @@ class imdb(object):
     def shuffle_roidb(self):
         if self._roidb is not None:
             npr.shuffle(self._roidb)
+            self._roidbSize = []
+            self.compute_size_along_roidb()
 
     def compute_size_along_roidb(self):
         raise NotImplementedError
