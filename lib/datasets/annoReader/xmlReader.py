@@ -59,7 +59,7 @@ class xmlReader(object):
         for ix, obj in enumerate(objs):
             if self._find_cls(obj) != -1:
                 num_objs+=1
-
+                
         boxes = np.zeros((num_objs, 4), dtype=np.uint16)
         gt_classes = np.zeros((num_objs), dtype=np.int32)
         overlaps = np.zeros((num_objs, self.num_classes), dtype=np.float32)

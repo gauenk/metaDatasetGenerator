@@ -103,6 +103,11 @@ def printPyroidbSetCounts(pyroidb):
         sizes[idsToSet[target]] += 1
     pp.pprint(sizes)
 
+def pyroidbTransform_cropImageToBox(inputs,**kwargs):
+    im_orig = inputs[0]
+    box = inputs[1]
+    return cropImageToAnnoRegion(im_orig,box)
+
 def cropImageToAnnoRegion(im_orig,box):
     x1 = box[0]
     y1 = box[1]
@@ -136,3 +141,60 @@ def compute_size_along_roidb(roidb):
         newSize = _roidbSize[-1] + len(image['boxes'])
         _roidbSize.append(newSize)
     return _roidbSize
+
+def roidbSampleImage(sample,annoIndex):
+    # load the image
+    img = cv2.imread(sample['image'])
+    if sample['flipped']:
+        img = img[:, ::-1, :]
+    return img,sample['set']
+
+def roidbSampleImageAndBox(sample,annoIndex):
+    # load the image
+    img = cv2.imread(sample['image'])
+    if sample['flipped']:
+        img = img[:, ::-1, :]
+    return [img,sample['boxes'][annoIndex]],sample['set']
+
+def roidbSampleHOG(sample,annoIndex):
+    # load the hog
+    return sample['hog'][annoIndex],sample['set']
+
+def roidbSampleBox(sample,annoIndex):
+    # load the box
+    return sample['boxes'][annoIndex],sample['set']
+
+def addRoidbField(roidb,fieldName,transformFunction):
+    if fieldName in roidb[0].keys():
+        print("WARNING: field name [{}] already exists.".format(fieldName))
+
+    for sample in roidb:
+        if fieldName in sample.keys():
+            sample[fieldName].append(transformFunction(sample))
+        else:
+            sample[fieldName] = transformFunction(sample)
+
+def checkNormalizeSample(sample,annoIndex):
+    return ("bbox_noramlized?" in sample.keys() and sample["bbox_noramlized?"][annoIndex] is False) or ("bbox_noramlized?" not in sample.keys())
+
+def initNormalizeSample(sample):
+    if "bbox_noramlized?" not in sample.keys():
+        sample["bbox_noramlized?"] = [False for _ in range(len(sample['boxes']))]
+
+def updateNormalizeSample(sample,annoIndex):
+    sample["bbox_noramlized?"][annoIndex] = True
+
+def pyroidbTransform_normalizeBox(inputs,**kwargs):
+    sample = kwargs['sample']
+    annoIndex = kwargs['annoIndex']
+    if checkNormalizeSample(sample,annoIndex):
+        initNormalizeSample(sample)
+        inputs = inputs.astype(np.float64)
+        inputs[::2] /= sample['width']
+        inputs[1::2] /= sample['height']
+        assert np.all(inputs <= 1)
+        assert np.all(inputs >= 0)
+        updateNormalizeSample(sample,annoIndex)
+    return inputs
+
+    

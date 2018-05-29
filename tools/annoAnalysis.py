@@ -4,13 +4,17 @@
 Run the annotation analysis on a mixed dataset
 """
 
+import matplotlib
+matplotlib.use('Agg')
+
+
 # metaDatasetGen imports
 import _init_paths
 from core.train import get_training_roidb
 from core.config import cfg, cfg_from_file, cfg_from_list, get_output_dir, loadDatasetIndexDict
 from datasets.factory import get_repo_imdb
 from datasets.ds_utils import load_mixture_set,print_each_size,computeTotalAnnosFromAnnoCount,cropImageToAnnoRegion
-from anno_analysis.metrics import annotationDensityPlot
+from anno_analysis.metrics import annotationDensityPlot,plotDensityPlot,metric_1
 
 # pytorch imports
 from datasets.pytorch_roidb_loader import RoidbDataset
@@ -39,8 +43,8 @@ def parse_args():
     parser.add_argument('--setID', dest='setID',
                         help='which 8 digit ID to read from',
                         default='11111111', type=str)
-    parser.add_argument('--repetition', dest='repetition',
-                        help='which repetition to read from',
+    parser.add_argument('--repeat', dest='repeat',
+                        help='which repeat to read from',
                         default='1', type=str)
     parser.add_argument('--size', dest='size',
                         help='which size to read from',
@@ -78,25 +82,21 @@ if __name__ == '__main__':
         np.random.seed(cfg.RNG_SEED)
 
     setID = args.setID
-    repetition = args.repetition
+    repeat = args.repeat
     size = args.size
 
 
-    roidb,annoCount = load_mixture_set(setID,repetition,size)
+    roidb,annoCount = load_mixture_set(setID,repeat,size)
     print(annoCount)
     numAnnos = computeTotalAnnosFromAnnoCount(annoCount)
     clsToSet = loadDatasetIndexDict()
-    pyroidb = RoidbDataset(roidb,[1,2,3,4,5,6,7,8],
-                           loader=cv2.imread,
-                           transform=cropImageToAnnoRegion,
-                           returnBox=True)
+    pyroidb = RoidbDataset(roidb,[0,1,2,3,4,5,6,7],
+                           loader=roidbSampleBox,
+                           transform=pyroidbTransform_normalizeBox)
 
     annoMaps = annotationDensityPlot(pyroidb)
-    saveDir = cfg.PATH_TO_ANNO_ANALYSIS_OUTPUT
-    if not osp.exists(saveDir):
-        os.makedirs(saveDir)
-    fn = osp.join(saveDir,"density_plot_{}.jpg") 
     for idx,annoMap in enumerate(annoMaps):
-        if np.all(annoMap < 0.01): continue
-        cv2.imwrite(fn.format(clsToSet[idx+1]),annoMap*255)
+        print(" -=-=-=- dataset {} -=-=-=-=- ".format(clsToSet[idx]))
+        print("M1: {}".format(metric_1(annoMap,10)))
+        plotDensityPlot(annoMap,clsToSet[idx])
 

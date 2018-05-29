@@ -24,10 +24,32 @@ from skimage.feature import hog
 from sklearn.model_selection import train_test_split
 from skimage.feature import hog
 from sklearn.metrics import confusion_matrix
+from datasets.ds_utils import cropImageToAnnoRegion,addRoidbField
 import warnings
 warnings.filterwarnings('ignore')
 
 
+def HOGfromRoidbSample(sample,orient=9, pix_per_cell=8,
+                       cell_per_block=2, hog_channel=0):
+    features = []
+    img = cv2.imread(sample['image'])
+    for box in sample['boxes']:
+        cimg = cropImageToAnnoRegion(img,box)
+        feature_image = np.copy(image)      
+        features.append(hogFromImage(feature_image))
+    return features
+
+def HOGFromImage(image,orient=9, pix_per_cell=8,
+                 cell_per_block=2):
+    image = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+    image = cv2.resize(image, (128,256))
+    hogFeatures =  get_hog_features(image[:,:], orient, 
+                                    pix_per_cell, cell_per_block,
+                                    vis=False, feature_vec=True)
+    return hogFeatures
+
+def appendHOGtoRoidb(roidb):
+    addRoidbField(roidb,"hog",HOGfromRoidbSample)
 
 def plot_confusion_matrix(cm, classes,
                           normalize=False,
@@ -140,7 +162,7 @@ def extract_pyroidb_features(pyroidb, feat_type, spatial_size=(32, 32),
     errors = 0
 
     # Iterate through the list of images
-    for i in range(pyroidb.__len__()):
+    for i in range(len(pyroidb)):
 
     # for file_p in pyroidb:
         try:
@@ -194,7 +216,10 @@ def extract_pyroidb_features(pyroidb, feat_type, spatial_size=(32, 32),
 #        features.append(file_features)
     return coco_feat, voc_feat, imageNet_feat, cam2_feat, inria_feat, caltech_feat, sun_feat, kitti_feat, y, X_idx # Return list of feature vectors
 
-
+def splitData(trainSize,testSize,inputFtrs):
+    trainFtrs = inputFtrs[0:trainSize]
+    testFtrs = inputFtrs[trainSize:trainSize + testSize]
+    return trainFtrs,testFtrs
 
 def split_data(train_size, test_size, coco_feat, voc_feat, imagenet_feat, cam2_feat, inria_feat, caltech_feat, sun_feat, kitti_feat):
     coco_train = coco_feat[0:train_size]
@@ -228,12 +253,20 @@ def split_data(train_size, test_size, coco_feat, voc_feat, imagenet_feat, cam2_f
         cam2_test = cam2_feat[train_size: train_size + len(cam2_feat)]
     try: 
         inria_test = inria_feat[train_size: train_size + test_size]
+    except: 
+        pass
     try:
         caltech_test = caltech_feat[train_size: train_size + test_size]
+    except: 
+        pass
     try: 
         sun_test = sun_feat[train_size: train_size + test_size]
+    except: 
+        pass
     try:
         kitti_test = kitti_feat[train_size: train_size + test_size]
+    except: 
+        pass
 
 
     return
