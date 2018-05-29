@@ -32,10 +32,11 @@ def get_repo_imdb(name):
         raise KeyError('Dataset name [{}] is not correct length'.format(name))
     for __set in __sets:
         if di[0] == __set:
-            if __set == "coco":
-                return coco(di[0],di[1],di[2])
-            else:
-                return RepoImdb(di[0],di[1],di[2])
+            return RepoImdb(di[0],di[1],di[2])
+            # if __set == "coco":
+            #     return coco(di[0],di[1],di[2])
+            # else:
+            #     return RepoImdb(di[0],di[1],di[2])
     raise KeyError('Unknown dataset: {}'.format(name))
 
 

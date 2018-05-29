@@ -16,6 +16,7 @@ import _init_paths
 from core.train import get_training_roidb
 from core.config import cfg, cfg_from_file, cfg_from_list, get_output_dir
 from datasets.factory import get_repo_imdb
+from datasets.ds_utils import load_mixture_set,print_each_size
 import os.path as osp
 import datasets.imdb
 import argparse
@@ -93,25 +94,6 @@ def vis_dets(im, class_names, dets, _idx_, fn=None, thresh=0.5):
                           edgecolor='red', linewidth=3.5)
         )
         
-        # if dets.shape[1] == 5:
-        #     score = dets[i, -1]
-        #     ax.text(bbox[0], bbox[1] - 2,
-        #             '{:s} {:.3f}'.format(class_name, score),
-        #             bbox=dict(facecolor='blue', alpha=0.5),
-        #             fontsize=14, color='white')
-        #     ax.set_title(('{} detections with '
-        #                   'p({} | box) >= {:.1f}').format(class_name, class_name,
-        #                                                   thresh),
-        #                  fontsize=14)
-        # else:
-        #     ax.text(bbox[0], bbox[1] - 2,
-        #             '{:s}'.format(class_name),
-        #             bbox=dict(facecolor='blue', alpha=0.5),
-        #             fontsize=14, color='white')
-        #     ax.set_title(('{} groundtruth detections').format(class_name, class_name,
-        #                                                   thresh),
-        #                  fontsize=14)
-        
     plt.axis('off')
     plt.tight_layout()
     plt.draw()
@@ -138,6 +120,7 @@ if __name__ == '__main__':
     imdb, roidb = get_roidb(args.imdb_name)
     numAnnos = imdb.roidb_num_bboxes_at(-1)
     print("\n\n-=-=-=-=-=-=-=-=-\n\n")
+
     print("Report:\n\n")
     print("number of classes: {}".format(imdb.num_classes))
     print("number of images: {}".format(len(roidb)))
@@ -158,6 +141,16 @@ if __name__ == '__main__':
     prefix_path = cfg.IMDB_REPORT_OUTPUT_PATH
     if osp.exists(prefix_path) is False:
         os.makedirs(prefix_path)
+
+    print("-="*50)
+    print(imdb.roidbSize)
+    print("mixed datasets roidbsize")
+    for size in [50,100,500,1000]:
+       sizedRoidb,actualSize = imdb.get_roidb_at_size(size)
+       print("size: {}".format(size))
+       print_each_size(sizedRoidb)
+    print("-="*50)
+
 
     # issue: we are getting zeros area for 5343 of bboxes for pascal_voc_2007
 

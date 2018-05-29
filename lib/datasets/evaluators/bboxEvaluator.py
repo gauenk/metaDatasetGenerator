@@ -170,5 +170,5 @@ class bboxEvaluator(object):
         tp, fp = compute_TP_FP(ovthresh,image_ids,BB,class_recs)
         rec, prec, ap = compute_REC_PREC_AP(tp,fp,npos,ovthresh,classname,False)
 
-        #print(fp,tp,rec,prec,ap,npos)
+        # print(fp,tp,rec,prec,ap,npos)
         return rec, prec, ap, ovthresh

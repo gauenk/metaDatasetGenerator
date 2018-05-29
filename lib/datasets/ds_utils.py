@@ -9,6 +9,8 @@
 from core.config import cfg, createFilenameID
 
 # misc imports
+import pprint
+pp = pprint.PrettyPrinter(indent=4)
 import pickle,cv2
 import os.path as osp
 import numpy as np
@@ -53,6 +55,9 @@ def load_mixture_set(setID,repetition,final_size):
     annoCounts = []
     datasetSizes = cfg.MIXED_DATASET_SIZES
     if final_size not in datasetSizes:
+        print("invalid dataset size")
+        print("valid option sizes include:")
+        print(datasetSizes)
         raise ValueError("size {} is not in cfg.MIXED_DATASET_SIZES".format(final_size))
     sizeIndex = datasetSizes.index(final_size)
     prevSize = 0
@@ -65,6 +70,7 @@ def load_mixture_set(setID,repetition,final_size):
             fid = open(pklName,"rb")
             loaded = pickle.load(fid)
             roidbs = loaded['allRoidb']
+            print_each_size(allRoidb)
             if size == final_size: # only save the last count
                 annoCounts = loaded['annoCounts']
             allRoidb.extend(roidbs)
@@ -75,9 +81,27 @@ def load_mixture_set(setID,repetition,final_size):
     return allRoidb,annoCounts
 
 def print_each_size(roidb):
+    print("="*100)
     sizes = [0 for _ in range(8)]
     for elem in roidb:
-        sizes[elem['set']-1] += 1
+        sizes[elem['set']] += len(elem['boxes'])
+    print(sizes)
+
+def printPyroidbSetCounts(pyroidb):
+    print("="*100)
+    import yaml
+    fn = "lib/datasets/ymlConfigs/default_dataset_index.yml"
+    fn = osp.join(cfg.ROOT_DIR,fn)
+    with open(fn,"r") as f:
+        setIds = yaml.load(f)
+
+    idsToSet = ["" for _ in range(8)]
+    for val,idx in setIds.items():
+        idsToSet[idx] = val
+    sizes = dict.fromkeys(idsToSet, 0)
+    for elem,target in pyroidb:
+        sizes[idsToSet[target]] += 1
+    pp.pprint(sizes)
 
 def cropImageToAnnoRegion(im_orig,box):
     x1 = box[0]
@@ -89,6 +113,8 @@ def cropImageToAnnoRegion(im_orig,box):
 def scaleImage(im_orig):
     target_size = cfg.CROPPED_IMAGE_SIZE 
     x_size,y_size = im_orig.shape[0:2]
+    if x_size == 0 or y_size == 0:
+        return im_orig
     im_scale_x = float(target_size) / x_size
     im_scale_y = float(target_size) / y_size
     im = cv2.resize(im_orig, (target_size,target_size),
@@ -97,7 +123,7 @@ def scaleImage(im_orig):
 
 def computeTotalAnnosFromAnnoCount(annoCount):
     size = 0
-    for cnt in annoCount.values():
+    for cnt in annoCount:
         size += cnt
     return size
 

@@ -3,12 +3,17 @@ import os.path as osp
 import xml.etree.ElementTree as ET
 import numpy as np
 
-def parse_rec(filename,load_annotation,classes):
-    if "COCO" in filename:
-        index = int(re.match(".*(?P<id>[0-9]{12})",filename).groupdict()['id'])
+def cocoID_to_base(cocoID):
+    if "COCO" in cocoID:
+        index = int(re.match(".*(?P<id>[0-9]{12})",cocoID).groupdict()['id'])
     else:
-        index = filename
+        index = cocoID
+    return index
 
+def parse_rec(filename,load_annotation,classes):
+
+    # convert if coco
+    index = cocoID_to_base(filename)
     recs = load_annotation(index)
     objects = []
     for idx,bbox in enumerate(recs['boxes']):
@@ -58,6 +63,15 @@ def load_groundTruth(cachedir,imagesetfile,annopath,annoReader,indexToCls):
 
 
 def extractClassGroundTruth(imagenames,recs,classname):
+
+    # printing infor for debug
+    if True:
+        for fn,objs in recs.items():
+            print("="*100)
+            print(fn)
+            for obj in objs:
+                print(obj['name'])
+
     # extract gt objects for this class
     class_recs = {}
     npos = 0
@@ -71,6 +85,11 @@ def extractClassGroundTruth(imagenames,recs,classname):
                                  'difficult': difficult,
                                  'det': det}
     return class_recs,npos
+
+def transformImageId(imageID):
+    # convert if coco
+    index = cocoID_to_base(imageID)
+    return str(index)
 
 def loadModelDets(detpath,classname):
     # read the file with the model detections
