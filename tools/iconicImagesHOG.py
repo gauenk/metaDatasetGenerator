@@ -19,7 +19,7 @@ import numpy as np
 import sys,os,cv2
 # pytorch imports
 from datasets.pytorch_roidb_loader import RoidbDataset
-from ntd.hog_svm import plot_confusion_matrix, extract_pyroidb_features
+from ntd.hog_svm import plot_confusion_matrix, extract_pyroidb_features, split_data, scale_data
 
 
 def parse_args():
@@ -131,9 +131,8 @@ if __name__ == '__main__':
 
     print("as pytorch friendly ")
 
-    pyroidb = RoidbDataset(roidb,[1,2,3,4,5,6,7,8],loader=cv2.imread,transform=cropImageToAnnoRegion)
+    pyroidb = RoidbDataset(roidb,[0,1,2,3,4,5,6,7],loader=cv2.imread,transform=cropImageToAnnoRegion)
     
-
     print('fdsggrfdsgsdfgdsgdsfgdsgfdsgfsdgdfsgsgsd')
     
     print(type(pyroidb))
@@ -142,11 +141,36 @@ if __name__ == '__main__':
     print(type(pyroidb[0][1]))
 
     print(pyroidb.__len__())
+   
+    print(pyroidb[0][1])
+    print('this is the annocount', annoCount)
+    coco_feat = []
+    voc_feat = []
+    imageNet_feat = []
+    cam2_feat = []
+    inria_feat = []
+    caltech_feat = []
+    sun_feat = []
+    kitti_feat = []
+    y = []
+    X_idx = []
 
 
-    # X, y, X_idx = extract_pyroidb_features(pyroidb, feat_type = 'hog')
+    coco_feat, voc_feat, imageNet_feat, cam2_feat, inria_feat, caltech_feat, sun_feat, kitti_feat, y, X_idx = extract_pyroidb_features(pyroidb = pyroidb, feat_type = 'hog', spatial_size=(32, 32),
+                                                                                                                                       hist_bins=32, orient=9, 
+                                                                                                                                       pix_per_cell=8, cell_per_block=2, hog_channel=0)
 
-    
+    train_size = 75
+    test_size = 25
+    print('the x_idx is ', X_idx)    
+
+    X_train, X_test, y_train, y_test, X_idx = split_data(train_size = train_size, test_size = test_size, coco_feat = coco_feat, 
+                                                        voc_feat = voc_feat, imagenet_feat = imageNet_feat, 
+                                                        cam2_feat = cam2_feat, inria_feat = inria_feat, caltech_feat = caltech_feat, 
+                                                        sun_feat = sun_feat, kitti_feat = kitti_feat, y = y, X_idx = X_idx)
+
+
+    print(X_idx)
     # print(pyroidb.roidb[872])
     # print(pyroidb[872])
     # errors = 0
