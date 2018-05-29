@@ -13,7 +13,7 @@ import _init_paths
 from core.train import get_training_roidb
 from core.config import cfg, cfg_from_file, cfg_from_list, get_output_dir, loadDatasetIndexDict
 from datasets.factory import get_repo_imdb
-from datasets.ds_utils import load_mixture_set,print_each_size,computeTotalAnnosFromAnnoCount,cropImageToAnnoRegion
+from datasets.ds_utils import load_mixture_set,print_each_size,computeTotalAnnosFromAnnoCount,cropImageToAnnoRegion,printPyroidbSetCounts
 import os.path as osp
 import datasets.imdb
 import argparse
@@ -36,8 +36,8 @@ def parse_args():
     parser.add_argument('--setID', dest='setID',
                         help='which 8 digit ID to read from',
                         default='11111111', type=str)
-    parser.add_argument('--repetition', dest='repetition',
-                        help='which repetition to read from',
+    parser.add_argument('--repeat', dest='repeat',
+                        help='which repeat to read from',
                         default='1', type=str)
     parser.add_argument('--size', dest='size',
                         help='which size to read from',
@@ -91,15 +91,15 @@ if __name__ == '__main__':
         np.random.seed(cfg.RNG_SEED)
 
     setID = args.setID
-    repetition = args.repetition
+    repeat = args.repeat
     size = args.size
     
-    roidb,annoCount = load_mixture_set(setID,repetition,size)
+    roidb,annoCount = load_mixture_set(setID,repeat,size)
     numAnnos = computeTotalAnnosFromAnnoCount(annoCount)
 
     print("\n\n-=-=-=-=-=-=-=-=-\n\n")
     print("Report:\n\n")
-    print("Mixture Dataset: {} {} {}\n\n".format(setID,repetition,size))
+    print("Mixture Dataset: {} {} {}\n\n".format(setID,repeat,size))
 
     print("number of images: {}".format(len(roidb)))
     print("number of annotations: {}".format(numAnnos))
@@ -132,7 +132,11 @@ if __name__ == '__main__':
 
     print("as pytorch friendly ")
 
-    pyroidb = RoidbDataset(roidb,[0,1,2,3,4,5,6,7],loader=cv2.imread,transform=cropImageToAnnoRegion)
+    pyroidb = RoidbDataset(roidb,[0,1,2,3,4,5,6,7],loader=cv2.imread,transform=cropImageToAnnoRegion,returnBox=False)
+    print(annoCount)
+
+    # printPyroidbSetCounts(pyroidb)
+    # print_each_size(roidb)
 
     if args.save:
         print("save 30 cropped annos in output folder.")
@@ -141,7 +145,7 @@ if __name__ == '__main__':
             print("making directory: {}".format(saveDir))
             os.makedirs(saveDir)
            
-        print("proidb length: {}".format(len(pyroidb)))
+        print("pyroidb length: {}".format(len(pyroidb)))
         randIdx = npr.permutation(len(pyroidb))
         for i in range(30):
             img, cls = pyroidb[randIdx[i]]

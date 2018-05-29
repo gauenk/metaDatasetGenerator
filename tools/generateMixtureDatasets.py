@@ -11,7 +11,7 @@
 import _init_paths
 from core.train import get_training_roidb, train_net
 from core.config import cfg, cfg_from_file, cfg_from_list, get_output_dir, createFilenameID, createPathRepeat, createPathSetID
-from dataset.ds_utils import print_each_size
+from datasets.ds_utils import print_each_size,printPyroidbSetCounts
 from datasets.factory import get_repo_imdb
 import datasets.imdb
 import numpy as np
@@ -19,16 +19,21 @@ import numpy.random as npr
 import argparse
 import pprint
 import numpy as np
-import sys,os,pickle
+import sys,os,pickle,cv2
 import os.path as osp
 
-TESTING = False
+# pytorch imports
+from datasets.pytorch_roidb_loader import RoidbDataset
+
+
+DEBUG = False
 #imdb_names = {"coco":1,"pacsal_voc":2,"imagenet":3,"caltech":4,"cam2":5,"inria":6,"sun":7,"kitti":8}
-imdb_names = {"pascal_voc-train-default":2,"caltech-medium-default":4,"coco-minival-default":1,"cam2-train-default":5,"sun-train-default":7,"kitti-train-default":8,"imagenet-train2014-default":3,"inria-train-default":6}
+imdb_names = {"pascal_voc-train-default":2,"caltech-train-default":4,"coco-minival2014-default":1,"cam2-train-default":5,"sun-train-default":7,"kitti-train-default":8,"imagenet-train2014-default":3,"inria-train-default":6}
 indexToImdbName = ['coco','pascal_voc','imagenet','cam2','caltech','kitti','sun','inria']
 datasetSizes = cfg.MIXED_DATASET_SIZES
 loadedRoidbs = {}
 loadedImdbs = {}
+prevCounts = [0 for _ in range(8)]
 
 def parse_args():
     """
@@ -66,7 +71,7 @@ def parse_args():
 
 def shuffle_imdbs():
     for imdb in loadedImdbs.values():
-        imdb.shuffle_image_index()
+        # imdb.shuffle_image_index()
         imdb.shuffle_roidb()
 
 def get_roidb(imdb_name):
@@ -90,23 +95,24 @@ def createMixtureDataset(setID,size):
     
     imdbs = setID_to_imdbs(setID)
 
-    # remove ONLY FOR TESTING
-    if TESTING:
+    # remove ONLY FOR DEBUG
+    if DEBUG:
         if len(imdbs) == 0: return []
     else:
         assert len(imdbs) == setID.count('1')
 
     imdbSize = size / len(imdbs)
     
-    mixedRoidb = {}
-    actualSizes = {}
+    mixedRoidb = [None for _ in range(8)]
+    annoCounts = [None for _ in range(8)]
     for imdb in imdbs:
-        print(imdb.name)
+        print(imdb.name,imdb.classes)
         imdb = loadedImdbs[imdb.name]
-        sizedRoidb,actualSize = imdb.get_roidb_at_size(size)
-        mixedRoidb[imdb.name] = sizedRoidb
-        actualSizes[imdb.name] = actualSize
-    return mixedRoidb,actualSizes
+        sizedRoidb,annoCount = imdb.get_roidb_at_size(size)
+        print_each_size(sizedRoidb)
+        mixedRoidb[imdb.config['setID']] = sizedRoidb
+        annoCounts[imdb.config['setID']] = annoCount
+    return mixedRoidb,annoCounts
 
 
 def filterForTesting(idx):
@@ -136,12 +142,26 @@ def loadDatasetsToMemory():
         loadedRoidbs[imdb.name] = roidb
 
 def combined_roidb(roidbs):
-    roidb = roidbs[0]
-    for r in roidbs[1:]:
+    # assumes ordering of roidbs
+    roidb = []
+    for r in roidbs:
+        print_each_size(roidb)
         roidb.extend(r)
     return roidb
 
+def combineOnlyNew(roidbs):
+    newRoidb = []
+    for idx,roidb in enumerate(roidbs):
+        newRoidb.extend(roidb[prevCounts[idx]:])
+    return newRoidb
 
+def updatePreviousCounts(roidbs):
+    for idx,roidb in enumerate(roidbs):
+        prevCounts[idx] = len(roidb)
+
+def zeroPreviousCounts():
+    for idx in range(8):
+        prevCounts[idx] = 0
 
 if __name__ == '__main__':
     args = parse_args()
@@ -183,34 +203,27 @@ if __name__ == '__main__':
                     os.makedirs(path_repeat)
                 # shuffle imdbs
                 shuffle_imdbs()
-                prevSize = 0
+                # reset previuos counters
+                zeroPreviousCounts()
                 for size in datasetSizes:
                     # create a file for each dataset size
                     idlist_filename = createFilenameID(setID,str(r),str(size))
                     repo_roidbs,roidbs_anno_counts = createMixtureDataset(setID,size)
                     assert len(repo_roidbs) == setID.count('1')
                     # write pickle file of the roidb
-                    allRoidb = combined_roidb(repo_roidbs.values())
+                    allRoidb = combined_roidb(repo_roidbs)
+                    onlyNewRoidb = combineOnlyNew(repo_roidbs)
                     pklName = idlist_filename + ".pkl"
-                    print(pklName,roidbs_anno_counts,prevSize,size)
-                    print_each_size(allRoidb)
-                    print_each_size(allRoidb[prevSize:])
-                    saveInfo = {"allRoidb":allRoidb[prevSize:],"annoCounts":roidbs_anno_counts}
+                    print(pklName,roidbs_anno_counts,size)
+                    pyroidb = RoidbDataset(allRoidb,[0,1,2,3,4,5,6,7],loader=None,transform=None,returnBox=True)
+                    printPyroidbSetCounts(pyroidb)
+                    pyroidb = RoidbDataset(onlyNewRoidb,[0,1,2,3,4,5,6,7],loader=None,transform=None,returnBox=True)
+                    printPyroidbSetCounts(pyroidb)
+
+                    saveInfo = {"allRoidb":onlyNewRoidb,"annoCounts":roidbs_anno_counts}
                     if osp.exists(pklName) is False:
                         with open(pklName,"wb") as f:
                             pickle.dump(saveInfo,f)
                     else:
                         print("{} exists".format(pklName))
-
-                    # OLD: write just the image id's to file
-                    f = open(idlist_filename + ".txt","w+")
-                    for dataset, roidb in repo_roidbs.items():
-                        # write the dataset name
-                        f.write("DATASET: {}\n".format(dataset))
-                        for image in roidb:
-                            # write the image id
-                            f.write("{}\n".format(image['image']))
-
-                    print(idlist_filename)
-                    f.close()
-                    prevSize += len(allRoidb[prevSize:])
+                    updatePreviousCounts(repo_roidbs)
