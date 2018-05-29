@@ -14,6 +14,7 @@ from core.train import get_training_roidb
 from core.config import cfg, cfg_from_file, cfg_from_list, get_output_dir, loadDatasetIndexDict
 from datasets.factory import get_repo_imdb
 from datasets.ds_utils import load_mixture_set,print_each_size,computeTotalAnnosFromAnnoCount,cropImageToAnnoRegion,printPyroidbSetCounts,roidbSampleImage,roidbSampleImageAndBox
+from ntd.hog_svm import appendHOGtoRoidb
 import os.path as osp
 import datasets.imdb
 import argparse
@@ -130,11 +131,12 @@ if __name__ == '__main__':
     np.savetxt(path,heights,fmt='%.18e',delimiter=' ')
         
     print("-="*50)
-    imdb.addRoidbField("hog",
-
-    print("-=-=-=-=-=-")
 
     clsToSet = loadDatasetIndexDict()
+    
+    # add the "HOG" field to pyroidb
+    appendHOGtoRoidb(roidb)
+
 
     print("as pytorch friendly ")
     

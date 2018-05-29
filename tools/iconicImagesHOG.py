@@ -93,9 +93,6 @@ if __name__ == '__main__':
     
     roidb,annoCount = load_mixture_set(setID,repetition,size)
     numAnnos = computeTotalAnnosFromAnnoCount(annoCount)
-    # add the "HOG" field to pyroidb
-    # appendHOGtoRoidb(roidb)
-
 
     print("\n\n-=-=-=-=-=-=-=-=-\n\n")
     print("Report:\n\n")

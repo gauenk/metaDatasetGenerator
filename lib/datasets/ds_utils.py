@@ -168,7 +168,13 @@ def addRoidbField(roidb,fieldName,transformFunction):
     if fieldName in roidb[0].keys():
         print("WARNING: field name [{}] already exists.".format(fieldName))
 
-    for sample in roidb:
+    totalRoidbs = len(roidb)
+    for idx,sample in enumerate(roidb):
+
+        # progress = int(float(idx) / float(totalRoidbs) * 100)
+        # print("-"*progress)
+        # print("")
+
         if fieldName in sample.keys():
             sample[fieldName].append(transformFunction(sample))
         else:

@@ -54,6 +54,8 @@ class RoidbDataset(data.Dataset):
 
         # (x1,y1,x2,y2) bounds correction
         if True:
+            if box[0] == box[2]: box[2] += 1
+            if box[1] == box[3]: box[3] += 1
             if box[0] < 0: box[0] = 0
             if box[1] < 0: box[1] = 0
             if box[2] > sample['width']: box[2] = sample['width']

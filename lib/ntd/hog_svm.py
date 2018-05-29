@@ -35,20 +35,18 @@ def HOGfromRoidbSample(sample,orient=9, pix_per_cell=8,
     img = cv2.imread(sample['image'])
     for box in sample['boxes']:
         cimg = cropImageToAnnoRegion(img,box)
-        if np.any(cimg.shape == 0):
+        feature_image = np.copy(cimg)      
+        try:
+            features.append(HOGFromImage(feature_image))
+        except:
             print(sample)
             return None
-        feature_image = np.copy(cimg)      
-        features.append(HOGFromImage(feature_image))
     return features
 
 def HOGFromImage(image,orient=9, pix_per_cell=8,
                  cell_per_block=2):
     image = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
-    try:
-        image = cv2.resize(image, (128,256))
-    except:
-        print(image)
+    image = cv2.resize(image, (128,256))
     hogFeatures =  get_hog_features(image[:,:], orient, 
                                     pix_per_cell, cell_per_block,
                                     vis=False, feature_vec=True)
