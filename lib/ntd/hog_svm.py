@@ -35,21 +35,30 @@ def HOGfromRoidbSample(sample,orient=9, pix_per_cell=8,
     img = cv2.imread(sample['image'])
     for box in sample['boxes']:
         cimg = cropImageToAnnoRegion(img,box)
-        feature_image = np.copy(image)      
-        features.append(hogFromImage(feature_image))
+        if np.any(cimg.shape == 0):
+            print(sample)
+            return None
+        feature_image = np.copy(cimg)      
+        features.append(HOGFromImage(feature_image))
     return features
 
 def HOGFromImage(image,orient=9, pix_per_cell=8,
                  cell_per_block=2):
     image = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
-    image = cv2.resize(image, (128,256))
+    try:
+        image = cv2.resize(image, (128,256))
+    except:
+        print(image)
     hogFeatures =  get_hog_features(image[:,:], orient, 
                                     pix_per_cell, cell_per_block,
                                     vis=False, feature_vec=True)
     return hogFeatures
 
 def appendHOGtoRoidb(roidb):
+    print("="*100)
+    print("appending the HOG field to Roidb")
     addRoidbField(roidb,"hog",HOGfromRoidbSample)
+    print("finished appending HOG")
 
 def plot_confusion_matrix(cm, classes,
                           normalize=False,
@@ -159,12 +168,13 @@ def extract_pyroidb_features(pyroidb, feat_type, spatial_size=(32, 32),
     sun_idx = []
     kitti_idx = []
 
+    # i = 0
     errors = 0
-
+    print('the length of the pyroidb is ', len(pyroidb))
     # Iterate through the list of images
-    for i in range(len(pyroidb)):
-
-    # for file_p in pyroidb:
+    for i in range(0, len(pyroidb)):
+        # print(pyroidb[i][1])
+        # for file_p in pyroidb:
         try:
             file_features = []
             image = pyroidb[i][0] # Read in each imageone by one
@@ -177,38 +187,54 @@ def extract_pyroidb_features(pyroidb, feat_type, spatial_size=(32, 32),
                 y.append(pyroidb[i][1])
 
                 # if mixed we need to do something like this
-            if pyroidb[i][1] == 0:
+            if pyroidb[i][1] == 1:
                 coco_feat.append(np.concatenate(file_features))
-                coco_idx.append(i)
-            elif pyroidb[i][1] == 1:
+                coco_idx.append([i])
+            elif pyroidb[i][1] == 2:
                 voc_feat.append(np.concatenate(file_features))
-                voc_idx.append(i)
-            elif pyroidb[i][1] == 2:    
+                voc_idx.append([i])
+            elif pyroidb[i][1] == 3:    
                 imageNet_feat.append(np.concatenate(file_features))
-                imageNet_idx.append(i)
-            elif pyroidb[i][1] == 3:   
+                imageNet_idx.append([i])
+            elif pyroidb[i][1] == 4:   
                 cam2_feat.append(np.concatenate(file_features))
-                cam2_idx.append(i)
-            elif pyroidb[i][1] == 4:    
-                inria_feat.append(np.concatenate(file_features))
-                inria_idx.append(i)
+                cam2_idx.append([i])
             elif pyroidb[i][1] == 5:    
-                caltech_feat.append(np.concatenate(file_features))
-                caltech_idx.append(i)
+                inria_feat.append(np.concatenate(file_features))
+                inria_idx.append([i])
             elif pyroidb[i][1] == 6:    
-                sun_feat.append(np.concatenate(file_features))
-                sun_idx.append(i)
+                caltech_feat.append(np.concatenate(file_features))
+                caltech_idx.append([i])
             elif pyroidb[i][1] == 7:    
+                sun_feat.append(np.concatenate(file_features))
+                sun_idx.append([i])
+            elif pyroidb[i][1] == 8:    
                 kitti_feat.append(np.concatenate(file_features))
-                kitti_idx.append(i)
+                kitti_idx.append([i])
         except: 
             errors = errors + 1
+    print('1')
+    print(coco_idx)
+    print('2')
 
-        # X = np.vstack((coco_feat, voc_feat, imageNet_feat, cam2_feat, inria_feat, caltech_feat, sun_feat, kitti_feat)).astype(np.float64)
-        X_idx = np.vstack((coco_idx, voc_idx, imageNet_idx, cam2_idx, inria_idx, caltech_idx, sun_idx, kitti_idx)).astype(np.float64)
+    print(voc_idx)
+    print('3')
+    print(imageNet_idx)
+    print('4')
+    print(cam2_idx)
+    print('5')
+    print(inria_idx)
+    print('6')
+    print(caltech_idx)
+    print('7')
+    print(sun_idx)
+    print('8')
+    print(kitti_idx)
+    # X = np.vstack((coco_feat, voc_feat, imageNet_feat, cam2_feat, inria_feat, caltech_feat, sun_feat, kitti_feat)).astype(np.float64)
+    X_idx = np.vstack((coco_idx, voc_idx, imageNet_idx, cam2_idx, inria_idx, caltech_idx, sun_idx, kitti_idx)).astype(np.float64)
 
-        y.sort()
-        print('number of errors = ', errors)
+    y.sort()
+    print('number of errors = ', errors)
 #        feature_image=cv2.flip(feature_image,1) # Augment the dataset with flipped images
 #        file_features = img_features(feature_image, hist_bins, orient, 
 #                        pix_per_cell, cell_per_block, hog_channel)
@@ -221,55 +247,165 @@ def splitData(trainSize,testSize,inputFtrs):
     testFtrs = inputFtrs[trainSize:trainSize + testSize]
     return trainFtrs,testFtrs
 
-def split_data(train_size, test_size, coco_feat, voc_feat, imagenet_feat, cam2_feat, inria_feat, caltech_feat, sun_feat, kitti_feat):
+def split_data(train_size, test_size, coco_feat, voc_feat, imagenet_feat, cam2_feat, inria_feat, caltech_feat, sun_feat, kitti_feat, X_idx, y):
+    y_train = []
+    y_test = []
+    # coco_idx = []
+    # voc_idx = []
+    # imageNet_idx = []
+    # cam2_idx = []
+    # inria_idx = []
+    # caltech_idx = []
+    # sun_idx = []
+    # kitti_idx = []
+
+
     coco_train = coco_feat[0:train_size]
+    y_train.append(y[0:train_size]) 
+    idx_loc = len(coco_feat)
+
     voc_train = voc_feat[0:train_size]
+    y_train.append(y[idx_loc:(idx_loc + train_size)]) 
+    idx_loc = idx_loc + len(voc_feat)
+
     imagenet_train = imagenet_feat[0:train_size]
+    y_train.append(y[idx_loc:(idx_loc + train_size)]) 
+    idx_loc = idx_loc + len(imagenet_feat)
+
     cam2_train = cam2_feat[0:train_size]
+    y_train.append(y[idx_loc:(idx_loc + train_size)]) 
+    idx_loc = idx_loc + len(cam2_feat)
+
     inria_train = inria_feat[0:train_size]
+    y_train.append(y[idx_loc:(idx_loc + train_size)]) 
+    idx_loc = idx_loc + len(inria_feat)
+
     caltech_train = caltech_feat[0:train_size]
+    y_train.append(y[idx_loc:(idx_loc + train_size)]) 
+    idx_loc = idx_loc + len(caltech_feat)
+
     sun_train = sun_feat[0:train_size]
+    y_train.append(y[idx_loc:(idx_loc + train_size)]) 
+    idx_loc = idx_loc + len(sun_feat)
+
     kitti_train = kitti_feat[0:train_size]
+    y_train.append(y[idx_loc:(idx_loc + train_size)]) 
 
 
     try:
         coco_test = coco_feat[train_size: train_size + test_size]
+        coco_idx = X_idx[train_size: train_size + test_size]
+        y_test.append(y[(train_size):(train_size+test_size)]) 
+
     except: 
         coco_test = coco_feat[train_size: train_size + len(coco_feat)]
+        coco_idx = X_idx[train_size: train_size + len(coco_feat)]
+        y_test.append(y[(train_size):(train_size+len(coco_feat))]) 
 
+   
+    idx_loc = len(coco_feat)
+    
     try: 
         voc_test = voc_feat[train_size: train_size + test_size]
+        voc_idx = X_idx[(idx_loc+train_size): (idx_loc + train_size + test_size)]
+        y_test.append(y[(idx_loc+train_size):(idx_loc + train_size+test_size)]) 
+
     except:
         voc_test = voc_feat[train_size: train_size + len(voc_feat)]
+        voc_idx = X_idx[(idx_loc+train_size): (idx_loc + train_size + len(voc_feat))]
+        y_test.append(y[(idx_loc+train_size):(idx_loc + train_size+len(voc_feat))]) 
 
+
+    idx_loc = idx_loc + len(voc_feat)
+    
     try:
         imagenet_test = imagenet_feat[train_size: train_size + test_size]
+        imagenet_idx = X_idx[(idx_loc+train_size): (idx_loc + train_size + test_size)]
+        y_test.append(y[(idx_loc+train_size):(idx_loc + train_size+test_size)]) 
     except: 
         imagenet_test = imagenet_feat[train_size: train_size + len(imagenet_feat)]
+        imagenet_idx = X_idx[(idx_loc+train_size): (idx_loc + train_size + len(imagenet_feat))]
+        y_test.append(y[(idx_loc+train_size):(idx_loc + train_size+len(imagenet_feat))]) 
+
+    idx_loc = idx_loc + len(imagenet_feat)
 
     try: 
         cam2_test = cam2_feat[train_size: train_size + test_size]
+        cam2_idx = X_idx[(idx_loc+train_size): (idx_loc + train_size + test_size)]
+        y_test.append(y[(idx_loc+train_size):(idx_loc + train_size+test_size)]) 
     except: 
         cam2_test = cam2_feat[train_size: train_size + len(cam2_feat)]
+        cam2_idx = X_idx[(idx_loc+train_size): (idx_loc + train_size + len(cam2_feat))]
+        y_test.append(y[(idx_loc+train_size):(idx_loc + train_size+len(cam2_feat))]) 
+
+    idx_loc = idx_loc + len(cam2_feat)
+
     try: 
         inria_test = inria_feat[train_size: train_size + test_size]
-    except: 
-        pass
+        inria_idx = X_idx[(idx_loc+train_size): (idx_loc + train_size + test_size)]
+        y_test.append(y[(idx_loc+train_size):(idx_loc + train_size+test_size)]) 
+    except:
+        inria_test = inria_feat[train_size: train_size + len(inria_feat)]
+        inria_idx = X_idx[(idx_loc+train_size): (idx_loc + train_size + len(inria_feat))]
+        y_test.append(y[(idx_loc+train_size):(idx_loc + train_size+len(inria_feat))]) 
+
+    idx_loc = idx_loc + len(inria_feat)
+    
     try:
         caltech_test = caltech_feat[train_size: train_size + test_size]
-    except: 
-        pass
+        caltech_idx = X_idx[(idx_loc+train_size): (idx_loc + train_size + test_size)]
+        y_test.append(y[(idx_loc+train_size):(idx_loc + train_size+test_size)]) 
+    except:
+        caltech_test = caltech_feat[train_size: train_size + len(caltech_feat)]
+        caltech_idx = X_idx[(idx_loc+train_size): (idx_loc + train_size + len(caltech_feat))]
+        y_test.append(y[(idx_loc+train_size):(idx_loc + train_size+len(caltech_feat))]) 
+
+    idx_loc = idx_loc + len(caltech_feat)
+
     try: 
         sun_test = sun_feat[train_size: train_size + test_size]
-    except: 
-        pass
+        sun_idx = X_idx[(idx_loc+train_size): (idx_loc + train_size + test_size)]
+        y_test.append(y[(idx_loc+train_size):(idx_loc + train_size+test_size)]) 
+    except:
+        sun_test = sun_feat[train_size: train_size + len(sun_feat)]
+        sun_idx = X_idx[(idx_loc+train_size): (idx_loc + train_size + len(sun_feat))]
+        y_test.append(y[(idx_loc+train_size):(idx_loc + train_size+len(sun_feat))]) 
+
+    idx_loc = idx_loc + len(sun_feat)
+
     try:
         kitti_test = kitti_feat[train_size: train_size + test_size]
-    except: 
-        pass
+        kitti_idx = X_idx[(idx_loc+train_size): (idx_loc + train_size + test_size)]
+        y_test.append(y[(idx_loc+train_size):(idx_loc + train_size+test_size)]) 
+    except:
+        kitti_test = kitti_feat[train_size: train_size + len(kitti_feat)]
+        kitti_idx = X_idx[(idx_loc+train_size): (idx_loc + train_size + len(kitti_feat))]
+        y_test.append(y[(idx_loc+train_size):(idx_loc + train_size+len(kitti_feat))]) 
 
+    print('the coco idx is ', type(coco_idx), type(coco_idx[0]))
+    print(type(coco_idx[0][0]))
+    print('1')
+    print(coco_test)
+    print('2')
 
-    return
+    print(voc_test)
+    print('3')
+    print(imagenet_test)
+    print('4')
+    print(cam2_test)
+    print('5')
+    print(inria_test)
+    print('6')
+    print(caltech_test)
+    print('7')
+    print(sun_test)
+    print('8')
+    print(kitti_test)
+    X_train = np.vstack((coco_train, voc_train, imagenet_train, cam2_train, inria_train, caltech_train, sun_train, kitti_train)).astype(np.float64)
+    X_test = np.vstack((coco_test, voc_test, imagenet_test, cam2_test, inria_test, caltech_test, sun_test, kitti_test)).astype(np.float64)
+    X_idx = np.vstack((coco_idx, voc_idx, imageNet_idx, cam2_idx, inria_idx, caltech_idx, sun_idx, kitti_idx)).astype(np.float64)
+
+    return X_train, X_test, y_train, y_test, X_idx
 
 
 
