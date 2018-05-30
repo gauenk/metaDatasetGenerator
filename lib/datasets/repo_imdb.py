@@ -28,6 +28,7 @@ class RepoImdb(imdb):
         self._datasetName = datasetName
         self._configName = configName
         self._image_set = imageSet
+        print(self._image_set)
         self._image_index = [] 
         self._convertIdToCls = None
         self._obj_proposer = 'gt'

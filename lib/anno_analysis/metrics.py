@@ -1,4 +1,4 @@
-import pdb,csv,sys,os
+import pdb,csv,sys,os,pickle
 import os.path as osp
 from core.config import cfg,cfgData,loadDatasetIndexDict
 from scipy import ndimage, misc
@@ -73,6 +73,17 @@ def plotDensityPlot(people_mask,fn_prefix,rescaled=True):
     saveDir = cfg.PATH_TO_ANNO_ANALYSIS_OUTPUT
     if not osp.exists(saveDir):
         os.makedirs(saveDir)
-    fn = osp.join(saveDir,fn) 
+    fn = osp.join(saveDir,fn)
     plt.savefig(fn,bbox_inches='tight')
                                                                                     
+
+def saveRawAnnoPlot(annoMap,fnPrefix):
+    saveDir = cfg.PATH_TO_ANNO_ANALYSIS_OUTPUT
+    if not osp.exists(saveDir):
+        os.makedirs(saveDir)
+    fn = "{}_raw_annomap.pkl".format(fnPrefix)
+    fn = osp.join(saveDir,fn)
+    with open(fn,"wb") as f:
+        pickle.dump(annoMap,f)
+
+

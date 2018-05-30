@@ -35,7 +35,7 @@ class txtReader(object):
         self._convertToPerson = convertToPerson
         if cleanRegex is not None: self._cleanRegex = cleanRegex # used for INRIA
         else:
-            self._cleanRegex = r"(?P<cls>[0-9]+) (?P<xmin>[0-9]*\.[0-9]+) (?P<ymin>[0-9]*\.[0-9]+) (?P<xmax>[0-9]*\.[0-9]+) (?P<ymax>[0-9]*\.[0-9]+)"
+            self._cleanRegex = r"(?P<cls>[0-9]+) (?P<xmin>[0-9]*\.[0-9]*) (?P<ymin>[0-9]*\.[0-9]*) (?P<xmax>[0-9]*\.[0-9]*) (?P<ymax>[0-9]*\.[0-9]*)"
         
     def _create_classToIndex(self,classes):
         return dict(zip(classes, range(self.num_classes)))

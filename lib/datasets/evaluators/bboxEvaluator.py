@@ -31,8 +31,9 @@ class bboxEvaluator(object):
         self._onlyCls = onlyCls
 
     def evaluate_detections(self, all_boxes, output_dir):
-        if self._classes != num_outputs:
-            raise ValueError("ERROR: the classes and output size don't match!")
+        # num_outpus = 
+        # if self._classes != num_outputs:
+        #     raise ValueError("ERROR: the classes and output size don't match!")
         self._pathResults = output_dir
         self._write_results_file(all_boxes)
         self._do_python_eval(output_dir)

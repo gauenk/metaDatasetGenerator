@@ -12,8 +12,9 @@ import _init_paths
 from utils.misc import PreviousCounts
 from core.train import get_training_roidb, train_net
 from core.config import cfg, cfg_from_file, cfg_from_list, get_output_dir, createFilenameID, createPathRepeat, createPathSetID
-from datasets.ds_utils import print_each_size,printPyroidbSetCounts
+from datasets.ds_utils import print_each_size,printPyroidbSetCounts,roidbSampleBox,roidbSampleImageAndBox
 from datasets.factory import get_repo_imdb
+from ntd.hog_svm import appendHOGtoRoidb
 import datasets.imdb
 import numpy as np
 import numpy.random as npr
@@ -59,6 +60,9 @@ def parse_args():
     parser.add_argument('--cfg', dest='cfg_file',
                         help='an optional config file',
                         default=None, type=str)
+    parser.add_argument('--appendHog', dest='appendHog',
+                        help='resave the loaded mixed dataset with HOG',
+                        action='store_true')
     parser.add_argument('--rand', dest='randomize',
                         help='randomize (do not use a fixed seed)',
                         action='store_true')
@@ -205,11 +209,18 @@ if __name__ == '__main__':
                     # write pickle file of the roidb
                     allRoidb = combined_roidb(repo_roidbs)
                     onlyNewRoidb = combineOnlyNew(repo_roidbs,pc)
+                    appendHOGtoRoidb(onlyNewRoidb)
                     pklName = idlist_filename + ".pkl"
                     print(pklName,roidbs_anno_counts,size)
-                    pyroidb = RoidbDataset(allRoidb,[0,1,2,3,4,5,6,7],loader=None,transform=None,returnBox=True)
+
+                    pyroidb = RoidbDataset(allRoidb,[0,1,2,3,4,5,6,7],
+                               loader=roidbSampleBox,
+                               transform=None)
                     printPyroidbSetCounts(pyroidb)
-                    pyroidb = RoidbDataset(onlyNewRoidb,[0,1,2,3,4,5,6,7],loader=None,transform=None,returnBox=True)
+
+                    pyroidb = RoidbDataset(onlyNewRoidb,[0,1,2,3,4,5,6,7],
+                               loader=roidbSampleBox,
+                               transform=None)
                     printPyroidbSetCounts(pyroidb)
 
                     saveInfo = {"allRoidb":onlyNewRoidb,"annoCounts":roidbs_anno_counts}
