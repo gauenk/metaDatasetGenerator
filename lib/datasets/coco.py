@@ -6,7 +6,7 @@
 
 from datasets.imdb import imdb
 import datasets.ds_utils as ds_utils
-from core.config import cfg
+from core.config import cfg,cfgData,cfgData_from_file
 import os.path as osp
 import sys
 import os
@@ -58,6 +58,14 @@ class coco(imdb):
         self._setupConfig()
         self._roidbSize = []
 
+        # work with metaDatasetGen
+        fn = osp.join(self._local_path,
+                      "ymlDatasets", cfg.PATH_YMLDATASETS,
+                      self._datasetName + ".yml")
+        cfgData_from_file(fn)
+        self._path_to_imageSets = cfgData['PATH_TO_IMAGESETS']
+        if not self._checkImageSet(year):
+            raise ValueError("imageSet path {} doesn't exist".format(self._imageSetPath))
 
         # load COCO API, classes, class <-> id mappings
         self._COCO = COCO(self._get_ann_file())
@@ -95,7 +103,8 @@ class coco(imdb):
         fn = osp.join(self._local_path,"ymlConfigs" ,self._configName + ".yml")
         with open(fn, 'r') as f:
             yaml_cfg = edict(yaml.load(f))
-        fn = osp.join(self._local_path,"ymlConfigs" ,yaml_cfg['CONFIG_DATASET_INDEX_DICTIONARY'])
+        fn = osp.join(self._local_path,"ymlConfigs" ,
+                      yaml_cfg['CONFIG_DATASET_INDEX_DICTIONARY_PATH'])
         with open(fn, 'r') as f:
             setID = edict(yaml.load(f))[self._datasetName]
         self.config = {'cleanup'     : yaml_cfg['CONFIG_CLEANUP'],
@@ -108,6 +117,7 @@ class coco(imdb):
     def _get_ann_file(self):
         prefix = 'instances' if self._image_set.find('test') == -1 \
                              else 'image_info'
+        print(self._data_path)
         return osp.join(self._data_path, 'annotations',
                         prefix + '_' + self._image_set + self._year + '.json')
 
@@ -119,6 +129,8 @@ class coco(imdb):
             newSize = self._roidbSize[-1] + len(image['boxes'])
             self._roidbSize.append(newSize)
 
+    def load_annotation(self,index):
+        return self._load_coco_annotation(index)
         
     def _load_image_set_index(self):
         """

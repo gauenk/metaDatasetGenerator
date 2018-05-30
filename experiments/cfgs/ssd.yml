@@ -1,6 +1,8 @@
 EXP_DIR: ssd
 SSD: True
 SSD_img_size: 300
+DATASET:
+  MODEL: "ssd"
 TRAIN:
   OBJ_DET:
     HAS_RPN: True

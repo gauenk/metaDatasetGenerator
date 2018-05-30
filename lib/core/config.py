@@ -51,14 +51,16 @@ __C.DATASETS.CONVERT_ID_TO_CLS_FILE = None
 __C.DATASETS.USE_IMAGE_SET = None
 __C.DATASETS.CONVERT_ID_TO_CLS_FILE = None
 __C.DATASETS.ONLY_PERSON = False
+__C.DATASETS.MODEL = None
+
 
 #
 # Training options
 #
 
 __C.TRAIN = edict()
-#__C.PATH_YMLDATASETS = "helps"
-__C.PATH_YMLDATASETS = "gauenk"
+__C.PATH_YMLDATASETS = "helps"
+#__C.PATH_YMLDATASETS = "gauenk"
 __C.PATH_MIXTURE_DATASETS = "./data/mixtureDatasets/"
 
 # Scales to use during training (can list multiple scales)
@@ -74,7 +76,7 @@ __C.TRAIN.MAX_SIZE = 1000
 __C.TRAIN.IMS_PER_BATCH = 2
 
 # Use horizontally-flipped images during training?
-__C.TRAIN.USE_FLIPPED = True
+__C.TRAIN.USE_FLIPPED = False
 
 # Iterations between snapshots
 __C.TRAIN.SNAPSHOT_ITERS = 500
@@ -210,6 +212,9 @@ __C.TEST.OBJ_DET.RPN_MIN_SIZE = 16
 # MISC
 #
 
+# For print statements
+__C.DEBUG = False
+
 # Pixel mean values (BGR order) as a (1, 1, 3) array
 # We use the same pixel mean for all networks even though it's not exactly what
 # they were trained with
@@ -263,6 +268,22 @@ __C.OBJ_DET.USE_GPU_NMS = True
 # How much information about the bounding boxes do we store in memory?
 __C.OBJ_DET.BBOX_VERBOSE = True
 
+# The sizes used for creating the mixture datasets
+__C.MIXED_DATASET_SIZES = [10,50,100,250,500,1000,2000,5000]
+
+# The size of the input for images cropped to their annotations
+__C.CROPPED_IMAGE_SIZE = 100
+
+# the size of the 
+__C.CONFIG_DATASET_INDEX_DICTIONARY_PATH = "default_dataset_index.yml"
+
+# name that dataset! output
+__C.PATH_TO_NTD_OUTPUT = "./output/ntd/"
+
+# output for annotation analysis
+__C.PATH_TO_ANNO_ANALYSIS_OUTPUT = "./output/annoAnalysis/"
+
+
 
 def get_output_dir(imdb, net=None):
     """Return the directory where experimental artifacts are placed.
@@ -291,8 +312,10 @@ def _merge_a_into_b(a, b):
             raise KeyError('{} is not a valid config key'.format(k))
 
         old_type = type(b[k])
-        # the types must match, too; unless old_type is not edict and not None
-        if old_type is not type(v) and (old_type is edict and old_type is not type(None)):
+        # the types must match, too; unless old_type is not edict and not None; and new_type is not None
+        if old_type is not type(v) and \
+        (old_type is edict and old_type is not type(None))\
+        and type(v) is not type(None):
             if isinstance(b[k], np.ndarray):
                 v = np.array(v, dtype=b[k].dtype)
             else:
@@ -357,6 +380,18 @@ def createPathRepeat(setID,r):
     
 def createFilenameID(setID,r,size):
     return osp.join(cfg.PATH_MIXTURE_DATASETS,setID,r,size)
+
+def loadDatasetIndexDict():
+    fn = osp.join(__C.ROOT_DIR,"./lib/datasets/ymlConfigs",cfg.CONFIG_DATASET_INDEX_DICTIONARY_PATH)
+    import yaml
+    with open(fn, 'r') as f:
+        yaml_cfg = edict(yaml.load(f))
+    indToCls = [None for _ in range(len(yaml_cfg))]
+    for k,v in yaml_cfg.items():
+        indToCls[v] = k
+    while(None in indToCls):
+        indToCls.remove(None)
+    return indToCls
 
 
 

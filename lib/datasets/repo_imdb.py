@@ -17,6 +17,7 @@ from datasets.evaluators.bboxEvaluator import bboxEvaluator
 from datasets.imageReader.rawReader import rawReader
 from datasets.annoReader.xmlReader import xmlReader
 from datasets.annoReader.txtReader import txtReader
+from datasets.annoReader.jsonReader import jsonReader
 
 class RepoImdb(imdb):
     """Image database."""
@@ -37,17 +38,20 @@ class RepoImdb(imdb):
         self._parseDatasetFile()
 
     def _parseDatasetFile(self):
+        self._resetDataConfig()
         self._setupConfig()
         fn = osp.join(self._local_path,
                       "ymlDatasets", cfg.PATH_YMLDATASETS,
                       self._datasetName + ".yml")
         cfgData_from_file(fn)
         assert self._datasetName == cfgData['EXP_DATASET'], "dataset name is not correct."
-
         self._set_classes(cfgData['CLASSES'],cfgData['CONVERT_TO_PERSON'],cfgData['ONLY_PERSON'])
         self._num_classes = len(self._classes)
         self._path_root = cfgData['PATH_ROOT']
         self._compID = cfgData['COMPID']
+        self._cachedir = os.path.join(self._path_root,\
+                            'annotations_cache',\
+                                self._image_set)
 
         self._path_to_imageSets = cfgData['PATH_TO_IMAGESETS']
         if not self._checkImageSet():
@@ -69,6 +73,10 @@ class RepoImdb(imdb):
                                                cfgData['USE_IMAGE_SET'],
         )
 
+    def _resetDataConfig(self):
+        cfgData.CONVERT_ID_TO_CLS_FILE = None
+        cfgData.USE_IMAGE_SET = None
+        
     def _set_id_to_cls(self):
         convertIdtoCls_filename = cfgData['CONVERT_ID_TO_CLS_FILE']
         if convertIdtoCls_filename is not None:
@@ -82,7 +90,8 @@ class RepoImdb(imdb):
         fn = osp.join(self._local_path,"ymlConfigs" ,self._configName + ".yml")
         with open(fn, 'r') as f:
             yaml_cfg = edict(yaml.load(f))
-        fn = osp.join(self._local_path,"ymlConfigs" ,yaml_cfg['CONFIG_DATASET_INDEX_DICTIONARY'])
+        fn = osp.join(self._local_path,"ymlConfigs" ,
+                      yaml_cfg['CONFIG_DATASET_INDEX_DICTIONARY_PATH'])
         with open(fn, 'r') as f:
             setID = edict(yaml.load(f))[self._datasetName]
         self.config = {'cleanup'     : yaml_cfg['CONFIG_CLEANUP'],
@@ -98,11 +107,6 @@ class RepoImdb(imdb):
         """
         index = self._image_index[i]
         return self.imgReader.image_path_from_index(index)
-
-    def get_roidb_sized_at(self, size):
-        self._sizedRoidb = []
-        
-        return sizedRoidb
 
     def _set_classes(self,classFilename,convertToPerson,onlyPerson):
         _classes = self._load_classes(classFilename)
@@ -124,18 +128,6 @@ class RepoImdb(imdb):
 
         self._classes = _classes        
 
-
-    def _checkImageSet(self):
-        self._imageSetPath = osp.join(self._path_to_imageSets, self._image_set + ".txt")
-        if osp.exists(self._imageSetPath) == True:
-            return 1
-        print("-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-")
-        print("imageSet error:")
-        for imageset in glob.glob(self._path_to_imageSets):
-            print(imageset)
-        print("-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-")
-        return 0
-
     def _createAnnoReader(self,annoPath,annoType,cleanRegex,convertToPerson,useImageSet):
         path = annoPath
         if useImageSet:
@@ -148,7 +140,11 @@ class RepoImdb(imdb):
                                                  self.config['setID'],cleanRegex=cleanRegex,
                                                  convertToPerson=convertToPerson,
                                                  convertIdToCls = self._convertIdToCls)
-        
+        elif annoType == "json": return jsonReader(path,self.classes,self._datasetName,
+                                                   self.config['setID'],self._image_set,
+                                                   convertToPerson=convertToPerson,
+                                                   convertIdToCls = self._convertIdToCls)
+
     def _createImgReader(self,imgPath,imgType,useImageSet):
         path = imgPath
         if useImageSet:
@@ -158,16 +154,14 @@ class RepoImdb(imdb):
     def _createEvaluator(self,annoPath):
         if self.config['use_salt']: self._salt = str(uuid.uuid4())
         else: self._salt = None
-        cachedir = os.path.join(self._path_root,\
-                            'annotations_cache',\
-                                self._image_set)
+        cachedir = self._cachedir
         if not osp.isdir(cachedir):
             os.makedirs(cachedir)
         return bboxEvaluator(self._datasetName,self.classes,
                              self._compID, "_" + self._salt,
                              cachedir, self._imageSetPath,
                              self._image_index,annoPath,
-                             self.annoReader)
+                             self.load_annotation)
 
     def _update_image_index(self,newImageIndex):
         self._image_index = newImageIndex
@@ -235,12 +229,15 @@ class RepoImdb(imdb):
             print('{} gt roidb loaded from {}'.format(self.name, cache_file))
             return roidb
 
-        gt_roidb = [self.annoReader.load_annotation(index)
+        gt_roidb = [self.load_annotation(index)
                     for index in self._image_index]
         with open(cache_file, 'wb') as fid:
             pickle.dump(gt_roidb, fid)
         print('wrote gt roidb to {}'.format(cache_file))
         return gt_roidb
+
+    def load_annotation(self,index):
+        return self.annoReader.load_annotation(index)
 
     def competition_mode(self, on):
         if on:
@@ -253,7 +250,8 @@ class RepoImdb(imdb):
     def compute_size_along_roidb(self):
         if self.roidb is None:
             raise ValueError("roidb must be loaded before 'compute_size_along_roidb' can be run")
-        self._roidbSize.append(len(self.roidb[0]['boxes']))
+        self._roidbSize.append(sum(self.roidb[0]['gt_classes'] \
+                                   == self.classes.index("person")))
         for image in self.roidb[1:]:
-            newSize = self._roidbSize[-1] + len(image['boxes'])
+            newSize = self._roidbSize[-1] + sum(image['gt_classes'] == self.classes.index("person"))
             self._roidbSize.append(newSize)

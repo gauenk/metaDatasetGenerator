@@ -5,7 +5,7 @@
 # Written by Ross Girshick
 # --------------------------------------------------------
 
-import os
+import os,glob
 import os.path as osp
 import PIL
 import numpy as np
@@ -21,7 +21,8 @@ class imdb(object):
         self._num_classes = 0
         self._classes = []
         self._image_index = []
-        self._obj_proposer = 'selective_search'
+        self._cachedir = "./data/annotation_cache/"
+        self._obj_proposer = 'gt'
         self._roidb = None
         self._roidb_handler = self.default_roidb
         self._roidbSize = []
@@ -61,14 +62,14 @@ class imdb(object):
         for idx,rsize in enumerate(self.roidbSize):
             #print("idx,rsize,gsize",idx,rsize,gsize)
             if rsize >= gsize: return idx
-        return -1
+        return -2
 
     def get_roidb_at_size(self,gsize):
         rindex = self._get_roidb_index_at_size(gsize)
-        if rindex == -1:
+        if rindex == -2:
             print("\n\nWARNING: imdb [{:s}] may be too small @ {}\n\n".\
                   format(self.name,self.roidbSize[rindex]))
-        return self.roidb[:rindex],self.roidbSize[rindex]
+        return self.roidb[:rindex+1],self.roidbSize[rindex]
 
     def roidb_num_bboxes_at(self,index):
         return self.roidbSize[index]
@@ -113,6 +114,9 @@ class imdb(object):
     def default_roidb(self):
         raise NotImplementedError
 
+    def load_annotation(self,i):
+        raise NotImplementedError
+
     def shuffle_image_index(self):
         if len(self._image_index) != 0:
             npr.shuffle(self._image_index)
@@ -120,6 +124,8 @@ class imdb(object):
     def shuffle_roidb(self):
         if self._roidb is not None:
             npr.shuffle(self._roidb)
+            self._roidbSize = []
+            self.compute_size_along_roidb()
 
     def compute_size_along_roidb(self):
         raise NotImplementedError
@@ -300,3 +306,15 @@ class imdb(object):
     def competition_mode(self, on):
         """Turn competition mode on or off."""
         pass
+
+
+    def _checkImageSet(self,year=""):
+        self._imageSetPath = osp.join(self._path_to_imageSets, self._image_set + year + ".txt")
+        if osp.exists(self._imageSetPath) == True:
+            return 1
+        print("-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-")
+        print("imageSet error:")
+        for imageset in glob.glob(self._path_to_imageSets):
+            print(imageset)
+        print("-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-")
+        return 0

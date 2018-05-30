@@ -16,7 +16,8 @@ class bboxEvaluator(object):
     """Image database."""
 
     def __init__(self, datasetName, classes, compID, salt, cacheDir,
-                 imageSetPath, imageIndex, annoPath,annoReader):
+                 imageSetPath, imageIndex, annoPath,load_annotation,
+                 onlyCls=None):
         self._datasetName = datasetName
         self._classes = classes
         self._comp_id = compID
@@ -24,9 +25,10 @@ class bboxEvaluator(object):
         self._cachedir = cacheDir
         self.image_index = imageIndex
         self._annoPath = annoPath
-        self._annoReader = annoReader
+        self._load_annotation = load_annotation
         self._imageSetPath = imageSetPath
         self._imageSet = imageSetPath.split("/")[-1].split(".")[0] # "...asdf/imageSet.txt"
+        self._onlyCls = onlyCls
 
     def evaluate_detections(self, all_boxes, output_dir):
         if self._classes != num_outputs:
@@ -67,6 +69,8 @@ class bboxEvaluator(object):
         for i, cls in enumerate(self._classes):
             if cls == '__background__':
                 continue
+            if self._onlyCls is not None and cls != self._onlyCls:
+                continue
             detfile = self._get_results_file_template().format(cls)
             rec, prec, ap, ovthresh = self.bbox_eval(
                 detfile, annopath, self._imageSetPath, cls, self._cachedir, ovthresh=0.5,
@@ -74,9 +78,9 @@ class bboxEvaluator(object):
             aps += [ap]
         aps = np.array(aps)
         infix = "faster-rcnn"
-        if cfgData.SSD:
-            infix = "ssd"
-            
+        if cfgData.MODEL:
+            infix = cfgData.MODEL
+
         results_fd = open("./results_{}_{}.txt".format(infix,self._datasetName + self._salt),"w")
         for kdx in range(len(ovthresh)):
             #print('{0:.3f}@{1:.2f}'.format(ap[kdx],ovthresh[kdx]))
@@ -154,18 +158,17 @@ class bboxEvaluator(object):
 
 
         # first load gt
-        imagenames, recs = load_groundTruth(cachedir,imagesetfile,annopath,self._annoReader)
+        imagenames, recs = load_groundTruth(cachedir,imagesetfile,annopath,
+                                            self._load_annotation,self._classes)
         # extract gt objects for this class
         class_recs, npos = extractClassGroundTruth(imagenames,recs,classname)
         # read dets from model
         image_ids, BB = loadModelDets(detpath,classname)
-
-        print(len(image_ids),len(BB))
 
         nd = len(image_ids)
         ovthresh = [0.5,0.75,0.95]
         tp, fp = compute_TP_FP(ovthresh,image_ids,BB,class_recs)
         rec, prec, ap = compute_REC_PREC_AP(tp,fp,npos,ovthresh,classname,False)
 
-        #print(fp,tp,rec,prec,ap,npos)
+        # print(fp,tp,rec,prec,ap,npos)
         return rec, prec, ap, ovthresh

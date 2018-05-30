@@ -45,6 +45,7 @@ git clone https://github.com/gauenk/metaDatasetGenerator.git
 cd ./metaDatasetGenerator/lib
 make
 cd ../
+./tools/add_helps_symlinks.sh
 ```
 
 To verify the complete installation of the github repo type:
@@ -58,14 +59,6 @@ It may complain the filepath for pascal_voc_2007 is set incorrectly. You may nee
 ```Python
 __C.PATH_YMLDATASETS = "helps"
 ```
-
-### Part 3: Adding the COCO dataset
-
-```Shell
-mkdir data
-ln -s /srv/sdb1/image_team/coco ./data/
-```
-
 
 ## Overview
 
@@ -118,7 +111,7 @@ What questions do we aim to answer?
 ## Usage
 
 
-The first requirement is to generate the mixture datasets in the `./lib/datasets/mixtureDatasets/` folder. This can be done by running the `genMixData.sh` script. For example:
+The first requirement is to generate the mixture datasets in the `./data/mixtureDatasets/` folder. This can be done by running the `genMixData.sh` script. For example:
 ```
 Usage: ./experiments/scripts/genMixData.sh START_INDEX END_INDEX REPEAT
 ```

@@ -1,4 +1,13 @@
 
+# metaDatasetGenerator imports
+from core.config import cfg, cfgData, createFilenameID, createPathRepeat, createPathSetID
+from datasets.imdb import imdb
+
+# 'other' imports
+import pickle
+import numpy as np
+import numpy.random as npr
+import os.path as osp
 
 def train_model(model, criterion, optimizer, scheduler, num_epochs=25):
     since = time.time()

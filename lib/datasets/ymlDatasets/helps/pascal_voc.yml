@@ -1,0 +1,15 @@
+EXP_DATASET: pascal_voc
+PATH_ROOT: /srv/sdb1/image_team/pascal_voc/VOCdevkit/VOC0712/
+PATH_TO_IMAGES: /srv/sdb1/image_team/pascal_voc/VOCdevkit/VOC0712/JPEGImages/
+PATH_TO_ANNOTATIONS: /srv/sdb1/image_team/pascal_voc/VOCdevkit/VOC0712/Annotations
+PATH_TO_IMAGESETS: /srv/sdb1/image_team/pascal_voc/VOCdevkit/VOC0712/ImageSets/Main/
+PATH_TO_RESULTS: /srv/sdb1/image_team/pascal_voc/VOCdevkit/VOC0712/results
+CLASSES: /srv/sdb1/image_team/pascal_voc/VOCdevkit/VOC0712/classes.txt
+COMPID: meaninglessPrefix
+IMAGE_TYPE: .jpg
+ANNOTATION_TYPE: xml
+PARSE_ANNOTATION_REGEX: None
+CONVERT_TO_PERSON: None
+IMAGE_INDEX_TO_IMAGE_PATH: default
+ONLY_PERSON: True
+USE_IMAGE_SET:
