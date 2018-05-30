@@ -10,14 +10,12 @@ The class is a "torchvision.dataset.DatasetFolder" type
 import numpy as np
 
 # metaDatasetGen
-from datasets.ds_utils import compute_size_along_roidb
+from datasets.ds_utils import compute_size_along_roidb,clean_box
 
 # pytorch imports
 import torch.utils.data as data
 from torchvision import datasets
 from torchvision.datasets.folder import IMG_EXTENSIONS,default_loader
-
-
 
 class RoidbDataset(data.Dataset):
 
@@ -54,12 +52,7 @@ class RoidbDataset(data.Dataset):
 
         # (x1,y1,x2,y2) bounds correction
         if True:
-            if box[0] == box[2]: box[2] += 1
-            if box[1] == box[3]: box[3] += 1
-            if box[0] < 0: box[0] = 0
-            if box[1] < 0: box[1] = 0
-            if box[2] > sample['width']: box[2] = sample['width']
-            if box[3] > sample['height']: box[3] = sample['height']
+            clean_box(box,sample)
             
         # load inputs and targets
         inputs,target = self.loader(sample,annoIndex)

@@ -43,12 +43,36 @@ def validate_boxes(boxes, width=0, height=0):
     assert (x2 < width).all()
     assert (y2 < height).all()
 
+def clean_box(box,sample):
+    if box[0] == box[2]: box[2] += 1
+    if box[1] == box[3]: box[3] += 1
+    if box[0] < 0: box[0] = 0
+    if box[1] < 0: box[1] = 0
+    if box[2] > sample['width']: box[2] = sample['width']
+    if box[3] > sample['height']: box[3] = sample['height']
+    
+
 def filter_small_boxes(boxes, min_size):
     w = boxes[:, 2] - boxes[:, 0]
     h = boxes[:, 3] - boxes[:, 1]
     keep = np.where((w >= min_size) & (h > min_size))[0]
     return keep
 
+def load_mixture_set_single(setID,repetition,size):
+    pklName = createFilenameID(setID,str(repetition),str(size)) + ".pkl"
+    # write pickle file of the roidb
+    if osp.exists(pklName) is True:
+        fid = open(pklName,"rb")
+        loaded = pickle.load(fid)
+        allRoidb = loaded['allRoidb']
+        annoCounts = loaded['annoCounts']
+        print_each_size(allRoidb)
+        fid.close()
+    else:
+        raise ValueError("{} does not exists".format(pklName))
+    return allRoidb,annoCounts
+
+    
 def load_mixture_set(setID,repetition,final_size):
 
     allRoidb = []
@@ -70,15 +94,22 @@ def load_mixture_set(setID,repetition,final_size):
             fid = open(pklName,"rb")
             loaded = pickle.load(fid)
             roidbs = loaded['allRoidb']
-            print_each_size(allRoidb)
+            print(pklName)
             if size == final_size: # only save the last count
                 annoCounts = loaded['annoCounts']
             allRoidb.extend(roidbs)
+            print_each_size(allRoidb)
             fid.close()
         else:
             raise ValueError("{} does not exists".format(pklName))
         prevSize += len(loaded)
     return allRoidb,annoCounts
+
+def save_mixture_set_single(roidb,annoCount,setID,repetition,size):
+    pklName = createFilenameID(setID,str(repetition),str(size)) + ".pkl"
+    saveInfo = {"allRoidb":roidb,"annoCounts":annoCount}
+    with open(pklName,"wb") as f:
+        pickle.dump(saveInfo,f)
 
 def print_each_size(roidb):
     print("="*100)
@@ -106,6 +137,7 @@ def printPyroidbSetCounts(pyroidb):
 def pyroidbTransform_cropImageToBox(inputs,**kwargs):
     im_orig = inputs[0]
     box = inputs[1]
+    clean_box(box,kwargs['sample'])
     return cropImageToAnnoRegion(im_orig,box)
 
 def cropImageToAnnoRegion(im_orig,box):
@@ -176,9 +208,9 @@ def addRoidbField(roidb,fieldName,transformFunction):
         # print("")
 
         if fieldName in sample.keys():
-            sample[fieldName].append(transformFunction(sample))
-        else:
-            sample[fieldName] = transformFunction(sample)
+            continue
+            # sample[fieldName].append(transformFunction(sample))
+        sample[fieldName] = transformFunction(sample)
 
 def checkNormalizeSample(sample,annoIndex):
     return ("bbox_noramlized?" in sample.keys() and sample["bbox_noramlized?"][annoIndex] is False) or ("bbox_noramlized?" not in sample.keys())
@@ -204,3 +236,6 @@ def pyroidbTransform_normalizeBox(inputs,**kwargs):
     return inputs
 
     
+
+
+

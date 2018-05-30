@@ -24,7 +24,7 @@ from skimage.feature import hog
 from sklearn.model_selection import train_test_split
 from skimage.feature import hog
 from sklearn.metrics import confusion_matrix
-from datasets.ds_utils import cropImageToAnnoRegion,addRoidbField
+from datasets.ds_utils import cropImageToAnnoRegion,addRoidbField,clean_box
 import warnings
 warnings.filterwarnings('ignore')
 
@@ -34,6 +34,7 @@ def HOGfromRoidbSample(sample,orient=9, pix_per_cell=8,
     features = []
     img = cv2.imread(sample['image'])
     for box in sample['boxes']:
+        clean_box(box,sample)
         cimg = cropImageToAnnoRegion(img,box)
         feature_image = np.copy(cimg)      
         try:
@@ -45,7 +46,8 @@ def HOGfromRoidbSample(sample,orient=9, pix_per_cell=8,
 
 def HOGFromImage(image,orient=9, pix_per_cell=8,
                  cell_per_block=2):
-    image = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+    if len(image.shape) == 3 and image.shape[2] == 3:
+        image = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
     image = cv2.resize(image, (128,256))
     hogFeatures =  get_hog_features(image[:,:], orient, 
                                     pix_per_cell, cell_per_block,
@@ -240,7 +242,7 @@ def extract_pyroidb_features(pyroidb, feat_type, spatial_size=(32, 32),
 #        features.append(file_features)
     return coco_feat, voc_feat, imageNet_feat, cam2_feat, inria_feat, caltech_feat, sun_feat, kitti_feat, y, X_idx # Return list of feature vectors
 
-def splitData(trainSize,testSize,inputFtrs):
+def splitFeatures(trainSize,testSize,inputFtrs):
     trainFtrs = inputFtrs[0:trainSize]
     testFtrs = inputFtrs[trainSize:trainSize + testSize]
     return trainFtrs,testFtrs
@@ -404,8 +406,6 @@ def split_data(train_size, test_size, coco_feat, voc_feat, imagenet_feat, cam2_f
     X_idx = np.vstack((coco_idx, voc_idx, imageNet_idx, cam2_idx, inria_idx, caltech_idx, sun_idx, kitti_idx)).astype(np.float64)
 
     return X_train, X_test, y_train, y_test, X_idx
-
-
 
 def scale_data(X_train, X_test):
     X_train_scaler = StandardScaler().fit(X_train)

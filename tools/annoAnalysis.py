@@ -13,8 +13,9 @@ import _init_paths
 from core.train import get_training_roidb
 from core.config import cfg, cfg_from_file, cfg_from_list, get_output_dir, loadDatasetIndexDict
 from datasets.factory import get_repo_imdb
-from datasets.ds_utils import load_mixture_set,print_each_size,computeTotalAnnosFromAnnoCount,cropImageToAnnoRegion
+from datasets.ds_utils import load_mixture_set,print_each_size,computeTotalAnnosFromAnnoCount,cropImageToAnnoRegion,roidbSampleBox,pyroidbTransform_normalizeBox
 from anno_analysis.metrics import annotationDensityPlot,plotDensityPlot,metric_1
+from ntd.hog_svm import HOGFromImage
 
 # pytorch imports
 from datasets.pytorch_roidb_loader import RoidbDataset
@@ -99,4 +100,5 @@ if __name__ == '__main__':
         print(" -=-=-=- dataset {} -=-=-=-=- ".format(clsToSet[idx]))
         print("M1: {}".format(metric_1(annoMap,10)))
         plotDensityPlot(annoMap,clsToSet[idx])
+        print(HOGFromImage(annoMap.astype(np.float32)).shape)
 
