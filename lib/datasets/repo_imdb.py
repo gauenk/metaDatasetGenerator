@@ -27,6 +27,7 @@ class RepoImdb(imdb):
         self._datasetName = datasetName
         self._configName = configName
         self._image_set = imageSet
+        print(self._image_set)
         self._image_index = [] 
         self._convertIdToCls = None
         self._obj_proposer = 'gt'
@@ -41,7 +42,7 @@ class RepoImdb(imdb):
                       "ymlDatasets", cfg.PATH_YMLDATASETS,
                       self._datasetName + ".yml")
         cfgData_from_file(fn)
-        assert(self._datasetName == cfgData['EXP_DATASET'], "dataset name is not correct.")
+        assert self._datasetName == cfgData['EXP_DATASET'], "dataset name is not correct."
 
         self._set_classes(cfgData['CLASSES'],cfgData['CONVERT_TO_PERSON'],cfgData['ONLY_PERSON'])
         self._num_classes = len(self._classes)
