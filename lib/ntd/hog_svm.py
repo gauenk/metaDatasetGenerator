@@ -24,10 +24,41 @@ from skimage.feature import hog
 from sklearn.model_selection import train_test_split
 from skimage.feature import hog
 from sklearn.metrics import confusion_matrix
+from datasets.ds_utils import cropImageToAnnoRegion,addRoidbField,clean_box
 import warnings
 warnings.filterwarnings('ignore')
 
 
+def HOGfromRoidbSample(sample,orient=9, pix_per_cell=8,
+                       cell_per_block=2, hog_channel=0):
+    features = []
+    img = cv2.imread(sample['image'])
+    for box in sample['boxes']:
+        clean_box(box,sample)
+        cimg = cropImageToAnnoRegion(img,box)
+        feature_image = np.copy(cimg)      
+        try:
+            features.append(HOGFromImage(feature_image))
+        except:
+            print(sample)
+            return None
+    return features
+
+def HOGFromImage(image,orient=9, pix_per_cell=8,
+                 cell_per_block=2):
+    if len(image.shape) == 3 and image.shape[2] == 3:
+        image = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+    image = cv2.resize(image, (128,256))
+    hogFeatures =  get_hog_features(image[:,:], orient, 
+                                    pix_per_cell, cell_per_block,
+                                    vis=False, feature_vec=True)
+    return hogFeatures
+
+def appendHOGtoRoidb(roidb):
+    print("="*100)
+    print("appending the HOG field to Roidb")
+    addRoidbField(roidb,"hog",HOGfromRoidbSample)
+    print("finished appending HOG")
 
 def plot_confusion_matrix(cm, classes,
                           normalize=False,
@@ -143,7 +174,7 @@ def extract_pyroidb_features(pyroidb, feat_type, spatial_size=(32, 32),
     # Iterate through the list of images
     for i in range(0, len(pyroidb)):
         # print(pyroidb[i][1])
-    # for file_p in pyroidb:
+        # for file_p in pyroidb:
         try:
             file_features = []
             image = pyroidb[i][0] # Read in each imageone by one
@@ -211,7 +242,10 @@ def extract_pyroidb_features(pyroidb, feat_type, spatial_size=(32, 32),
 #        features.append(file_features)
     return coco_feat, voc_feat, imageNet_feat, cam2_feat, inria_feat, caltech_feat, sun_feat, kitti_feat, y, X_idx # Return list of feature vectors
 
-
+def splitFeatures(trainSize,testSize,inputFtrs):
+    trainFtrs = inputFtrs[0:trainSize]
+    testFtrs = inputFtrs[trainSize:trainSize + testSize]
+    return trainFtrs,testFtrs
 
 def split_data(train_size, test_size, coco_feat, voc_feat, imagenet_feat, cam2_feat, inria_feat, caltech_feat, sun_feat, kitti_feat, X_idx, y):
     y_train = []
@@ -372,8 +406,6 @@ def split_data(train_size, test_size, coco_feat, voc_feat, imagenet_feat, cam2_f
     X_idx = np.vstack((coco_idx, voc_idx, imageNet_idx, cam2_idx, inria_idx, caltech_idx, sun_idx, kitti_idx)).astype(np.float64)
 
     return X_train, X_test, y_train, y_test, X_idx
-
-
 
 def scale_data(X_train, X_test):
     X_train_scaler = StandardScaler().fit(X_train)

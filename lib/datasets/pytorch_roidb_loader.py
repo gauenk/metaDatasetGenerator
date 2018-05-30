@@ -10,19 +10,17 @@ The class is a "torchvision.dataset.DatasetFolder" type
 import numpy as np
 
 # metaDatasetGen
-from datasets.ds_utils import compute_size_along_roidb
+from datasets.ds_utils import compute_size_along_roidb,clean_box
 
 # pytorch imports
 import torch.utils.data as data
 from torchvision import datasets
 from torchvision.datasets.folder import IMG_EXTENSIONS,default_loader
 
-
-
 class RoidbDataset(data.Dataset):
 
     def __init__(self, roidb, classes, transform=None, target_transform=None,
-                 loader=default_loader, returnBox=False):
+                 loader=default_loader, normalize_box=True):
 
         self.roidb = roidb
         self.classes = classes
@@ -33,7 +31,7 @@ class RoidbDataset(data.Dataset):
         self.transform = transform
         self.target_transform = target_transform
         self.loader = loader
-        self._returnBox = returnBox
+        self._normalize_box = normalize_box
 
     # re-defitinion of the index function 
     def __getitem__(self, index):
@@ -44,35 +42,38 @@ class RoidbDataset(data.Dataset):
         Returns:
            tuple: (sample, target) where target is class_index of the target class.
         """
+        sample,annoIndex = self.getSampleAtIndex(index)
+
+        if sample['flipped']:
+            print("FLIPPED")
+            sys.exit()
+
+        box = sample['boxes'][annoIndex]
+
+        # (x1,y1,x2,y2) bounds correction
+        if True:
+            clean_box(box,sample)
+            
+        # load inputs and targets
+        inputs,target = self.loader(sample,annoIndex)
+
+        # transform image or target
+        if self.transform is not None:
+            inputs = self.transform(inputs,sample=sample,annoIndex=annoIndex)
+        if self.target_transform is not None:
+            target = self.target_transform(target)
+
+        return inputs, target
+            
+    def getSampleAtIndex(self,index):
         sampleIndex = np.argwhere(self.roidbSizes > index)[0][0]
         sample = self.roidb[sampleIndex]
-        target = sample['set']
-
         # which box to load
         if sampleIndex > 0:
             annoIndex = index - self.roidbSizes[sampleIndex-1]
         else:
             annoIndex = index
-
-        box = sample['boxes'][annoIndex]
-
-        # only return box if set
-        if self._returnBox:
-            return box, target
-
-        # load the image
-        img = self.loader(sample['image'])
-        if sample['flipped']:
-            img = img[:, ::-1, :]
-
-        # transform image or target
-        if self.transform is not None:
-            img = self.transform(img,box)
-        if self.target_transform is not None:
-            target = self.target_transform(target)
-
-        return img, target
-            
+        return sample, annoIndex
                 
     def __len__(self):
         return self.roidbSizes[-1]
@@ -87,3 +88,6 @@ class RoidbDataset(data.Dataset):
         fmt_str += '{0}{1}'.format(tmp, self.target_transform.__repr__().replace('\n', '\n' + ' ' * len(tmp)))
         return fmt_str
 
+    def datasetID_at_index(self,index):
+        sampleIndex = np.argwhere(self.roidbSizes > index)[0][0]
+        return self.roidb[sampleIndex]['set']

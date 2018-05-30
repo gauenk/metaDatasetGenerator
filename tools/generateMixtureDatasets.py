@@ -9,6 +9,7 @@
 """Get information about the mixture datasets"""
 
 import _init_paths
+from utils.misc import PreviousCounts
 from core.train import get_training_roidb, train_net
 from core.config import cfg, cfg_from_file, cfg_from_list, get_output_dir, createFilenameID, createPathRepeat, createPathSetID
 from datasets.ds_utils import print_each_size,printPyroidbSetCounts
@@ -33,7 +34,6 @@ indexToImdbName = ['coco','pascal_voc','imagenet','cam2','caltech','kitti','sun'
 datasetSizes = cfg.MIXED_DATASET_SIZES
 loadedRoidbs = {}
 loadedImdbs = {}
-prevCounts = [0 for _ in range(8)]
 
 def parse_args():
     """
@@ -149,19 +149,11 @@ def combined_roidb(roidbs):
         roidb.extend(r)
     return roidb
 
-def combineOnlyNew(roidbs):
+def combineOnlyNew(roidbs,pc):
     newRoidb = []
     for idx,roidb in enumerate(roidbs):
-        newRoidb.extend(roidb[prevCounts[idx]:])
+        newRoidb.extend(roidb[pc[idx]:])
     return newRoidb
-
-def updatePreviousCounts(roidbs):
-    for idx,roidb in enumerate(roidbs):
-        prevCounts[idx] = len(roidb)
-
-def zeroPreviousCounts():
-    for idx in range(8):
-        prevCounts[idx] = 0
 
 if __name__ == '__main__':
     args = parse_args()
@@ -187,8 +179,8 @@ if __name__ == '__main__':
         sys.exit()
 
     loadDatasetsToMemory()
-    
-    
+    pc = PreviousCounts(8,0)
+
     for setNum in range(range_start,range_end+1):
         # for each of the "ranges" we want
         for setID in createListFromId(setNum):
@@ -204,7 +196,7 @@ if __name__ == '__main__':
                 # shuffle imdbs
                 shuffle_imdbs()
                 # reset previuos counters
-                zeroPreviousCounts()
+                pc.zero()
                 for size in datasetSizes:
                     # create a file for each dataset size
                     idlist_filename = createFilenameID(setID,str(r),str(size))
@@ -212,7 +204,7 @@ if __name__ == '__main__':
                     assert len(repo_roidbs) == setID.count('1')
                     # write pickle file of the roidb
                     allRoidb = combined_roidb(repo_roidbs)
-                    onlyNewRoidb = combineOnlyNew(repo_roidbs)
+                    onlyNewRoidb = combineOnlyNew(repo_roidbs,pc)
                     pklName = idlist_filename + ".pkl"
                     print(pklName,roidbs_anno_counts,size)
                     pyroidb = RoidbDataset(allRoidb,[0,1,2,3,4,5,6,7],loader=None,transform=None,returnBox=True)
@@ -226,4 +218,4 @@ if __name__ == '__main__':
                             pickle.dump(saveInfo,f)
                     else:
                         print("{} exists".format(pklName))
-                    updatePreviousCounts(repo_roidbs)
+                    pc.update(repo_roidbs)

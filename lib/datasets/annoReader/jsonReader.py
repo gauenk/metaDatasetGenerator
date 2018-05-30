@@ -4,19 +4,18 @@
 # Written by Kent Gauen
 # --------------------------------------------------------
 
-import os
+import os,json
 import os.path as osp
 import numpy as np
 import scipy.sparse
 from core.config import cfg,cfgData
 from easydict import EasyDict as edict
-import xml.etree.ElementTree as ET
+from datasets.ds_utils import xywh_to_xyxy
 
+class jsonReader(object):
+    """annoRead for reading json files."""
 
-class xmlReader(object):
-    """Image database."""
-
-    def __init__(self, annoPath, classes , datasetName, setID, bboxOffset = 0, useDiff = True, convertToPerson=None, convertIdToCls = None):
+    def __init__(self, annoPath, classes , datasetName, setID, imageSet, bboxOffset = 0, useDiff = True, convertToPerson=None, convertIdToCls = None):
         """
         __init__ function for annoReader [annotationReader]
 
@@ -25,6 +24,7 @@ class xmlReader(object):
         self._bboxOffset = bboxOffset
         self._datasetName = datasetName
         self._setID = setID
+        self._imageSet = imageSet
         self._convertToPerson = convertToPerson
         self.num_classes = len(classes)
         self.useDiff = useDiff
@@ -39,27 +39,36 @@ class xmlReader(object):
         load annotations depending on how the annotation should be loaded
 
         """
-        return self._load_xml_annotation(index)
+        return self._load_json_annotation(index)
 
-    def _load_xml_annotation(self, index):
+    def _getBaseImageSet(self):
+        # return base name; "train", "test2014", "test2015", "val"
+        if "train" in self._imageSet:
+            return "train"
+        elif "val" in self._imageSet:
+            return "val2014"
+        elif "test" in self._imageSet:
+            return self._imageSet
+
+    def _load_json_annotation(self, index):
         """
         requires the following format @ 
         <PATH_TO_ANNOTATIONS>/*xml
         """
-        filename = os.path.join(self._annoPath, index + '.xml')
-        tree = ET.parse(filename)
-        objs = tree.findall('object')
-        if not self.useDiff:
-            # Exclude the samples labeled as difficult
-            objs = [
-                obj for obj in objs if int(obj.find('difficult').text) == 0]
+        if type(index) is int:
+            index = 'COCO_' + self._getBaseImageSet() + '_' +\
+                        str(index).zfill(12)
+        filename = os.path.join(self._annoPath, index + '.json')
+        with open(filename,"r") as f:
+            anno = json.load(f)
 
         # set the number of objects
         num_objs = 0
-        for ix, obj in enumerate(objs):
-            if self._find_cls(obj) != -1:
+        for ix, obj in enumerate(anno['annotation']):
+            cls = obj['category_id']
+            if self._find_cls(cls) != -1:
                 num_objs+=1
-                
+
         boxes = np.zeros((num_objs, 4), dtype=np.uint16)
         gt_classes = np.zeros((num_objs), dtype=np.int32)
         overlaps = np.zeros((num_objs, self.num_classes), dtype=np.float32)
@@ -68,41 +77,42 @@ class xmlReader(object):
 
         # Load object bounding boxes into a data frame.
         ix = 0
-        for obj in objs:
-            bbox = obj.find('bndbox')
-            cls = self._find_cls(obj)
+        for obj in anno['annotation']:
+            cls = obj['category_id']
+            cls = self._find_cls(cls)
             if cls == -1:
                 continue
-            # Make pixel indexes 0-based
-            x1 = float(bbox.find('xmin').text) - self._bboxOffset
-            y1 = float(bbox.find('ymin').text) - self._bboxOffset
-            x2 = float(bbox.find('xmax').text) - self._bboxOffset
-            y2 = float(bbox.find('ymax').text) - self._bboxOffset
-            # handle scaling caltech; annos were modified for YOLO
-            x1,y1,x2,y2 = self._handle_caltech_helps_vs_gauenk(*[x1, y1, x2, y2])
-            boxes[ix, :] = [x1, y1, x2, y2]
-            gt_classes[ix] = cls
+            boxes[ix, :] = xywh_to_xyxy(np.array(obj['bbox'])[np.newaxis,:])
+            x1,y1,x2,y2 = boxes[ix, :]
+            gt_classes[ix] = obj['category_id']
             overlaps[ix, cls] = 1.0
             seg_areas[ix] = (x2 - x1 + 1) * (y2 - y1 + 1)
             ix += 1
 
         overlaps = scipy.sparse.csr_matrix(overlaps)
-        # TODO: convert the 'set' into an index for a vector;
-        # add the conversion of the layer in the "train.prototxt"
-        # of the VAE 
+
         return {'boxes' : boxes,
                 'gt_classes': gt_classes,
                 'gt_overlaps' : overlaps,
                 'flipped' : False,
                 'seg_areas' : seg_areas,
                 'set': self._setID}
-                #'set': self._datasetName}
 
-    def _find_cls(self,obj):
-        cls = obj.find('name').text.lower().strip()
-        #TODO: sun. "person model" is not accounted for (missing 17 annos)
-        # find out what is happening to them
+    def _find_cls(self,cls):
+        if type(cls) is int:
+            return self._find_cls_int(cls)
+        elif type(cls) is str:
+            return self._find_cls_str(cls)
+        else:
+            print(type(cls))
 
+    def _find_cls_int(self,cls):
+        if cls < len(self._classToIndex):
+            return cls
+        else:
+            return -1
+
+    def _find_cls_str(self,cls):
         if self._convertIdToCls is not None: cls = self._convertIdToCls[cls]
         # check if we need to convert annotation class to "person"
         if self._convertToPerson is not None and cls in self._convertToPerson:
@@ -113,6 +123,7 @@ class xmlReader(object):
         else:
             cls = -1
         return cls
+
 
     def _handle_caltech_helps_vs_gauenk(self,x1,y1,x2,y2):
         if "helps" in cfg.PATH_YMLDATASETS and "caltech" in cfgData.EXP_DATASET: 

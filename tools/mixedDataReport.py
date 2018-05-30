@@ -11,9 +11,10 @@
 
 import _init_paths
 from core.train import get_training_roidb
-from core.config import cfg, cfg_from_file, cfg_from_list, get_output_dir, loadDatasetIndexDict
+from core.config import cfg, cfg_from_file, cfg_from_list, get_output_dir, loadDatasetIndexDict,createPathRepeat
 from datasets.factory import get_repo_imdb
-from datasets.ds_utils import load_mixture_set,print_each_size,computeTotalAnnosFromAnnoCount,cropImageToAnnoRegion,printPyroidbSetCounts
+from datasets.ds_utils import load_mixture_set,print_each_size,computeTotalAnnosFromAnnoCount,cropImageToAnnoRegion,printPyroidbSetCounts,roidbSampleImage,roidbSampleImageAndBox,save_mixture_set_single,load_mixture_set_single,pyroidbTransform_cropImageToBox
+from ntd.hog_svm import appendHOGtoRoidb,train_SVM
 import os.path as osp
 import datasets.imdb
 import argparse
@@ -42,6 +43,12 @@ def parse_args():
     parser.add_argument('--size', dest='size',
                         help='which size to read from',
                         default=1000, type=int)
+    parser.add_argument('--pyroidb_type', dest='pyroidb_type',
+                        help='which type of pyroidb to load',
+                        default="mixture", type=str)
+    parser.add_argument('--appendHog', dest='appendHog',
+                        help='resave the loaded mixed dataset with HOG',
+                        action='store_true')
     parser.add_argument('--save', dest='save',
                         help='save some samples with bboxes visualized?',
                         action='store_true')
@@ -75,6 +82,14 @@ def get_bbox_info(roidb,size):
             idx += 1
     return areas,widths,heights
 
+def resaveWithHog(setID,repeat):
+    datasetSizes = cfg.MIXED_DATASET_SIZES
+    for size in datasetSizes:
+        roidb,annoCount = load_mixture_set_single(setID,repeat,size)
+        print_each_size(roidb)
+        appendHOGtoRoidb(roidb)
+        save_mixture_set_single(roidb,annoCount,setID,repeat,size)
+
 if __name__ == '__main__':
     args = parse_args()
 
@@ -105,7 +120,7 @@ if __name__ == '__main__':
     print("number of annotations: {}".format(numAnnos))
     print("size of roidb in memory: {}kB".format(len(roidb) * sys.getsizeof(roidb[0])/1024.))
     print("example roidb:")
-    for k,v in roidb[0].items():
+    for k,v in roidb[10].items():
         print("\t==> {},{}".format(k,type(v)))
         print("\t\t{}".format(v))
 
@@ -126,18 +141,24 @@ if __name__ == '__main__':
     path = osp.join(prefix_path,"heights.dat")
     np.savetxt(path,heights,fmt='%.18e',delimiter=' ')
         
-    print("-=-=-=-=-=-")
+    print("-="*50)
 
     clsToSet = loadDatasetIndexDict()
+    
+    # add the "HOG" field to pyroidb
+    if args.appendHog:
+        resaveWithHog(setID,repeat)
 
     print("as pytorch friendly ")
-
-    pyroidb = RoidbDataset(roidb,[0,1,2,3,4,5,6,7],loader=cv2.imread,transform=cropImageToAnnoRegion,returnBox=False)
-    print(annoCount)
-
-    # printPyroidbSetCounts(pyroidb)
-    # print_each_size(roidb)
-
+    
+    if args.pyroidb_type == "mixture":
+        pyroidb = RoidbDataset(roidb,[0,1,2,3,4,5,6,7],
+                               loader=roidbSampleImageAndBox,
+                               transform=pyroidbTransform_cropImageToBox)
+    elif args.pyroidb_type == "hog":
+        pyroidb = RoidbDataset(roidb,[0,1,2,3,4,5,6,7],
+                               loader=roidbSampleHOG,
+                               transform=None)
     if args.save:
         print("save 30 cropped annos in output folder.")
         saveDir = "./output/mixedDataReport/"

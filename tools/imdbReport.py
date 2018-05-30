@@ -16,7 +16,7 @@ import _init_paths
 from core.train import get_training_roidb
 from core.config import cfg, cfg_from_file, cfg_from_list, get_output_dir
 from datasets.factory import get_repo_imdb
-from datasets.ds_utils import load_mixture_set,print_each_size
+from datasets.ds_utils import load_mixture_set,print_each_size,roidbSampleBox,pyroidbTransform_cropImageToBox,pyroidbTransform_normalizeBox,roidbSampleImageAndBox
 import os.path as osp
 import datasets.imdb
 import argparse
@@ -24,7 +24,10 @@ import pprint
 import numpy as np
 import numpy.random as npr
 import sys,os,cv2,uuid
+from anno_analysis.metrics import annotationDensityPlot,plotDensityPlot
 
+# pytorch imports
+from datasets.pytorch_roidb_loader import RoidbDataset
 
 def parse_args():
     """
@@ -143,7 +146,6 @@ if __name__ == '__main__':
         os.makedirs(prefix_path)
 
     print("-="*50)
-    print(imdb.roidbSize)
     print("mixed datasets roidbsize")
     for size in [50,100,500,1000]:
        sizedRoidb,actualSize = imdb.get_roidb_at_size(size)
@@ -160,6 +162,10 @@ if __name__ == '__main__':
     np.savetxt(path,widths,fmt='%.18e',delimiter=' ')
     path = osp.join(prefix_path,"heights.dat")
     np.savetxt(path,heights,fmt='%.18e',delimiter=' ')
+
+    pyroidb = RoidbDataset(roidb,[0,1,2,3,4,5,6,7],
+                           loader=roidbSampleImageAndBox,
+                           transform=pyroidbTransform_cropImageToBox)
 
     if args.save:
         index = imdb._get_roidb_index_at_size(30)
