@@ -155,14 +155,18 @@ if __name__ == '__main__':
 
     """
     -> below is the raw output for x_test; we want the max "k" values 
-    from each dataset (along the columns) from ~1000 regions of each dataset
+    from each dataset (along the columns) from ~1000 images of each dataset
     -> a good "k" is 10
     -> print the image paths to a file
     -> use the format given below
     -> TODO: write the "findMaxRegions" function in "hog_svm.py"
     """
 
-    rawOutputs = np.matmul(model.coef_,npt(X_test)) + model.intercept_.shape
+    # rawOutputs = np.matmul(model.coef_,npt(X_test)) + model.intercept_[:,np.newaxis]
+    rawOutputs = model.decision_function(X_test)
+
+    print(rawOutputs)
+    print(rawOutputs.shape)
 
     fileName = osp.join(cfg.PATH_TO_NTD_OUTPUT,\
                         "{}_{}_{}.txt".format(setID,repeat,size))
@@ -173,3 +177,5 @@ if __name__ == '__main__':
         maxRegions = findMaxRegions(pyroidb,rawOutputs,l_idx)
         fn.write(maxRegions)
     fn.close()
+
+    

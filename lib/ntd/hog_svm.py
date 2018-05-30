@@ -210,7 +210,7 @@ def split_data(train_size, test_size, l_feat,l_idx, y, clsToSet):
 
         feats = l_feat[idx]
         x_train.append(feats[:train_size])
-        x_test.append(feats[:test_size])
+        x_test.append(feats[train_size:train_size+test_size])
 
         indicies = l_idx[idx]
         trIdx = indicies[:train_size]
