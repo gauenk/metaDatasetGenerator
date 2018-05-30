@@ -89,3 +89,18 @@ if __name__ == '__main__':
         imdb.set_proposal_method(cfg.TEST.PROPOSAL_METHOD)
 
     test_net(net, imdb, max_per_image=args.max_per_image, vis=args.vis)
+    
+'''
+argparse.ArgumentParser
+Input: (description='Test an Object Detection network'), Output: parser
+
+caffe.Net
+input: (args.prototxt, args.caffemodel, caffe.TEST), Output: net
+
+os.path.splitext
+input: (os.path.basename(args.caffemodel)), output: net.name
+
+get_repo_imdb
+input: (args.imdb_name), output: imdb
+'''
+    
