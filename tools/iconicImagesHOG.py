@@ -8,7 +8,7 @@ Created on Tue Mar 13 21:32:08 2018
 
 import _init_paths
 from core.train import get_training_roidb
-from core.config import cfg, cfg_from_file, cfg_from_list, get_output_dir, loadDatasetIndexDict
+from core.config import cfg, cfg_from_file, cfg_from_list, get_output_dir, loadDatasetIndexDict,iconicImagesFileFormat
 from datasets.factory import get_repo_imdb
 from datasets.ds_utils import load_mixture_set,print_each_size,computeTotalAnnosFromAnnoCount,cropImageToAnnoRegion,roidbSampleHOG,roidbSampleImage
 import os.path as osp
@@ -16,7 +16,7 @@ import datasets.imdb
 import argparse
 import pprint
 import numpy as np
-import sys,os,cv2
+import sys,os,cv2,pickle
 # pytorch imports
 from datasets.pytorch_roidb_loader import RoidbDataset
 from numpy import transpose as npt
@@ -45,6 +45,9 @@ def parse_args():
     parser.add_argument('--rand', dest='randomize',
                         help='randomize (do not use a fixed seed)',
                         action='store_true')
+    parser.add_argument('--model', dest='model',
+                        help='give the path to a fit model',
+                        default=None, type=str)
 
     if len(sys.argv) == 1:
         parser.print_help()
@@ -142,16 +145,23 @@ if __name__ == '__main__':
                                               orient=9, pix_per_cell=8, cell_per_block=2, \
                                               hog_channel=0)
 
-    train_size = 75
-    test_size = 25
+    train_size = 300
+    test_size = 300
+
 
     X_train, X_test, y_train, y_test, X_idx = split_data(train_size, test_size, \
                                                          l_feat,l_idx, y,\
                                                          clsToSet)
     print(X_train.shape)
     print(y_train.shape)
-    model = train_SVM(X_train,y_train)
-    print("accuracy on test data {}".format(model.score(X_test,y_test)))
+
+    if args.model is not None:
+        model = pickle.load(open(args.model,"rb"))
+    else:
+        model = train_SVM(X_train,y_train)
+        pickle.dump(model,open(iconicImagesFileFormat().format("model.pkl"),"wb"))
+
+    # print("accuracy on test data {}".format(model.score(X_test,y_test)))
 
     """
     -> below is the raw output for x_test; we want the max "k" values 
@@ -167,16 +177,19 @@ if __name__ == '__main__':
 
     print(rawOutputs)
     print(rawOutputs.shape)
-
-    fileName = osp.join(cfg.PATH_TO_NTD_OUTPUT,\
+    
+    fileDir = cfg.PATH_TO_NTD_OUTPUT
+    if not osp.exists(fileDir):
+        os.makedirs(fileDir)
+    
+    fileName = osp.join(fileDir,\
                         "{}_{}_{}.txt".format(setID,repeat,size))
-
-    fn = open(fileName,"r")
-    for idx,name in enumerate(clsToSet):
-        print("{}: {}".format(idx,name))
-        maxRegions = findMaxRegions(pyroidb,rawOutputs,l_idx)
-        fn.write(maxRegions)
+    topK = 10
+    fn = open(fileName,"w")
+    maxRegionsStr = findMaxRegions(topK,pyroidb,rawOutputs,X_idx,clsToSet)
+    fn.write(maxRegionsStr)
     fn.close()
+    
     
     '''
 argparse.ArgumentParser:

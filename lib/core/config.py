@@ -375,6 +375,11 @@ def cfg_from_list(cfg_list):
             type(value), type(d[subkey]))
         d[subkey] = value
 
+def iconicImagesFileFormat():
+    if not osp.exists(cfg.PATH_TO_NTD_OUTPUT):
+        os.makedirs(cfg.PATH_TO_NTD_OUTPUT)
+    return osp.join(cfg.PATH_TO_NTD_OUTPUT,"{}")
+
 def createPathSetID(setID):
     return osp.join(cfg.PATH_MIXTURE_DATASETS,setID)
 
