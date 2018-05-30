@@ -103,3 +103,32 @@ if __name__ == '__main__':
                     imageToId(obj['image']),box[0],box[1],
                     box[2],box[3]))
     f.close()
+    
+    '''
+ argparse.ArgumentParser:
+ Input: (description='Generate an Imdb Report') Output: parser
+     
+get_repo_imdb:
+Input: (imdb_name), Output: imdb
+
+get_training_roidb:
+Input: (imdb), Output: roidb
+
+np.zeros:
+ Input: (size), Output: areas
+ 
+np.zeros:
+Input: (size), Output: widths
+
+np.zeros:
+Inputs: (size), Output: heights
+
+get_roidb
+Input: (args.imdb_name), Output: imdb, roidb
+
+imdb.roidb_num_bboxes_at
+Input: (-1), Output: numAnnos
+    
+open
+Input: (txtFilename,"w+"), Output: f
+'''
