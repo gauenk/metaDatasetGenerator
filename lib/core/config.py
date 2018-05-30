@@ -212,6 +212,9 @@ __C.TEST.OBJ_DET.RPN_MIN_SIZE = 16
 # MISC
 #
 
+# For print statements
+__C.DEBUG = False
+
 # Pixel mean values (BGR order) as a (1, 1, 3) array
 # We use the same pixel mean for all networks even though it's not exactly what
 # they were trained with
@@ -279,6 +282,7 @@ __C.PATH_TO_NTD_OUTPUT = "./output/ntd/"
 
 # output for annotation analysis
 __C.PATH_TO_ANNO_ANALYSIS_OUTPUT = "./output/annoAnalysis/"
+
 
 
 def get_output_dir(imdb, net=None):
@@ -385,7 +389,8 @@ def loadDatasetIndexDict():
     indToCls = [None for _ in range(len(yaml_cfg))]
     for k,v in yaml_cfg.items():
         indToCls[v] = k
-    print(indToCls)
+    while(None in indToCls):
+        indToCls.remove(None)
     return indToCls
 
 
