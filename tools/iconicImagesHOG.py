@@ -173,3 +173,51 @@ if __name__ == '__main__':
         maxRegions = findMaxRegions(pyroidb,rawOutputs,l_idx)
         fn.write(maxRegions)
     fn.close()
+    
+    '''
+argparse.ArgumentParser:
+Input: (description='create the mixture datasets.'), Output: parser
+
+np.zeros
+Input: (size), Output: areas
+
+np.zeros
+Input: (size), Output: width
+    
+np.zeros
+Input: (size), Output: heights
+
+load_mixture_set
+Input: (setID,repeat,size), Output: roidb, annoCount
+
+computeTotalAnnosFromAnnoCount
+ Input: (annoCount), Output: numAnnos
+
+get_bbox_info
+Input: roidb, numAnnos, Output: areas, widths, heights
+
+
+pyroidb = RoidbDataset
+Input: (roidb,[0,1,2,3,4,5,6,7], loader=roidbSampleHOG, transform=None), Output: pyroidb
+
+extract_pyroidb_features
+Input: (pyroidb, 'hog', clsToSet,\spatial_size=(32, 32),hist_bins=32, \orient=9, pix_per_cell=8, cell_per_block=2, \hog_channel=0)
+Output: l_feat,l_idx,y
+
+train_SVM
+Input: (X_train,y_train), Output: model
+
+np.matmul
+Input: (model.coef_,npt(X_test)) + model.intercept_.shape)
+Output: rawOutputs
+
+ osp.join
+Input: (cfg.PATH_TO_NTD_OUTPUT,\
+                        "{}_{}_{}.txt".format(setID,repeat,size))
+Output: fileName
+
+open
+Input: (fileName,"r"),
+Output: fn
+'''
+           
