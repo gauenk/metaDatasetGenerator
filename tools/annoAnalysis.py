@@ -132,5 +132,23 @@ if __name__ == '__main__':
 def HOGFromImage(image,orient=9, pix_per_cell=8,
                  spatial_size=(128,256), hist_bins=32,
                  cell_per_block=2):
+ '''   
+ argparse.ArgumentParser
+Input: (argparse.ArgumentParser), Output: parser
 
+load_mixture_set
+Input: (setID, repeat, size), Output: roidb,annoCount
+
+computeTotalAnnosFromAnnoCount
+Input: (annoCount), Output: numAnnos
+
+RoidbDataset
+Input: (roidb,[0,1,2,3,4,5,6,7],loader=roidbSampleBox, transform=pyroidbTransform_normalizeBox), Output: pyroidb
+
+annotationDensityPlot
+Input: (pyroidb), Output:  annoMaps
+
+"{}_{}_{}_hog_a".format
+Input: (clsToSet[idx],size,repeat), Output: fnPrefix
+'''
 
