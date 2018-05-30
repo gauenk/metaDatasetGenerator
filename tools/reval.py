@@ -61,3 +61,17 @@ if __name__ == '__main__':
     output_dir = os.path.abspath(args.output_dir[0])
     imdb_name = args.imdb_name
     from_dets(imdb_name, output_dir, args)
+    
+    '''
+argparse.ArgumentParser
+Input: (description='Re-evaluate results'), Output: parser
+
+get_repo_imdb
+Input: (imdb_name), Output: imdb
+
+apply_nms
+Input: (dets, cfg.TEST.NMS), Output: nms_dets
+
+os.path.abspath
+Input: (args.output_dir[0]), Output: output_dir
+'''
