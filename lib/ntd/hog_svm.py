@@ -274,15 +274,17 @@ def boxToStr(box):
     return "{}_{}_{}_{}".format(
         box[0],box[1],box[2],box[3])
 
-def findMaxRegions(topK,pyroidb,rawOutputs,testIndex,clsToSet):
+def findMaxRegions(topK,pyroidb,rawOutputs,y_test,testIndex,clsToSet):
     output_str = ""
     topKIndex = np.argsort(rawOutputs,axis=0)[-topK:,:]
     for idx,name in enumerate(clsToSet):
         print("{}: {}".format(idx,name))
         pyroidbIdx = testIndex[topKIndex[:,idx]]
         dsRawValues = rawOutputs[topKIndex[:,idx],idx]
-        print(dsRawValues)
+        targets = y_test[topKIndex[:,idx]]
         for rowIdx,elemIdx in enumerate(pyroidbIdx):
+            print(targets[rowIdx],targets[rowIdx])
+            if targets[rowIdx] != targets[rowIdx]: continue
             elemIdx = int(elemIdx)
             sample,annoIndex = pyroidb.getSampleAtIndex(elemIdx)
             output_str += "{},{},{},{}\n".format(name,sample['image'],

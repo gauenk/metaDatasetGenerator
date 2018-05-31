@@ -9,11 +9,13 @@
 
 """Train an Img2Vec network on a "region of interest" database."""
 
+import matplotlib
+matplotlib.use("Agg")
 import _init_paths
 from core.train import get_training_roidb
 from core.config import cfg, cfg_from_file, cfg_from_list, get_output_dir, loadDatasetIndexDict,createPathRepeat
 from datasets.factory import get_repo_imdb
-from datasets.ds_utils import load_mixture_set,print_each_size,computeTotalAnnosFromAnnoCount,cropImageToAnnoRegion,printPyroidbSetCounts,roidbSampleImage,roidbSampleImageAndBox,save_mixture_set_single,load_mixture_set_single,pyroidbTransform_cropImageToBox
+from datasets.ds_utils import load_mixture_set,print_each_size,computeTotalAnnosFromAnnoCount,cropImageToAnnoRegion,printPyroidbSetCounts,roidbSampleImage,roidbSampleImageAndBox,save_mixture_set_single,load_mixture_set_single,pyroidbTransform_cropImageToBox,vis_dets
 from ntd.hog_svm import appendHOGtoRoidb,train_SVM
 import os.path as osp
 import datasets.imdb
@@ -167,12 +169,27 @@ if __name__ == '__main__':
             os.makedirs(saveDir)
            
         print("pyroidb length: {}".format(len(pyroidb)))
-        randIdx = npr.permutation(len(pyroidb))
-        for i in range(30):
+        # randIdx = npr.permutation(len(pyroidb))
+        randIdx = np.arange(len(pyroidb))
+        for i in range(len(pyroidb)): #range(200):
+
+            # find a specific image
+            sample,annoCount = pyroidb.getSampleAtIndex(randIdx[i])
+
+            if sample['image'] != "/srv/sdb1/image_team/pascal_voc/VOCdevkit/VOC0712/JPEGImages/2010_002708.jpg": continue
+
             img, cls = pyroidb[randIdx[i]]
             ds = clsToSet[cls]
             fn = osp.join(saveDir,"{}_{}.jpg".format(randIdx[i],ds))
-            print(fn)
             cv2.imwrite(fn,img)
 
+            # find a specific image
+            sample,annoCount = pyroidb.getSampleAtIndex(randIdx[i])
+            print(sample['image'])
+            if sample['image'] == "/srv/sdb1/image_team/pascal_voc/VOCdevkit/VOC0712/JPEGImages/2010_002708.jpg":
+                fn = osp.join(saveDir,"{}_{}_raw.png".format(ds,i))
+                im = cv2.imread(sample['image'])
+                cls = sample['gt_classes']
+                boxes = sample['boxes']
+                vis_dets(im,cls,boxes,i,fn=fn)
     

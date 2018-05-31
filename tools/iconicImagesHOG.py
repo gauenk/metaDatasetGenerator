@@ -145,8 +145,8 @@ if __name__ == '__main__':
                                               orient=9, pix_per_cell=8, cell_per_block=2, \
                                               hog_channel=0)
 
-    train_size = 300
-    test_size = 300
+    train_size = 500
+    test_size = 500
 
 
     X_train, X_test, y_train, y_test, X_idx = split_data(train_size, test_size, \
@@ -159,7 +159,7 @@ if __name__ == '__main__':
         model = pickle.load(open(args.model,"rb"))
     else:
         model = train_SVM(X_train,y_train)
-        pickle.dump(model,open(iconicImagesFileFormat().format("model.pkl"),"wb"))
+        pickle.dump(model,open(iconicImagesFileFormat().format("model_{}_{}_{}.pkl".format(setID,repeat,size)),"wb"))
 
     # print("accuracy on test data {}".format(model.score(X_test,y_test)))
 
@@ -184,57 +184,57 @@ if __name__ == '__main__':
     
     fileName = osp.join(fileDir,\
                         "{}_{}_{}.txt".format(setID,repeat,size))
-    topK = 10
+    topK = 30
     fn = open(fileName,"w")
-    maxRegionsStr = findMaxRegions(topK,pyroidb,rawOutputs,X_idx,clsToSet)
+    maxRegionsStr = findMaxRegions(topK,pyroidb,rawOutputs,y_test,X_idx,clsToSet)
     fn.write(maxRegionsStr)
     fn.close()
     
     
     '''
-argparse.ArgumentParser:
-Input: (description='create the mixture datasets.'), Output: parser
+    argparse.ArgumentParser:
+    Input: (description='create the mixture datasets.'), Output: parser
 
-np.zeros
-Input: (size), Output: areas
+    np.zeros
+    Input: (size), Output: areas
 
-np.zeros
-Input: (size), Output: width
-    
-np.zeros
-Input: (size), Output: heights
+    np.zeros
+    Input: (size), Output: width
 
-load_mixture_set
-Input: (setID,repeat,size), Output: roidb, annoCount
+    np.zeros
+    Input: (size), Output: heights
 
-computeTotalAnnosFromAnnoCount
- Input: (annoCount), Output: numAnnos
+    load_mixture_set
+    Input: (setID,repeat,size), Output: roidb, annoCount
 
-get_bbox_info
-Input: roidb, numAnnos, Output: areas, widths, heights
+    computeTotalAnnosFromAnnoCount
+     Input: (annoCount), Output: numAnnos
+
+    get_bbox_info
+    Input: roidb, numAnnos, Output: areas, widths, heights
 
 
-pyroidb = RoidbDataset
-Input: (roidb,[0,1,2,3,4,5,6,7], loader=roidbSampleHOG, transform=None), Output: pyroidb
+    pyroidb = RoidbDataset
+    Input: (roidb,[0,1,2,3,4,5,6,7], loader=roidbSampleHOG, transform=None), Output: pyroidb
 
-extract_pyroidb_features
-Input: (pyroidb, 'hog', clsToSet,\spatial_size=(32, 32),hist_bins=32, \orient=9, pix_per_cell=8, cell_per_block=2, \hog_channel=0)
-Output: l_feat,l_idx,y
+    extract_pyroidb_features
+    Input: (pyroidb, 'hog', clsToSet,\spatial_size=(32, 32),hist_bins=32, \orient=9, pix_per_cell=8, cell_per_block=2, \hog_channel=0)
+    Output: l_feat,l_idx,y
 
-train_SVM
-Input: (X_train,y_train), Output: model
+    train_SVM
+    Input: (X_train,y_train), Output: model
 
-np.matmul
-Input: (model.coef_,npt(X_test)) + model.intercept_.shape)
-Output: rawOutputs
+    np.matmul
+    Input: (model.coef_,npt(X_test)) + model.intercept_.shape)
+    Output: rawOutputs
 
- osp.join
-Input: (cfg.PATH_TO_NTD_OUTPUT,\
-                        "{}_{}_{}.txt".format(setID,repeat,size))
-Output: fileName
+     osp.join
+    Input: (cfg.PATH_TO_NTD_OUTPUT,\
+                            "{}_{}_{}.txt".format(setID,repeat,size))
+    Output: fileName
 
-open
-Input: (fileName,"r"),
-Output: fn
-'''
-           
+    open
+    Input: (fileName,"r"),
+    Output: fn
+    '''
+

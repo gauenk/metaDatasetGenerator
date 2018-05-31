@@ -11,7 +11,7 @@ from core.config import cfg, createFilenameID
 # misc imports
 import pprint
 pp = pprint.PrettyPrinter(indent=4)
-import pickle,cv2
+import pickle,cv2,uuid
 import os.path as osp
 import numpy as np
 
@@ -236,6 +236,38 @@ def pyroidbTransform_normalizeBox(inputs,**kwargs):
     return inputs
 
     
+def vis_dets(im, class_names, dets, _idx_, fn=None, thresh=0.5):
+    """Draw detected bounding boxes."""
+    import matplotlib
+    matplotlib.use('Agg')
+    import matplotlib.pyplot as plt
+
+    im = im[:, :, (2, 1, 0)]
+    fig, ax = plt.subplots(figsize=(12, 12))
+    ax.imshow(im, aspect='equal')
+    for i in range(len(dets)):
+        bbox = dets[i, :4]
+        
+        
+        ax.add_patch(
+            plt.Rectangle((bbox[0], bbox[1]),
+                          bbox[2] - bbox[0],
+                          bbox[3] - bbox[1], fill=False,
+                          edgecolor='red', linewidth=3.5)
+        )
+        
+    plt.axis('off')
+    plt.tight_layout()
+    plt.draw()
+    if fn is None:
+        plt.savefig("img_{}_{}.png".format(_idx_,str(uuid.uuid4())))
+    else:
+        plt.savefig(fn.format(_idx_,str(uuid.uuid4())))
+
+
+
+
+
 
 
 
