@@ -85,4 +85,16 @@ if __name__ == "__main__":
     train_net(args.solver, roidb, output_dir,
               pretrained_model=args.pretrained_model,
               max_iters=args.max_iters)
+'''
+argparse.ArgumentParser
+Innput: (description='Train a Fast R-CNN network'), Output: parser
 
+RepoImdb
+Input: ("pascal_voc", "train", "default"), Output: imdb
+
+get_training_roidb
+Input: (imdb), output: roidb
+
+get_output_dir
+input: (imdb), output: output_dir
+'''
