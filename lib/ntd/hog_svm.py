@@ -236,7 +236,7 @@ def split_data(train_size, test_size, l_feat,l_idx, y, clsToSet):
     x_test = []
     y_train = []
     y_test = []
-    te_idx = [ [] for _ in range(len(clsToSet)) ]
+    te_idx = []
     y = np.array(y)
 
     """
@@ -254,7 +254,7 @@ def split_data(train_size, test_size, l_feat,l_idx, y, clsToSet):
         indicies = l_idx[idx]
         trIdx = indicies[:train_size]
         teIdx = indicies[train_size:train_size+test_size]
-        te_idx[idx] = teIdx
+        te_idx.extend(teIdx)
         y_train.extend(y[trIdx])
         y_test.extend(y[teIdx])
 
@@ -265,9 +265,9 @@ def split_data(train_size, test_size, l_feat,l_idx, y, clsToSet):
 
     X_train = np.vstack(x_train).astype(np.float64)
     X_test = np.vstack(x_test).astype(np.float64)
+    X_idx = np.array(te_idx).astype(np.float64)
     Y_train = np.array(y_train).astype(np.float64)
     Y_test = np.array(y_test).astype(np.float64)
-    X_idx = np.vstack(te_idx).astype(np.float64)
 
     return X_train, X_test, Y_train, Y_test, X_idx
 
@@ -295,7 +295,23 @@ def test_acc(model, X_test, y_test):
     print('Test Accuracy of SVC = ', round(model.score(X_test, y_test), 4)) # Check the score of the SVC
     return
 
-def findMaxRegions(pyroidb,rawOutputs, y_test, l_idx,clsToSet):
-    
-    return
-    
+def boxToStr(box):
+    return "{}_{}_{}_{}".format(
+        box[0],box[1],box[2],box[3])
+
+def findMaxRegions(topK,pyroidb,rawOutputs,testIndex,clsToSet):
+    output_str = ""
+    topKIndex = np.argsort(rawOutputs,axis=0)[-topK:,:]
+    for idx,name in enumerate(clsToSet):
+        print("{}: {}".format(idx,name))
+        pyroidbIdx = testIndex[topKIndex[:,idx]]
+        dsRawValues = rawOutputs[topKIndex[:,idx],idx]
+        print(dsRawValues)
+        for rowIdx,elemIdx in enumerate(pyroidbIdx):
+            elemIdx = int(elemIdx)
+            sample,annoIndex = pyroidb.getSampleAtIndex(elemIdx)
+            output_str += "{},{},{},{}\n".format(name,sample['image'],
+                                                 boxToStr(sample['boxes'][annoIndex]),
+                                                 dsRawValues[rowIdx])
+    print(output_str)
+    return output_str
