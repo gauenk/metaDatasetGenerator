@@ -182,7 +182,7 @@ if __name__ == '__main__':
             ds = clsToSet[cls]
             fn = osp.join(saveDir,"{}_{}.jpg".format(randIdx[i],ds))
             cv2.imwrite(fn,img)
-
+            
             # find a specific image
             sample,annoCount = pyroidb.getSampleAtIndex(randIdx[i])
             print(sample['image'])
@@ -192,4 +192,33 @@ if __name__ == '__main__':
                 cls = sample['gt_classes']
                 boxes = sample['boxes']
                 vis_dets(im,cls,boxes,i,fn=fn)
+
+'''
+argparse.ArgumentParser
+Input: (description='Test loading a mixture dataset'), Output: parser
+
+np.zeros
+Input: ((size)), Output: areas
     
+np.zeros
+Input: (size), Output: widths
+
+np.zeros
+Input: (size), Output: heights
+
+load_mixture_set_single
+Input: (setID,repeat,size), Output: roidb,annoCount
+
+get_bbox_info
+Input: (roidb,numAnnos), Output: areas, widths, heights
+
+osp.join
+Input: (prefix_path,"areas.dat"), Output: path
+
+RoidbDataset
+Input:(roidb,[0,1,2,3,4,5,6,7],
+                               loader=roidbSampleImageAndBox,
+                               transform=pyroidbTransform_cropImageToBox)
+Output: pyroidb
+'''
+                               

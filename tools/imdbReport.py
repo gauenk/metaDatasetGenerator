@@ -181,3 +181,47 @@ if __name__ == '__main__':
             fn = osp.join(prefix_path,"{}_{}.png".format(imdb.name,i))
             print(fn)
             vis_dets(im,cls,boxes,i,fn=fn)
+            
+'''
+argparse.ArgumentParser
+Input: (description='Generate an Imdb Report'), Output: parser
+
+get_repo_imdb
+Input: (imdb_name), Output: imdb
+
+get_training_roidb
+Input: (imdb), Output: roidb
+
+np.zeros
+Input: (size), Output: areas
+
+np.zeros
+Input:(size), Output: widths
+
+np.zeros
+Input: (size), Output: heights
+
+plt.subplots
+Input: (figsize=(12, 12), Output: fig, ax
+
+get_roidb
+Input: (args.imdb_name), Output: imdb, roidb
+ 
+imdb.roidb_num_bboxes_at
+Input: (-1), Output: numAnnos
+
+imdb.get_roidb_at_size
+Input: (size), Output: sizedRoidb,actualSize
+
+osp.join
+Input: (prefix_path,"areas.dat"), Output: path
+
+RoidbDataset
+Input: (roidb,[0,1,2,3,4,5,6,7],
+                           loader=roidbSampleImageAndBox,
+                           transform=pyroidbTransform_cropImageToBox)
+Output:pyroidb
+
+imdb._get_roidb_index_at_size
+Input: (30), Output: index
+'''
