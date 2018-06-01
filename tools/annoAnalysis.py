@@ -91,6 +91,7 @@ if __name__ == '__main__':
     if args.repeat != -1:
         repeatRange = [args.repeat]
 
+    ## load svm
     for size in datasetSizes:
         for repeat in range(repeatRange):
             roidb,annoCount = load_mixture_set(setID,repeat,size)
@@ -129,9 +130,6 @@ if __name__ == '__main__':
                 saveHogFeatures(hogFts,fnPrefix)
 
 
-def HOGFromImage(image,orient=9, pix_per_cell=8,
-                 spatial_size=(128,256), hist_bins=32,
-                 cell_per_block=2):
  '''   
  argparse.ArgumentParser
 Input: (argparse.ArgumentParser), Output: parser

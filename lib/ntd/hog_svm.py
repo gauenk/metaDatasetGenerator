@@ -65,7 +65,7 @@ def appendHOGtoRoidb(roidb):
     print("finished appending HOG")
 
 
-def make_confusion_matrix(model, X_test, y_test, clsToSet, path_to_save,normalize=True):
+def make_confusion_matrix(model, X_test, y_test, clsToSet, normalize=True):
 
     y_pred = model.predict(X_test)    
     # Compute confusion matrix
@@ -75,26 +75,26 @@ def make_confusion_matrix(model, X_test, y_test, clsToSet, path_to_save,normaliz
     np.set_printoptions(precision=2)
     
     # Plot normalized confusion matrix  ----- NEED TO FIX CLASS NAMES DEPENDS ON PYROIDB
-    class_names = clsToSet
-    cm = plot_confusion_matrix(np.copy(cnf_matrix), class_names, path_to_save, normalize=True)
     return cnf_matrix
 
 
 def plot_confusion_matrix(cm, classes, path_to_save, 
                           normalize=False,
                           cmap=plt.cm.Blues, show_plot = False,
-                          vmin = 0, vmax = 100):
+                          vmin = 0, vmax = 100, title = None):
     """
     This function prints and plots the confusion matrix.
     Normalization can be applied by setting `normalize=True`.
     """
-
-
     order = ['COCO', 'ImageNet', 'VOC', 'Caltech', 'INRIA', 'SUN', 'KITTI', 'CAM2']
-
     new_order = ['coco', 'imagenet', 'pascal_voc', 'caltech', 'inria', 'sun','kitti','cam2' ]
     
-    plt.figure()
+    fontdict = {'family':'monospace',
+                'fontname':'Courier New',
+                'size': 20
+                }
+
+    fig, ax = plt.subplots()
 
     print(cm)
 
@@ -104,7 +104,7 @@ def plot_confusion_matrix(cm, classes, path_to_save,
     classes  = order 
     cm = cm * 100
     cm = np.around(cm,0)
-    plt.imshow(cm, interpolation='nearest', cmap=cmap, vmin = vmin, vmax = vmax)
+    ax.imshow(cm, interpolation='nearest', cmap=cmap, vmin = vmin, vmax = vmax)
     tick_marks = np.arange(len(classes))
     plt.xticks(tick_marks, classes, rotation=45)
     plt.yticks(tick_marks, classes)
@@ -112,12 +112,15 @@ def plot_confusion_matrix(cm, classes, path_to_save,
     fmt = '.0f'# if normalize else 'd'
     thresh = cm.max() / 2.
     for i, j in itertools.product(range(cm.shape[0]), range(cm.shape[1])):
-        plt.text(j, i, format(cm[i, j], fmt),
+        ax.text(j, i, format(cm[i, j], fmt),
                  horizontalalignment="center",
                  color="white" if cm[i, j] > thresh else "black")
 
+    plt.subplots_adjust(hspace=0, wspace=0)
+    if title != None:
+        plt.title(title,fontdict=fontdict)
     plt.tight_layout()
-    plt.savefig(path_to_save)
+    plt.savefig(path_to_save,transparent=True,bbox_inches='tight')
     if show_plot == True:
         plt.show()
     return cm

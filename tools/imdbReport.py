@@ -14,7 +14,7 @@ matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 import _init_paths
 from core.train import get_training_roidb
-from core.config import cfg, cfg_from_file, cfg_from_list, get_output_dir
+from core.config import cfg, cfg_from_file, cfg_from_list, get_output_dir,loadDatasetIndexDict
 from datasets.factory import get_repo_imdb
 from datasets.ds_utils import load_mixture_set,print_each_size,roidbSampleBox,pyroidbTransform_cropImageToBox,pyroidbTransform_normalizeBox,roidbSampleImageAndBox
 import os.path as osp
@@ -45,6 +45,9 @@ def parse_args():
                         action='store_true')
     parser.add_argument('--save', dest='save',
                         help='save some samples with bboxes visualized?',
+                        action='store_true')
+    parser.add_argument('--createAnnoMap', dest='createAnnoMap',
+                        help='save a created annotation map',
                         action='store_true')
 
     if len(sys.argv) == 1:
@@ -181,7 +184,29 @@ if __name__ == '__main__':
             fn = osp.join(prefix_path,"{}_{}.png".format(imdb.name,i))
             print(fn)
             vis_dets(im,cls,boxes,i,fn=fn)
-            
+
+    if args.createAnnoMap:
+        clsToSet = loadDatasetIndexDict()
+        pyroidb = RoidbDataset(roidb,[0,1,2,3,4,5,6,7],
+                               loader=roidbSampleBox,
+                               transform=pyroidbTransform_normalizeBox)
+        annoMaps = annotationDensityPlot(pyroidb)
+        annoMap = annoMaps[clsToSet.index(imdb.name)]
+        print(annoMap)
+        print(annoMap*100)
+        print(annoMap*255)
+        print(annoMap*255*100)
+        print("annoMap: max value: {}".format(annoMap.max()))
+        print("annoMap: min value: {}".format(annoMap.min()))
+
+        annoMap /= annoMap.max()
+        annoMap *= 255
+
+        saveFilename = osp.join(cfg.PATH_TO_ANNO_ANALYSIS_OUTPUT,
+                                "annoMap_{}.png".format(imdb.name))
+        
+        cv2.imwrite(saveFilename,annoMap)
+        
 '''
 argparse.ArgumentParser
 Input: (description='Generate an Imdb Report'), Output: parser

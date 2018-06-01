@@ -43,14 +43,22 @@ def validate_boxes(boxes, width=0, height=0):
     assert (x2 < width).all()
     assert (y2 < height).all()
 
-def clean_box(box,sample):
-    if box[0] == box[2]: box[2] += 1
-    if box[1] == box[3]: box[3] += 1
+def clean_box(box,w,h):
     if box[0] < 0: box[0] = 0
     if box[1] < 0: box[1] = 0
-    if box[2] > sample['width']: box[2] = sample['width']
-    if box[3] > sample['height']: box[3] = sample['height']
-    
+
+    if box[0] >= w:
+        box[0] = w-1
+        box[2] = w
+
+    if box[1] >= h:
+        box[1] = h-1
+        box[3] = h
+
+    if box[2] > w: box[2] = w
+    if box[3] > h: box[3] = h
+
+    return box
 
 def filter_small_boxes(boxes, min_size):
     w = boxes[:, 2] - boxes[:, 0]
@@ -137,7 +145,7 @@ def printPyroidbSetCounts(pyroidb):
 def pyroidbTransform_cropImageToBox(inputs,**kwargs):
     im_orig = inputs[0]
     box = inputs[1]
-    clean_box(box,kwargs['sample'])
+    clean_box(box,kwargs['sample']['width'],kwargs['sample']['height'])
     return cropImageToAnnoRegion(im_orig,box)
 
 def cropImageToAnnoRegion(im_orig,box):
@@ -228,8 +236,11 @@ def pyroidbTransform_normalizeBox(inputs,**kwargs):
     if checkNormalizeSample(sample,annoIndex):
         initNormalizeSample(sample)
         inputs = inputs.astype(np.float64)
+        inputs = clean_box(inputs,sample['width'],sample['height'])
         inputs[::2] /= sample['width']
         inputs[1::2] /= sample['height']
+        if np.any(inputs > 1):
+            print(inputs,sample)
         assert np.all(inputs <= 1)
         assert np.all(inputs >= 0)
         updateNormalizeSample(sample,annoIndex)

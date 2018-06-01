@@ -104,7 +104,6 @@ def createLatexTable(xdata):
             outputStr += "\\cellcolor{{{0:s}!{1:d}}}{2:s}{3:2.0f}\%".format(color,
                                                                        colorValue,
                                                                        sign,tableValue)
-
             if idx == (len(paperFriendlySets) - 1):
                 outputStr += " & {{\\bf {0:2.0f}\% }}".format(
                     sum(np.abs(apDiff[name].values()))*100)
