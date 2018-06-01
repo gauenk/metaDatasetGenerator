@@ -51,7 +51,7 @@ def _get_image_blob(im):
         if cfg.SSD == True:
             im_scale_x = float(cfg.SSD_img_size) / float(im_shape[1])
             im_scale_y = float(cfg.SSD_img_size) / float(im_shape[0])
-
+        
         im = cv2.resize(im_orig, None, None, fx=im_scale_x, fy=im_scale_y,
                         interpolation=cv2.INTER_LINEAR)
         if cfg.SSD == True:

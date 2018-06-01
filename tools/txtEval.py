@@ -158,4 +158,43 @@ if __name__ == '__main__':
     bbEval._imageSet = _imageSet
     bbEval._do_python_eval("./output/txtEval/")
 
+'''
+argparse.ArgumentParser
+Input: (description='Generate an Imdb Report'), Output: parser
 
+get_repo_imdb
+input: (imdb_name), output: imdb
+
+get_training_roidb
+input: (imdb), output: roidb
+
+areas = np.zeros
+input: (size), output: areas
+
+np.zeros
+input: (size), output: widths
+
+np.zeros
+input: (size), output: heights
+
+get_roidb
+input: (args.imdb_name), output: imdb, roidb
+
+imdb.roidb_num_bboxes_at
+input: (-1), output: numAnnos
+
+get_bbox_info
+input: (roidb,numAnnos), output: areas, widths, heights
+
+osp.join
+input: (prefix_path,"areas.dat"), output: path
+
+osp.join
+input: (prefix_path,"widths.dat"), output: path
+
+osp.join
+input: (prefix_path,"heights.dat"), output: path
+
+getResultsFileFormatFromFilename
+input: (txtFilename), output: _compID,_salt,_imageSet,cls
+'''

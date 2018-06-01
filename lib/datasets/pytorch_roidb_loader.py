@@ -52,7 +52,7 @@ class RoidbDataset(data.Dataset):
 
         # (x1,y1,x2,y2) bounds correction
         if True:
-            clean_box(box,sample)
+            box = clean_box(box,sample['width'],sample['height'])
             
         # load inputs and targets
         inputs,target = self.loader(sample,annoIndex)

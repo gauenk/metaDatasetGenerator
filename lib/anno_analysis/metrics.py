@@ -15,8 +15,8 @@ def annotationDensityPlot(pyroidb):
     clsToSet = loadDatasetIndexDict()
     matr = np.zeros((8,500,500)).astype(np.float64)
     cls_count = np.zeros((8)).astype(np.int)
+
     for box,cls in pyroidb:
-        print(box)
         box = box.copy() * 500
         xmin = int(box[0])
         ymin = int(box[1])
@@ -27,13 +27,13 @@ def annotationDensityPlot(pyroidb):
         #     print(ymin)
         matr[cls, ymin:ymax, xmin:xmax] += 1
         cls_count[cls] += 1
-    print(cls_count)
-    print(sum(cls_count))
     for idx,cls in enumerate(cls_count):
         if cls == 0: continue
         print("{}: {}".format(clsToSet[idx],cls))
         matr[idx,...] /= cls
     return matr
+
+    
 
 def metric_1(matr,k):
     """

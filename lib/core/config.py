@@ -244,9 +244,6 @@ __C.EXP_DIR = "default"
 # Default GPU device id
 __C.GPU_ID = 0
 
-# path to save information for imdb report
-__C.IMDB_REPORT_OUTPUT_PATH = "output/imdbReport/"
-
 # is it ssd?
 __C.SSD = False
 
@@ -277,11 +274,17 @@ __C.CROPPED_IMAGE_SIZE = 100
 # the size of the 
 __C.CONFIG_DATASET_INDEX_DICTIONARY_PATH = "default_dataset_index.yml"
 
+# path to save information for imdb report
+__C.IMDB_REPORT_OUTPUT_PATH = "output/imdbReport/"
+
 # name that dataset! output
 __C.PATH_TO_NTD_OUTPUT = "./output/ntd/"
 
 # output for annotation analysis
 __C.PATH_TO_ANNO_ANALYSIS_OUTPUT = "./output/annoAnalysis/"
+
+# output for cross dataset generalization
+__C.PATH_TO_X_DATASET_GEN = "./output/xDatasetGen/"
 
 
 
@@ -371,6 +374,11 @@ def cfg_from_list(cfg_list):
             'type {} does not match original type {}'.format(
             type(value), type(d[subkey]))
         d[subkey] = value
+
+def iconicImagesFileFormat():
+    if not osp.exists(cfg.PATH_TO_NTD_OUTPUT):
+        os.makedirs(cfg.PATH_TO_NTD_OUTPUT)
+    return osp.join(cfg.PATH_TO_NTD_OUTPUT,"{}")
 
 def createPathSetID(setID):
     return osp.join(cfg.PATH_MIXTURE_DATASETS,setID)
