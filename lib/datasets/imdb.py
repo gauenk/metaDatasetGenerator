@@ -21,6 +21,7 @@ class imdb(object):
         self._num_classes = 0
         self._classes = []
         self._image_index = []
+        self._image_set = ''
         self._cachedir = "./data/annotation_cache/"
         self._obj_proposer = 'gt'
         self._roidb = None
@@ -101,6 +102,10 @@ class imdb(object):
     @property
     def num_images(self):
       return len(self.image_index)
+
+    @property
+    def imageSet(self):
+      return self._image_set
 
     def image_path_at(self, i):
         raise NotImplementedError

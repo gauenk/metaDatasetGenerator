@@ -47,6 +47,10 @@ def clean_box(box,w,h):
     if box[0] < 0: box[0] = 0
     if box[1] < 0: box[1] = 0
 
+    # if equal; we elect to open the box right 1 pixel
+    if box[0] == box[2]: box[2] += 1
+    if box[1] == box[3]: box[3] += 1
+
     if box[0] >= w:
         box[0] = w-1
         box[2] = w
@@ -72,19 +76,24 @@ def load_mixture_set_single(setID,repetition,size):
     if osp.exists(pklName) is True:
         fid = open(pklName,"rb")
         loaded = pickle.load(fid)
-        allRoidb = loaded['allRoidb']
-        annoCounts = loaded['annoCounts']
-        print_each_size(allRoidb)
         fid.close()
+
+        trainData = loaded['train']
+        print_each_size(trainData[0])
+        testData = loaded['test']
+        print_each_size(testData[0])
     else:
         raise ValueError("{} does not exists".format(pklName))
-    return allRoidb,annoCounts
+    return trainData,testData
 
     
 def load_mixture_set(setID,repetition,final_size):
 
-    allRoidb = []
-    annoCounts = []
+    roidbTr = []
+    roidbTe = []
+    annoCountsTr = []
+    annoCountsTe = []
+
     datasetSizes = cfg.MIXED_DATASET_SIZES
     if final_size not in datasetSizes:
         print("invalid dataset size")
@@ -92,7 +101,6 @@ def load_mixture_set(setID,repetition,final_size):
         print(datasetSizes)
         raise ValueError("size {} is not in cfg.MIXED_DATASET_SIZES".format(final_size))
     sizeIndex = datasetSizes.index(final_size)
-    prevSize = 0
     
     for size in datasetSizes[:sizeIndex+1]:
         # create a file for each dataset size
@@ -101,17 +109,18 @@ def load_mixture_set(setID,repetition,final_size):
         if osp.exists(pklName) is True:
             fid = open(pklName,"rb")
             loaded = pickle.load(fid)
-            roidbs = loaded['allRoidb']
+            train = loaded['train']
+            test = loaded['test']
             print(pklName)
             if size == final_size: # only save the last count
-                annoCounts = loaded['annoCounts']
-            allRoidb.extend(roidbs)
-            print_each_size(allRoidb)
+                annoCountsTr = train[1]
+                annoCountsTe = test[1]
+            roidbTr.extend(train[0])
+            roidbTe.extend(test[0])
             fid.close()
         else:
             raise ValueError("{} does not exists".format(pklName))
-        prevSize += len(loaded)
-    return allRoidb,annoCounts
+    return {"train":[roidbTr,annoCountsTr],"test":[roidbTe,annoCountsTe]}
 
 def save_mixture_set_single(roidb,annoCount,setID,repetition,size):
     pklName = createFilenameID(setID,str(repetition),str(size)) + ".pkl"
@@ -169,6 +178,7 @@ def scaleImage(im_orig):
 def computeTotalAnnosFromAnnoCount(annoCount):
     size = 0
     for cnt in annoCount:
+        if cnt is None: continue
         size += cnt
     return size
 
@@ -204,8 +214,12 @@ def roidbSampleBox(sample,annoIndex):
     # load the box
     return sample['boxes'][annoIndex],sample['set']
 
+def getFirstElementNotNone(pythonList):
+    return next(item for item in pythonList if item is not None)
+
 def addRoidbField(roidb,fieldName,transformFunction):
-    if fieldName in roidb[0].keys():
+    firstRoidb = getFirstElementNotNone(roidb)
+    if fieldName in firstRoidb.keys():
         print("WARNING: field name [{}] already exists.".format(fieldName))
 
     totalRoidbs = len(roidb)
@@ -215,7 +229,7 @@ def addRoidbField(roidb,fieldName,transformFunction):
         # print("-"*progress)
         # print("")
 
-        if fieldName in sample.keys():
+        if fieldName in sample.keys() and sample[fieldName] is not None:
             continue
             # sample[fieldName].append(transformFunction(sample))
         sample[fieldName] = transformFunction(sample)

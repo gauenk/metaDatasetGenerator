@@ -212,6 +212,10 @@ __C.TEST.OBJ_DET.RPN_MIN_SIZE = 16
 # MISC
 #
 
+# official names for publication
+__C.DATASET_NAMES_PAPER = ['COCO', 'ImageNet', 'VOC', 'Caltech', 'INRIA', 'SUN', 'KITTI', 'CAM2']
+__C.DATASET_NAMES_ORDERED = ['coco', 'imagenet', 'pascal_voc', 'caltech', 'inria', 'sun','kitti','cam2' ]
+
 # For print statements
 __C.DEBUG = False
 

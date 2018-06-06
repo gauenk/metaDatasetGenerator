@@ -6,7 +6,7 @@ Created on Tue Mar 13 21:32:08 2018
 @author: zkapach
 """
 import matplotlib
-# matplotlib.use("Agg")
+matplotlib.use("Agg")
 
 
 import _init_paths

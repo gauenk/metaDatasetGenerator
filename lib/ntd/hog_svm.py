@@ -35,13 +35,14 @@ def HOGfromRoidbSample(sample,orient=9, pix_per_cell=8,
     features = []
     img = cv2.imread(sample['image'])
     for box in sample['boxes']:
-        clean_box(box,sample)
+        box = clean_box(box,sample['width'],sample['height'])
         cimg = cropImageToAnnoRegion(img,box)
         feature_image = np.copy(cimg)      
         try:
             features.append(HOGFromImage(feature_image))
-        except:
-            print(sample)
+        except Exception as e:
+            print(e)
+            print('hog failed @ path {}'.format(sample['image']))
             return None
     return features
 
@@ -73,7 +74,7 @@ def make_confusion_matrix(model, X_test, y_test, clsToSet, normalize=True):
     if normalize:
         cnf_matrix = cnf_matrix.astype('float') / cnf_matrix.sum(axis=1)[:, np.newaxis]
     np.set_printoptions(precision=2)
-    
+    cnf_matrix = switch_rows_cols(cnf_matrix,clsToSet,cfg.DATASET_NAMES_ORDERED)
     # Plot normalized confusion matrix  ----- NEED TO FIX CLASS NAMES DEPENDS ON PYROIDB
     return cnf_matrix
 
@@ -86,35 +87,32 @@ def plot_confusion_matrix(cm, classes, path_to_save,
     This function prints and plots the confusion matrix.
     Normalization can be applied by setting `normalize=True`.
     """
-    order = ['COCO', 'ImageNet', 'VOC', 'Caltech', 'INRIA', 'SUN', 'KITTI', 'CAM2']
-    new_order = ['coco', 'imagenet', 'pascal_voc', 'caltech', 'inria', 'sun','kitti','cam2' ]
+    order = cfg.DATASET_NAMES_PAPER
+    new_order = cfg.DATASET_NAMES_ORDERED
     
     fontdict = {'family':'monospace',
                 'fontname':'Courier New',
-                'size': 20
+                'size': 25
                 }
 
     fig, ax = plt.subplots()
 
     print(cm)
 
-    dict_classes = classes_to_dict(classes)
-    cm = switch_rows_cols(cm, classes, dict_classes, new_order)
-
-    classes  = order 
     cm = cm * 100
     cm = np.around(cm,0)
     ax.imshow(cm, interpolation='nearest', cmap=cmap, vmin = vmin, vmax = vmax)
     tick_marks = np.arange(len(classes))
-    plt.xticks(tick_marks, classes, rotation=45)
-    plt.yticks(tick_marks, classes)
+    plt.xticks(tick_marks, classes, rotation=45,size="15",ha="right")
+    plt.yticks(tick_marks, classes,size="15")
 
     fmt = '.0f'# if normalize else 'd'
     thresh = cm.max() / 2.
     for i, j in itertools.product(range(cm.shape[0]), range(cm.shape[1])):
-        ax.text(j, i, format(cm[i, j], fmt),
-                 horizontalalignment="center",
-                 color="white" if cm[i, j] > thresh else "black")
+        ax.text(j, i+.2, format(cm[i, j], fmt),
+                horizontalalignment="center",
+                color="white" if cm[i, j] > thresh else "black",
+                fontsize="17")
 
     plt.subplots_adjust(hspace=0, wspace=0)
     if title != None:
@@ -131,12 +129,12 @@ def classes_to_dict(classes):
         dict_classes[name] = i
     return dict_classes
 
-def switch_rows_cols(cm, classes, dict_classes, new_order):
+def switch_rows_cols(cm, classes, new_order):
     new_cm = np.copy(cm)
     for idx, nameA in enumerate(classes):
         for jdx, nameB in enumerate(classes):
-            xVal = dict_classes[new_order[idx]]
-            yVal = dict_classes[new_order[jdx]]
+            xVal = classes.index(new_order[idx])
+            yVal = classes.index(new_order[jdx])
             new_cm[idx,jdx] = cm[xVal,yVal]
     # for i, name in enumerate(classes):
     #     new_cm[i,:] = cm[dict_classes[new_order[i]],:]
@@ -211,7 +209,7 @@ def extract_pyroidb_features(pyroidb, feat_type, clsToSet, calc_feat = False, sp
             l_idx[target].append(i)
             y.append(target)
         except Exception as e:
-            print(e)
+            print(e,i)
             errors = errors + 1
 
     # now let's make each "sublist" a numpy array
@@ -224,8 +222,7 @@ def extract_pyroidb_features(pyroidb, feat_type, clsToSet, calc_feat = False, sp
 
     if cfg.DEBUG:
        for idx,name in enumerate(clsToSet):
-           print("{}: {}".format(idx,name))
-           print(l_idx[idx])
+           print("{}: {},{}".format(idx,name,len(l_idx[idx])))
 
     return l_feat, l_idx, y # Return list of feature vectors
 
@@ -263,12 +260,14 @@ def split_data(train_size, test_size, l_feat,l_idx, y, clsToSet):
 
     if cfg.DEBUG:
         for idx,name in enumerate(clsToSet):
-            print("{}: {}".format(idx,name))
-            print(x_test[idx])
+            print("{}: {}, {}".format(idx,name,len(x_test[idx])))
 
+    for elem in x_train:
+        print(len(elem[0]))
+        print(len(elem))
     X_train = np.vstack(x_train).astype(np.float64)
     X_test = np.vstack(x_test).astype(np.float64)
-    X_idx = np.array(te_idx).astype(np.float64)
+    X_idx = [{"idx":idx,"split":"train"} for idx in np.array(te_idx).astype(np.float64)]
     Y_train = np.array(y_train).astype(np.float64)
     Y_test = np.array(y_test).astype(np.float64)
 

@@ -24,6 +24,7 @@ import pprint
 import numpy as np
 import numpy.random as npr
 import sys,os,cv2
+from utils.misc import *
 
 # pytorch imports
 from datasets.pytorch_roidb_loader import RoidbDataset
@@ -65,25 +66,6 @@ def parse_args():
     args = parser.parse_args()
     return args
 
-def get_bbox_info(roidb,size):
-    areas = np.zeros((size))
-    widths = np.zeros((size))
-    heights = np.zeros((size))
-    actualSize = 0
-    idx = 0
-    for image in roidb:
-        if image['flipped'] is True: continue
-        bbox = image['boxes']
-        for box in bbox:
-            actualSize += 1
-            widths[idx] = box[2] - box[0]
-            heights[idx] = box[3] - box[1]
-            assert widths[idx] >= 0,"widths[{}] = {}".format(idx,widths[idx])
-            assert heights[idx] >= 0
-            areas[idx] = widths[idx] * heights[idx]
-            idx += 1
-    return areas,widths,heights
-
 def resaveWithHog(setID,repeat):
     datasetSizes = cfg.MIXED_DATASET_SIZES
     for size in datasetSizes:
@@ -111,37 +93,14 @@ if __name__ == '__main__':
     repeat = args.repeat
     size = args.size
     
-    roidb,annoCount = load_mixture_set(setID,repeat,size)
-    numAnnos = computeTotalAnnosFromAnnoCount(annoCount)
+    mixedData = load_mixture_set(setID,repeat,size)
+    train,test = mixedData["train"],mixedData["test"]
+    roidbTr = train[0]
+    annoCountTr = train[1]
+    roidbTe = test[0]
+    annoCountTe = test[1]
 
-    print("\n\n-=-=-=-=-=-=-=-=-\n\n")
-    print("Report:\n\n")
-    print("Mixture Dataset: {} {} {}\n\n".format(setID,repeat,size))
-
-    print("number of images: {}".format(len(roidb)))
-    print("number of annotations: {}".format(numAnnos))
-    print("size of roidb in memory: {}kB".format(len(roidb) * sys.getsizeof(roidb[0])/1024.))
-    print("example roidb:")
-    for k,v in roidb[10].items():
-        print("\t==> {},{}".format(k,type(v)))
-        print("\t\t{}".format(v))
-
-    print("computing bbox info...")
-    areas, widths, heights = get_bbox_info(roidb,numAnnos)
-
-    print("ave area: {} | std. area: {}".format(np.mean(areas),np.std(areas,dtype=np.float64)))
-    print("ave width: {} | std. width: {}".format(np.mean(widths),np.std(widths,dtype=np.float64)))
-    print("ave height: {} | std. height: {}".format(np.mean(heights),np.std(heights,dtype=np.float64)))
-    prefix_path = cfg.IMDB_REPORT_OUTPUT_PATH
-    if osp.exists(prefix_path) is False:
-        os.makedirs(prefix_path)
-
-    path = osp.join(prefix_path,"areas.dat")
-    np.savetxt(path,areas,fmt='%.18e',delimiter=' ')
-    path = osp.join(prefix_path,"widths.dat")
-    np.savetxt(path,widths,fmt='%.18e',delimiter=' ')
-    path = osp.join(prefix_path,"heights.dat")
-    np.savetxt(path,heights,fmt='%.18e',delimiter=' ')
+    print_report(roidbTr,annoCountTr,roidbTe,annoCountTe,setID,repeat,size)
         
     print("-="*50)
 
@@ -154,11 +113,11 @@ if __name__ == '__main__':
     print("as pytorch friendly ")
     
     if args.pyroidb_type == "mixture":
-        pyroidb = RoidbDataset(roidb,[0,1,2,3,4,5,6,7],
+        pyroidb = RoidbDataset(roidbTr,[0,1,2,3,4,5,6,7],
                                loader=roidbSampleImageAndBox,
                                transform=pyroidbTransform_cropImageToBox)
     elif args.pyroidb_type == "hog":
-        pyroidb = RoidbDataset(roidb,[0,1,2,3,4,5,6,7],
+        pyroidb = RoidbDataset(roidbTr,[0,1,2,3,4,5,6,7],
                                loader=roidbSampleHOG,
                                transform=None)
     if args.save:
@@ -172,11 +131,6 @@ if __name__ == '__main__':
         # randIdx = npr.permutation(len(pyroidb))
         randIdx = np.arange(len(pyroidb))
         for i in range(len(pyroidb)): #range(200):
-
-            # find a specific image
-            sample,annoCount = pyroidb.getSampleAtIndex(randIdx[i])
-
-            if sample['image'] != "/srv/sdb1/image_team/pascal_voc/VOCdevkit/VOC0712/JPEGImages/2010_002708.jpg": continue
 
             img, cls = pyroidb[randIdx[i]]
             ds = clsToSet[cls]

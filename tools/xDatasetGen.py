@@ -60,11 +60,27 @@ def xDataToApDiff(xdata):
             apDiff[trSet][teSet] = computePercentDiff(perf,aps[trSet])
     return apDiff,aps
 
+def elementValues(diff):
+    maxColorValue = 40
+    colorValue = int(np.abs(diff) * maxColorValue)
+    if colorValue > maxColorValue: colorValue = maxColorValue
+    if diff < 0:
+        color = "red"
+        sign = "-"
+    elif diff == 0:
+        color = "gray"
+        sign = ""
+        colorValue = 20
+    else:
+        color = "blue"
+        sign = "+"
+    return color,sign,colorValue
+
 def createLatexTable(xdata):
     outputFile = osp.join("./output/faster_rcnn/","xDatasetGen.txt")
     apDiff,aps = xDataToApDiff(xdata)
-    
-    outputStr = "Model & Base AP & \\multicolumn{1}{c||}{\\backslashbox{Training on:}{Testing on:}} & "
+    diffMat = np.zeros((len(apDiff.keys()),len(apDiff['VOC'].keys())))
+    outputStr = "Base AP & \\multicolumn{1}{c||}{\\backslashbox{Training on:}{Testing on:}} & "
     for idx,name in enumerate(paperFriendlySets):
         
         if idx == (len(paperFriendlySets) - 1):
@@ -76,31 +92,16 @@ def createLatexTable(xdata):
     outputStr += " & \multicolumn{1}{c|}{\makebox[3em]{AB}}"
     outputStr += "\\\\\n\\hline\n\\hline\n"
     outputStr += "\\arrayrulecolor{light-gray}\n"
-    outputStr += "\\multirow{4}{*}{Faster-RCNN:} & "
     trSetCount = 0
     for name in paperFriendlySets:
         if name not in apDiff.keys(): continue
-        if trSetCount == 0:
-            outputStr += "{:2.4f} & {:s} & ".format(aps[name],name)
-        else:
-            outputStr += " & {:2.4f} & {:s} & ".format(aps[name],name)
+        outputStr += "{:2.4f} & {:s} & ".format(aps[name],name)
         trSetCount+=1
         for idx,teSet in enumerate(paperFriendlySets):
             diff = apDiff[name][teSet]
-            maxColorValue = 40
-            colorValue = int(np.abs(diff) * maxColorValue)
-            if colorValue > maxColorValue: colorValue = maxColorValue
             tableValue = round(np.abs(diff) * 100,0)
-            if diff < 0:
-                color = "red"
-                sign = "-"
-            elif diff == 0:
-                color = "gray"
-                sign = ""
-                colorValue = 20
-            else:
-                color = "blue"
-                sign = "+"
+            diffMat[trSetCount-1,idx] = diff
+            color,sign,colorValue = elementValues(diff)
             outputStr += "\\cellcolor{{{0:s}!{1:d}}}{2:s}{3:2.0f}\%".format(color,
                                                                        colorValue,
                                                                        sign,tableValue)
@@ -117,7 +118,20 @@ def createLatexTable(xdata):
                 outputStr += " & "
 
 
-
+    print(diffMat)
+    outputStr += " & Total & "
+    colSums = np.mean(diffMat,axis=0)
+    print(colSums)
+    for idx,col in enumerate(colSums):
+        tableValue = round(np.abs(col) * 100,0)
+        color,sign,colorValue = elementValues(col)
+        outputStr += "\\cellcolor{{{0:s}!{1:d}}}{2:s}{3:2.0f}\%".format(color,
+                                                                        colorValue,
+                                                                        sign,tableValue)
+        if idx < (len(colSums)-1):
+            outputStr += "&"
+    outputStr += "& \\\\\n\\hline\n"
+    
     print(outputStr)
             
     pp.pprint(apDiff)

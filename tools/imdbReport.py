@@ -57,6 +57,45 @@ def parse_args():
     args = parser.parse_args()
     return args
 
+def saveCaltechOneFromEach(roidb):
+    prefix_path = cfg.IMDB_REPORT_OUTPUT_PATH
+    if osp.exists(prefix_path) is False:
+        os.makedirs(prefix_path)
+    #index = imdb._get_roidb_index_at_size(50)
+    index = len(roidb)
+    print("saving 30 imdb annotations to output folder...")        
+    print(prefix_path)
+    setXX = 0
+    vXXX = 0
+    setXX_s = 'set{:02}'.format(setXX)
+    vXXX_s = 'V{:03}'.format(vXXX)
+
+    for i in range(index):
+        print(setXX_s,vXXX_s,roidb[i]['image'])
+
+        if setXX_s in roidb[i]['image'] and vXXX_s in roidb[i]['image']:
+
+            boxes = roidb[i]['boxes']
+            if len(boxes) == 0: continue
+            im = cv2.imread(roidb[i]['image'])
+            if roidb[i]['flipped']:
+                im = im[:, ::-1, :]
+            cls = roidb[i]['gt_classes']
+            fn = osp.join(prefix_path,"{}_{}_{}_{}.png".format(imdb.name,
+                                                               setXX_s,vXXX_s,
+                                                               i))
+            vXXX += 1
+            print(fn)
+            vis_dets(im,cls,boxes,i,fn=fn)
+
+        if setXX_s not in roidb[i]['image']:
+            setXX += 1
+            vXXX = 0
+
+        setXX_s = 'set{:02}'.format(setXX)
+        vXXX_s = 'V{:03}'.format(vXXX)
+    
+
 def get_roidb(imdb_name):
     imdb = get_repo_imdb(imdb_name)
     print 'Loaded dataset `{:s}` for training'.format(imdb.name)
@@ -170,8 +209,9 @@ if __name__ == '__main__':
                            loader=roidbSampleImageAndBox,
                            transform=pyroidbTransform_cropImageToBox)
 
+    saveCaltechOneFromEach(roidb)
     if args.save:
-        index = imdb._get_roidb_index_at_size(30)
+        index = imdb._get_roidb_index_at_size(50)
         print("saving 30 imdb annotations to output folder...")        
         print(prefix_path)
         for i in range(index):
@@ -181,7 +221,8 @@ if __name__ == '__main__':
             if roidb[i]['flipped']:
                 im = im[:, ::-1, :]
             cls = roidb[i]['gt_classes']
-            fn = osp.join(prefix_path,"{}_{}.png".format(imdb.name,i))
+            fn = osp.join(prefix_path,"{}_{}.png".format(imdb.name,
+                                                               i))
             print(fn)
             vis_dets(im,cls,boxes,i,fn=fn)
 

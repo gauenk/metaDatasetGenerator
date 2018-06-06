@@ -28,13 +28,13 @@ import os.path as osp
 from datasets.pytorch_roidb_loader import RoidbDataset
 
 
-DEBUG = False
 #imdb_names = {"coco":1,"pacsal_voc":2,"imagenet":3,"caltech":4,"cam2":5,"inria":6,"sun":7,"kitti":8}
-imdb_names = {"pascal_voc-train-default":2,"caltech-train-default":4,"coco-minival2014-default":1,"cam2-train-default":5,"sun-train-default":7,"kitti-train-default":8,"imagenet-train2014-default":3,"inria-train-default":6}
+train_imdb_names = ["coco-minival2014-default","pascal_voc-test-default","imagenet-val1-default","cam2-all-default","caltech-train-default","kitti-train-default","sun-all-default","inria-all-default"]
+test_imdb_names = ["coco-minival2014-default","pascal_voc-test-default","imagenet-val1-default","cam2-all-default","caltech-test-default","kitti-val-default","sun-all-default","inria-all-default"]
 indexToImdbName = ['coco','pascal_voc','imagenet','cam2','caltech','kitti','sun','inria']
 datasetSizes = cfg.MIXED_DATASET_SIZES
-loadedRoidbs = {}
-loadedImdbs = {}
+loadedImdbsTr = {}
+loadedImdbsTe = {}
 
 def parse_args():
     """
@@ -74,7 +74,10 @@ def parse_args():
     return args
 
 def shuffle_imdbs():
-    for imdb in loadedImdbs.values():
+    for imdb in loadedImdbsTr.values():
+        # imdb.shuffle_image_index()
+        imdb.shuffle_roidb()
+    for imdb in loadedImdbsTe.values():
         # imdb.shuffle_image_index()
         imdb.shuffle_roidb()
 
@@ -95,67 +98,103 @@ def createListFromId(setNum):
             idList.append(strNum)
     return idList
 
-def createMixtureDataset(setID,size):
-    
-    imdbs = setID_to_imdbs(setID)
+def matchMangledDatasetName(imdb,proposalDatasetNames):
+    for proposalDatasetName in proposalDatasetNames:
+        name,imageSet,ds_type = proposalDatasetName.split("-")
+        if imdb.name == name and imdb.imageSet == imageSet:
+            return True
+    return False
 
+def getImdbs(setID):
+    imdbsTr,imdbsTe = filterImdbsBySetID(setID)
     # remove ONLY FOR DEBUG
-    if DEBUG:
-        if len(imdbs) == 0: return []
+    if cfg.DEBUG:
+        if len(imdbsTr) == 0: return []
     else:
-        assert len(imdbs) == setID.count('1')
+        assert len(imdbsTr) == setID.count('1')
+    return imdbsTr,imdbsTe
 
-    imdbSize = size / len(imdbs)
-    
+
+def getMixtureRoidb(imdbs,size,pc):
+    numImdbs = len(imdbs)
     mixedRoidb = [None for _ in range(8)]
     annoCounts = [None for _ in range(8)]
     for imdb in imdbs:
-        print(imdb.name,imdb.classes)
-        imdb = loadedImdbs[imdb.name]
+        imdb = loadedImdbsTr[imdb.name]
         sizedRoidb,annoCount = imdb.get_roidb_at_size(size)
-        print_each_size(sizedRoidb)
         mixedRoidb[imdb.config['setID']] = sizedRoidb
         annoCounts[imdb.config['setID']] = annoCount
+        print_each_size(sizedRoidb)
     return mixedRoidb,annoCounts
+    
+def createMixtureDataset(setID,size,pcTr,pcTe):
+    
+    imdbsTr,imdbsTe = getImdbs(setID)
+    mixedRoidbTr,annoCountsTr = getMixtureRoidb(imdbsTr,size,pcTr)
+    mixedRoidbTe,annoCountsTe = getMixtureRoidb(imdbsTe,size,pcTe)
+    assert len(mixedRoidbTr) == setID.count('1')
+    # no assert for "mixedRoidbTe" since varies from length
+
+    comboTr = combined_roidb(mixedRoidbTr)
+    comboTe = combined_roidb(mixedRoidbTe)
+    onlyNewTr = combineOnlyNew(mixedRoidbTr,pcTr)
+    onlyNewTe = combineOnlyNew(mixedRoidbTe,pcTe)
+
+    appendHOGtoRoidb(onlyNewTr)
+    appendHOGtoRoidb(onlyNewTe)
+
+    pcTr.update(mixedRoidbTr)
+    pcTe.update(mixedRoidbTe)
+
+    return {"train":[onlyNewTr,annoCountsTr],"test":[onlyNewTe,annoCountsTe]}
 
 
-def filterForTesting(idx):
-    if indexToImdbName[idx] in loadedImdbs.keys():
-        return False
-    return True
-
-def setID_to_imdbs(setID):
+def filterImdbsBySetID(setID):
     global indexToImdbName
+    global train_imdb_names
+    global test_imdb_names
 
-    imdb_list = []
+    imdbListTr = []
+    imdbListTe = []
+
     for idx,char in enumerate(setID):
-        if filterForTesting(idx): continue
         if char == '1':
-            # load imdb
             imdb_name = indexToImdbName[idx]
-            imdb_list.append(loadedImdbs[imdb_name])
-    return imdb_list
+            imdbListTr.append(loadedImdbsTr[imdb_name])
+            if train_imdb_names[idx] != test_imdb_names[idx]:
+                imdbListTe.append(loadedImdbsTe[imdb_name])
+    return imdbListTr,imdbListTe
     
 def loadDatasetsToMemory():
-    global loadedImdbs
-    global loadedRoidbs
-    global imdb_names
-    for imdb_name in imdb_names.keys():
+    global loadedImdbsTr
+    global loadedImdbsTe
+    global train_imdb_names
+    global test_imdb_names
+    for imdb_name in train_imdb_names:
         imdb, roidb = get_roidb(imdb_name)
-        loadedImdbs[imdb.name] = imdb
-        loadedRoidbs[imdb.name] = roidb
+        loadedImdbsTr[imdb.name] = imdb
+    # only load into test if different from train
+    for tr_imdb_name,te_imdb_name in zip(train_imdb_names,test_imdb_names):
+        if tr_imdb_name == te_imdb_name: continue
+        imdb, roidb = get_roidb(te_imdb_name)
+        loadedImdbsTe[imdb.name] = imdb
 
 def combined_roidb(roidbs):
     # assumes ordering of roidbs
     roidb = []
     for r in roidbs:
-        print_each_size(roidb)
+        # skips "None"; shouldn't impact the outcome
+        if r is None: continue
         roidb.extend(r)
+        print_each_size(roidb)
     return roidb
 
 def combineOnlyNew(roidbs,pc):
+    # assumes ordering of roidbs
     newRoidb = []
+    print(pc)
     for idx,roidb in enumerate(roidbs):
+        if roidb is None: continue
         newRoidb.extend(roidb[pc[idx]:])
     return newRoidb
 
@@ -183,7 +222,8 @@ if __name__ == '__main__':
         sys.exit()
 
     loadDatasetsToMemory()
-    pc = PreviousCounts(8,0)
+    pcTr = PreviousCounts(8,0)
+    pcTe = PreviousCounts(8,0)
 
     for setNum in range(range_start,range_end+1):
         # for each of the "ranges" we want
@@ -200,33 +240,18 @@ if __name__ == '__main__':
                 # shuffle imdbs
                 shuffle_imdbs()
                 # reset previuos counters
-                pc.zero()
+                pcTr.zero()
+                pcTe.zero()
                 for size in datasetSizes:
                     # create a file for each dataset size
                     idlist_filename = createFilenameID(setID,str(r),str(size))
-                    repo_roidbs,roidbs_anno_counts = createMixtureDataset(setID,size)
-                    assert len(repo_roidbs) == setID.count('1')
-                    # write pickle file of the roidb
-                    allRoidb = combined_roidb(repo_roidbs)
-                    onlyNewRoidb = combineOnlyNew(repo_roidbs,pc)
-                    appendHOGtoRoidb(onlyNewRoidb)
+                    mixedData = createMixtureDataset(setID,size,pcTr,pcTe)
                     pklName = idlist_filename + ".pkl"
-                    print(pklName,roidbs_anno_counts,size)
-
-                    pyroidb = RoidbDataset(allRoidb,[0,1,2,3,4,5,6,7],
-                               loader=roidbSampleBox,
-                               transform=None)
-                    printPyroidbSetCounts(pyroidb)
-
-                    pyroidb = RoidbDataset(onlyNewRoidb,[0,1,2,3,4,5,6,7],
-                               loader=roidbSampleBox,
-                               transform=None)
-                    printPyroidbSetCounts(pyroidb)
-
-                    saveInfo = {"allRoidb":onlyNewRoidb,"annoCounts":roidbs_anno_counts}
+                    print(pklName)
+                    print(mixedData['train'][1],mixedData['test'][1])
                     if osp.exists(pklName) is False:
                         with open(pklName,"wb") as f:
-                            pickle.dump(saveInfo,f)
+                            pickle.dump(mixedData,f)
                     else:
                         print("{} exists".format(pklName))
-                    pc.update(repo_roidbs)
+
