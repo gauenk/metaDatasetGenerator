@@ -33,6 +33,9 @@ warnings.filterwarnings('ignore')
 def HOGfromRoidbSample(sample,orient=9, pix_per_cell=8,
                        cell_per_block=2, hog_channel=0):
     features = []
+    if 'image' not in sample:
+        print(sample)
+        print(sample.keys())
     img = cv2.imread(sample['image'])
     for box in sample['boxes']:
         box = clean_box(box,sample['width'],sample['height'])
@@ -102,6 +105,7 @@ def plot_confusion_matrix(cm, classes, path_to_save,
     cm = cm * 100
     cm = np.around(cm,0)
     ax.imshow(cm, interpolation='nearest', cmap=cmap, vmin = vmin, vmax = vmax)
+    classes = order
     tick_marks = np.arange(len(classes))
     plt.xticks(tick_marks, classes, rotation=45,size="15",ha="right")
     plt.yticks(tick_marks, classes,size="15")

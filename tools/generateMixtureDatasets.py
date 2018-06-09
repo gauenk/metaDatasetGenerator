@@ -29,8 +29,8 @@ from datasets.pytorch_roidb_loader import RoidbDataset
 
 
 #imdb_names = {"coco":1,"pacsal_voc":2,"imagenet":3,"caltech":4,"cam2":5,"inria":6,"sun":7,"kitti":8}
-train_imdb_names = ["coco-minival2014-default","pascal_voc-test-default","imagenet-val1-default","cam2-all-default","caltech-train-default","kitti-train-default","sun-all-default","inria-all-default"]
-test_imdb_names = ["coco-minival2014-default","pascal_voc-test-default","imagenet-val1-default","cam2-all-default","caltech-test-default","kitti-val-default","sun-all-default","inria-all-default"]
+train_imdb_names = ["coco-minival2014-default","pascal_voc-test-default","imagenet-val1-default","cam2-train-default","caltech-train-default","kitti-train-default","sun-all-default","inria-all-default"]
+test_imdb_names = ["coco-minival2014-default","pascal_voc-test-default","imagenet-val1-default","cam2-test-default","caltech-test-default","kitti-val-default","sun-all-default","inria-all-default"]
 indexToImdbName = ['coco','pascal_voc','imagenet','cam2','caltech','kitti','sun','inria']
 datasetSizes = cfg.MIXED_DATASET_SIZES
 loadedImdbsTr = {}
