@@ -104,20 +104,21 @@ if __name__ == '__main__':
     clsToSet = loadDatasetIndexDict()
 
     
-    convMat_fn = "output/ntd/confMats_11111111_1_1000.pkl"
+    convMat_fn = "output/ntd/confMats_{}_{}_{}.pkl".format(setID,repeat,size)
     convMat = pickle.load(open(convMat_fn,"rb"))
+    repeat = 100
     print(convMat)
 
-    path_to_save = osp.join(cfg.PATH_TO_NTD_OUTPUT, 'ntd_cropped_confusion_matrix.png')
+    path_to_save = osp.join(cfg.PATH_TO_NTD_OUTPUT, 'ntd_cropped_confusion_matrix_{}.png'.format(repeat))
     cm_cropped = convMat['cropped']
     plot_confusion_matrix(np.copy(cm_cropped), clsToSet, path_to_save, title="Cropped Images",
                           show_plot=False)
 
-    path_to_save = osp.join(cfg.PATH_TO_NTD_OUTPUT, 'ntd_raw_confusion_matrix.png')
+    path_to_save = osp.join(cfg.PATH_TO_NTD_OUTPUT, 'ntd_raw_confusion_matrix_{}.png'.format(repeat))
     cm_raw = convMat['raw']
     plot_confusion_matrix(np.copy(cm_raw), clsToSet, path_to_save, title="Raw Images")
 
-    path_to_save = osp.join(cfg.PATH_TO_NTD_OUTPUT, 'ntd_diff_raw_cropped_confusion_matrix.png')
+    path_to_save = osp.join(cfg.PATH_TO_NTD_OUTPUT, 'ntd_diff_raw_cropped_confusion_matrix_{}.png'.format(repeat))
     diff = cm_raw - cm_cropped
     plot_confusion_matrix(np.copy(diff), clsToSet,
                           path_to_save,
