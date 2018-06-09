@@ -114,7 +114,8 @@ def roidbToSVMData(roidbTr,roidbTe,train_size,test_size,pyloader=roidbSampleHOG,
                                                          clsToSet)
     l_feat_te,l_idx_te,y_te = roidbToFeatures(roidbTe)
     # this is a work-around for the loading of a "testing" mixed dataset... overwrites the original split from the training data
-    mangleTestingData(l_feat_te,l_idx_te,y_te,X_test,y_test,X_idx,test_size)
+
+    # mangleTestingData(l_feat_te,l_idx_te,y_te,X_test,y_test,X_idx,test_size)
     X_train, X_test = scale_data(X_train, X_test)
     print(X_train.shape)
     print(y_train.shape)
@@ -148,6 +149,8 @@ if __name__ == '__main__':
     appendHOGtoRoidb(roidbTr)
     appendHOGtoRoidb(roidbTe)
 
+    print("annoCountTr: {}".format(annoCountTr))
+    print("annoCountTe: {}".format(annoCountTe))
     print_report(roidbTr,annoCountTr,roidbTe,annoCountTe,setID,repeat,size)
 
     print("-="*50)
