@@ -405,5 +405,5 @@ def loadDatasetIndexDict():
         indToCls.remove(None)
     return indToCls
 
-
+__C.clsToSet = loadDatasetIndexDict()
 

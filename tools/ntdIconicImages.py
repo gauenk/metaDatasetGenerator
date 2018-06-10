@@ -1,10 +1,5 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
-"""
-Created on Tue Mar 13 21:32:08 2018
-
-@author: zkapach
-"""
 
 import _init_paths
 from core.train import get_training_roidb
@@ -26,7 +21,7 @@ def parse_args():
     """
     Parse input arguments
     """
-    parser = argparse.ArgumentParser(description='Test loading a mixture dataset')
+    parser = argparse.ArgumentParser(description='Get iconic image paths from a model')
     parser.add_argument('--cfg', dest='cfg_file',
                         help='optional config file',
                         default=None, type=str)
