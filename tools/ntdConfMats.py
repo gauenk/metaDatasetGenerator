@@ -1,10 +1,5 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
-"""
-Created on Tue Mar 13 21:32:08 2018
-
-@author: zkapach
-"""
 import matplotlib
 matplotlib.use("Agg")
 
@@ -20,12 +15,13 @@ import argparse
 import pprint
 import numpy as np
 import matplotlib.pyplot as plt
-import sys,os,cv2,pickle
+import sys,os,cv2,pickle,uuid
 # pytorch imports
 from datasets.pytorch_roidb_loader import RoidbDataset
 from numpy import transpose as npt
 from ntd.hog_svm import plot_confusion_matrix, extract_pyroidb_features,appendHOGtoRoidb,split_data, scale_data,train_SVM,findMaxRegions, make_confusion_matrix
 from utils.misc import *
+
 
 def parse_args():
     """
@@ -37,13 +33,13 @@ def parse_args():
                         default=None, type=str)
     parser.add_argument('--setID', dest='setID',
                         help='which 8 digit ID to read from',
-                        default='11111111', type=str)
+                        default=['11111111'],nargs='*',type=str)
     parser.add_argument('--repeat', dest='repeat',
                         help='which repeat to read from',
-                        default='1', type=str)
+                        default=[1],nargs='*',type=int)
     parser.add_argument('--size', dest='size',
                         help='which size to read from',
-                        default=250, type=int)
+                        default=[250],nargs='*',type=int)
     parser.add_argument('--save', dest='save',
                         help='save some samples with bboxes visualized?',
                         action='store_true')
@@ -88,7 +84,7 @@ def roidbToFeatures(roidb,pyloader=roidbSampleHOG,calcHog=False):
                            loader=pyloader,
                            transform=None)
 
-    l_feat,l_idx,y = extract_pyroidb_features(pyroidb, 'hog', clsToSet, calc_feat = calcHog, \
+    l_feat,l_idx,y = extract_pyroidb_features(pyroidb, 'hog', cfg.clsToSet, calc_feat = calcHog, \
                                               spatial_size=(32, 32),hist_bins=32, \
                                               orient=9, pix_per_cell=8, cell_per_block=2, \
                                               hog_channel=0)
@@ -111,7 +107,7 @@ def roidbToSVMData(roidbTr,roidbTe,train_size,test_size,pyloader=roidbSampleHOG,
     l_feat_tr,l_idx_tr,y_tr = roidbToFeatures(roidbTr,pyloader=pyloader,calcHog=calcHog)
     X_train, X_test, y_train, y_test, X_idx = split_data(train_size, test_size, \
                                                          l_feat_tr,l_idx_tr, y_tr,\
-                                                         clsToSet)
+                                                         cfg.clsToSet)
     l_feat_te,l_idx_te,y_te = roidbToFeatures(roidbTe)
     # this is a work-around for the loading of a "testing" mixed dataset... overwrites the original split from the training data
 
@@ -121,27 +117,7 @@ def roidbToSVMData(roidbTr,roidbTe,train_size,test_size,pyloader=roidbSampleHOG,
     print(y_train.shape)
     return X_train, X_test, y_train, y_test, X_idx
         
-if __name__ == '__main__':
-    args = parse_args()
-
-    print('Called with args:')
-    print(args)
-
-    if args.cfg_file is not None:
-        cfg_from_file(args.cfg_file)
-    cfg.DEBUG = False
-
-    print('Using config:')
-    pprint.pprint(cfg)
-
-    if not args.randomize:
-        np.random.seed(cfg.RNG_SEED)
-
-    setID = args.setID
-    repeat = args.repeat
-    size = args.size
-    
-
+def prepareMixedDataset(setID,repeat,size):
     mixedData = load_mixture_set(setID,repeat,size)
     roidbTr,annoCountTr,roidbTe,annoCountTe = mixedData["train"][0],mixedData["train"][1],mixedData["test"][0],mixedData["test"][1]
 
@@ -155,67 +131,103 @@ if __name__ == '__main__':
 
     print("-="*50)
 
-    clsToSet = loadDatasetIndexDict()
+    return roidbTr,roidbTe
 
-    print("as pytorch friendly ")
 
-    train_size = 500
-    test_size = 500
-
-    X_train, X_test, y_train, y_test, X_idx = roidbToSVMData(roidbTr,roidbTe,\
-                                                             train_size,test_size)
-    if args.modelCropped is not None:
-        model = pickle.load(open(args.modelCropped,"rb"))
+def loadModel(modelFn,modelStr,setID,repeat,size,X_train,y_train):
+    if modelFn is not None:
+        model = pickle.load(open(modelFn,"rb"))
     else:
         model = train_SVM(X_train,y_train)
-        pickle.dump(model,open(iconicImagesFileFormat().format("modelCropped_{}_{}_{}.pkl".format(setID,repeat,size)),"wb"))
-
-    print("accuracy on test data {}".format(model.score(X_test,y_test)))
-
-    path_to_save = osp.join(cfg.PATH_TO_NTD_OUTPUT, 'Mat1_'+setID+'_'+repeat+'_'+str(size))
+        pickle.dump(model,open(iconicImagesFileFormat().format("model{}_{}_{}_{}.pkl".format(modelStr,setID,repeat,size)),"wb"))
+    print("\n\n-=- model loaded -=-\n\n")
+    return model
     
-    cm_cropped = make_confusion_matrix(model, X_test, y_test, clsToSet)
-    plot_confusion_matrix(np.copy(cm_cropped), clsToSet,
-                          path_to_save, title="Cropped Images",
-                          cmap = plt.cm.bwr_r,vmin=-100,vmax=100,)
+def genConfCropped(modelFn,roidbTr,roidbTe,ntdGameInfo):
+    return genConf(modelFn,"Cropped",roidbTr,roidbTe,roidbSampleHOG,False,ntdGameInfo)
 
+def genConfRaw(modelFn,roidbTr,roidbTe,ntdGameInfo):
+    return genConf(modelFn,"Raw",roidbTr,roidbTe,roidbSampleImage,True,ntdGameInfo)
 
-    #raw image input 
+def genConf(modelFn,modelStr,roidbTr,roidbTe,pyloader,calcHog,ntdGameInfo):
     X_train, X_test, y_train, y_test, X_idx = roidbToSVMData(roidbTr,roidbTe,\
-                                                             train_size,test_size,
-                                                             pyloader=roidbSampleImage,
-                                                             calcHog=True)
-    if args.modelRaw is not None:
-        model = pickle.load(open(args.modelRaw,"rb"))
-    else:
-        model = train_SVM(X_train,y_train)
-        pickle.dump(model,open(iconicImagesFileFormat().format("modelRaw_{}_{}_{}.pkl".format(setID,repeat,size)),"wb"))
-
+                                                             ntdGameInfo['trainSize'],
+                                                             ntdGameInfo['testSize'],
+                                                             pyloader=pyloader,
+                                                             calcHog=calcHog)
+    model = loadModel(modelFn,modelStr,ntdGameInfo['setID'],ntdGameInfo['repeat'],
+                      ntdGameInfo['size'],X_train,y_train)
     print("accuracy on test data {}".format(model.score(X_test,y_test)))
-    
-    path_to_save = osp.join(cfg.PATH_TO_NTD_OUTPUT, 'Mat2_'+setID+'_'+repeat+'_'+str(size))
+    return make_confusion_matrix(model, X_test, y_test, cfg.clsToSet)
 
-    cm_raw = make_confusion_matrix(model, X_test, y_test, clsToSet)
-    plot_confusion_matrix(np.copy(cm_raw), clsToSet,
-                          path_to_save, title="Raw Images",
-                          cmap = plt.cm.bwr_r,vmin=-100,vmax=100,)
-
-    #diff between to cm's
-    print("at this line")   
-    print(cm_raw)
-    print(cm_cropped)
-    diff = cm_raw - cm_cropped
-
-    fid = open(iconicImagesFileFormat().format("confMats_{}_{}_{}.pkl".format(setID,repeat,size)),"wb")
-    pickle.dump({"raw":cm_raw,"cropped":cm_cropped},fid)
+def saveConfMats(cmRaw,cmCropped,ntdGameInfo):
+    fid = open(iconicImagesFileFormat().format("confMats_{}_{}_{}_{}.pkl".\
+                                               format(ntdGameInfo['setID'],
+                                                      ntdGameInfo['repeat'],
+                                                      ntdGameInfo['size'],
+                                                      cfg.uuid)),"wb")
+    pickle.dump({"raw":cmRaw,"cropped":cmCropped},fid)
     fid.close()
 
-    path_to_save = osp.join(cfg.PATH_TO_NTD_OUTPUT, 'diff_Mat1_'+setID+'_'+repeat+'_'+str(size)+'Mat2_'+setID+'_'+repeat+'_'+str(size))
+def plotConfMats(cmRaw,cmCropped,cmDiff,ntdGameInfo):
+    appendStr = '{}_{}_{}_{}'.format(ntdGameInfo['setID'],ntdGameInfo['repeat'],
+                                     ntdGameInfo['size'],cfg.uuid)
+    pathToRaw = osp.join(cfg.PATH_TO_NTD_OUTPUT, 'ntd_raw_{}'.format(appendStr))
+    pathToCropped = osp.join(cfg.PATH_TO_NTD_OUTPUT, 'ntd_cropped_{}'.format(appendStr))
+    pathToDiff = osp.join(cfg.PATH_TO_NTD_OUTPUT, 'ntd_diff_raw_cropped_{}'.format(appendStr))
+    plot_confusion_matrix(np.copy(cmRaw), cfg.clsToSet,
+                          pathToRaw, title="Raw Images",
+                          cmap = plt.cm.bwr_r,vmin=-100,vmax=100)
+    plot_confusion_matrix(np.copy(cmCropped), cfg.clsToSet,
+                          pathToCropped, title="Cropped Images",
+                          cmap = plt.cm.bwr_r,vmin=-100,vmax=100)
+    plot_confusion_matrix(np.copy(cmDiff), cfg.clsToSet, 
+                          pathToDiff,title="Raw - Cropped",
+                          cmap = plt.cm.bwr_r,vmin=-100,vmax=100)
 
-    # plotLimit = np.max(np.abs(diff))
-    plot_confusion_matrix(diff, 
-                          clsToSet, path_to_save, 
-                          cmap = plt.cm.bwr_r,
-                          show_plot = False,vmin=-100,vmax=100,
-                          title="Raw - Cropped")
+    
+    
+if __name__ == '__main__':
+    
+    args = parse_args()
+
+    print('Called with args:')
+    print(args)
+
+    if args.cfg_file is not None:
+        cfg_from_file(args.cfg_file)
+    cfg.DEBUG = False
+    cfg.uuid = str(uuid.uuid4())
+    ntdGameInfo = {}
+    ntdGameInfo['trainSize'] = 5
+    ntdGameInfo['testSize'] = 5
+
+    print('Using config:')
+    # pprint.pprint(cfg)
+
+    if not args.randomize:
+        np.random.seed(cfg.RNG_SEED)
+
+    setID_l = args.setID
+    repeat_l = args.repeat
+    size_l = args.size
+
+    for setID in setID_l:
+        for repeat in repeat_l:
+            for size in size_l:
+                ntdGameInfo['setID'] = setID
+                ntdGameInfo['repeat'] = repeat
+                ntdGameInfo['size'] = size
+
+                roidbTr,roidbTe = prepareMixedDataset(setID,repeat,size)
+                cmRaw = genConfRaw(args.modelRaw, roidbTr,roidbTe, ntdGameInfo)
+                cmCropped = genConfCropped(args.modelCropped, roidbTr, roidbTe, ntdGameInfo)
+
+
+                cmDiff = cmRaw - cmCropped
+
+                saveConfMats(cmRaw,cmCropped,ntdGameInfo)
+                plotConfMats(cmRaw,cmCropped,cmDiff,ntdGameInfo)
+                print("\n\n -=-=-=- uuid: {} -=-=-=- \n\n".format(cfg.uuid))
+
    
