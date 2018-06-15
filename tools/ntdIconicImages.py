@@ -21,26 +21,29 @@ def parse_args():
     """
     Parse input arguments
     """
-    parser = argparse.ArgumentParser(description='Get iconic image paths from a model')
+    parser = argparse.ArgumentParser(description='Test loading a mixture dataset')
     parser.add_argument('--cfg', dest='cfg_file',
                         help='optional config file',
                         default=None, type=str)
     parser.add_argument('--setID', dest='setID',
                         help='which 8 digit ID to read from',
-                        default='11111111', type=str)
+                        default=['11111111'],nargs='*',type=str)
     parser.add_argument('--repeat', dest='repeat',
                         help='which repeat to read from',
-                        default='1', type=str)
+                        default=[1],nargs='*',type=int)
     parser.add_argument('--size', dest='size',
                         help='which size to read from',
-                        default=250, type=int)
+                        default=[250],nargs='*',type=int)
     parser.add_argument('--save', dest='save',
                         help='save some samples with bboxes visualized?',
                         action='store_true')
     parser.add_argument('--rand', dest='randomize',
                         help='randomize (do not use a fixed seed)',
                         action='store_true')
-    parser.add_argument('--model', dest='model',
+    parser.add_argument('--modelRaw', dest='modelRaw',
+                        help='give the path to a fit model',
+                        default=None, type=str)
+    parser.add_argument('--modelCropped', dest='modelCropped',
                         help='give the path to a fit model',
                         default=None, type=str)
 
@@ -51,111 +54,59 @@ def parse_args():
     args = parser.parse_args()
     return args
 
-def get_bbox_info(roidb,size):
-    areas = np.zeros((size))
-    widths = np.zeros((size))
-    heights = np.zeros((size))
-    actualSize = 0
-    idx = 0
-    for image in roidb:
-        if image['flipped'] is True: continue
-        bbox = image['boxes']
-        for box in bbox:
-            actualSize += 1
-            widths[idx] = box[2] - box[0]
-            heights[idx] = box[3] - box[1]
-            assert widths[idx] >= 0,"widths[{}] = {}".format(idx,widths[idx])
-            assert heights[idx] >= 0
-            areas[idx] = widths[idx] * heights[idx]
-            idx += 1
-    return areas,widths,heights
-
 
 if __name__ == '__main__':
     args = parse_args()
 
     print('Called with args:')
     print(args)
-
     if args.cfg_file is not None:
         cfg_from_file(args.cfg_file)
-
+    if not args.randomize:
+        np.random.seed(cfg.RNG_SEED)
     print('Using config:')
     pprint.pprint(cfg)
 
-    if not args.randomize:
-        np.random.seed(cfg.RNG_SEED)
+    cfg.DEBUG = False
+    cfg.uuid = str(uuid.uuid4())
+    ntdGameInfo = {}
+    ntdGameInfo['trainSize'] = 500
+    ntdGameInfo['testSize'] = 500
 
-    setID = args.setID
-    repeat = args.repeat
-    size = args.size
-    
-    roidb,annoCount = load_mixture_set(setID,repeat,size)
-    numAnnos = computeTotalAnnosFromAnnoCount(annoCount)
+    setID_l = args.setID
+    repeat_l = args.repeat
+    size_l = args.size
 
-    print("\n\n-=-=-=-=-=-=-=-=-\n\n")
-    print("Report:\n\n")
-    print("Mixture Dataset: {} {} {}\n\n".format(setID,repeat,size))
+    for setID in setID_l:
+        for repeat in repeat_l:
+            for size in size_l:
+                ntdGameInfo['setID'] = setID
+                ntdGameInfo['repeat'] = repeat
+                ntdGameInfo['size'] = size
 
-    print("number of images: {}".format(len(roidb)))
-    print("number of annotations: {}".format(numAnnos))
-    print("size of roidb in memory: {}kB".format(len(roidb) * sys.getsizeof(roidb[0])/1024.))
-    print("example roidb:")
-    for k,v in roidb[0].items():
-        print("\t==> {},{}".format(k,type(v)))
-        print("\t\t{}".format(v))
+                roidbTr,roidbTe = prepareMixedDataset(setID,repeat,size)
+                cmRaw,modelRaw = genConfRaw(args.modelRaw, roidbTr, roidbTe, ntdGameInfo)
+                cmCropped,modelCropped = genConfCropped(args.modelCropped, roidbTr, roidbTe, ntdGameInfo)
 
-    print("computing bbox info...")
-    areas, widths, heights = get_bbox_info(roidb,numAnnos)
+                
 
-    print("ave area: {} | std. area: {}".format(np.mean(areas),np.std(areas,dtype=np.float64)))
-    print("ave width: {} | std. width: {}".format(np.mean(widths),np.std(widths,dtype=np.float64)))
-    print("ave height: {} | std. height: {}".format(np.mean(heights),np.std(heights,dtype=np.float64)))
-    prefix_path = cfg.IMDB_REPORT_OUTPUT_PATH
-    if osp.exists(prefix_path) is False:
-        os.makedirs(prefix_path)
+    def iconicImagesOutputFilename(ntdGameInfo):
+        fileDir = cfg.PATH_TO_NTD_OUTPUT
+        if not osp.exists(fileDir):
+            os.makedirs(fileDir)
+        filename = osp.join(fileDir,\
+                            "{}_{}_{}.txt".format(ntdGameInfo['setID'],
+                                                  ntdGameInfo['repeat'],
+                                                  ntdGameInfo['size']))
+        return filename
+        
+    def getIconicImages(model,X_test,y_test,X_idx,pyroidb,ntdGameInfo):
+        rawOutputs = model.decision_function(X_test)
+        filename = iconicImagesOutputFilename
+        
 
-    path = osp.join(prefix_path,"areas.dat")
-    np.savetxt(path,areas,fmt='%.18e',delimiter=' ')
-    path = osp.join(prefix_path,"widths.dat")
-    np.savetxt(path,widths,fmt='%.18e',delimiter=' ')
-    path = osp.join(prefix_path,"heights.dat")
-    np.savetxt(path,heights,fmt='%.18e',delimiter=' ')
 
         
-    print("-="*50)
-
-    clsToSet = loadDatasetIndexDict()
-
-    print("as pytorch friendly ")
-
-    pyroidb = RoidbDataset(roidb,[0,1,2,3,4,5,6,7],
-                           loader=roidbSampleHOG,
-                           transform=None)
-    
-    print('this is the annocount', annoCount)
-
-    l_feat,l_idx,y = extract_pyroidb_features(pyroidb, 'hog', clsToSet,\
-                                              spatial_size=(32, 32),hist_bins=32, \
-                                              orient=9, pix_per_cell=8, cell_per_block=2, \
-                                              hog_channel=0)
-
-    train_size = 500
-    test_size = 500
-
-
-    X_train, X_test, y_train, y_test, X_idx = split_data(train_size, test_size, \
-                                                         l_feat,l_idx, y,\
-                                                         clsToSet)
-    print(X_train.shape)
-    print(y_train.shape)
-
-    if args.model is not None:
-        model = pickle.load(open(args.model,"rb"))
-    else:
-        model = train_SVM(X_train,y_train)
-        pickle.dump(model,open(iconicImagesFileFormat().format("model_{}_{}_{}.pkl".format(setID,repeat,size)),"wb"))
-
     # print("accuracy on test data {}".format(model.score(X_test,y_test)))
 
     """
@@ -173,12 +124,6 @@ if __name__ == '__main__':
     print(rawOutputs)
     print(rawOutputs.shape)
     
-    fileDir = cfg.PATH_TO_NTD_OUTPUT
-    if not osp.exists(fileDir):
-        os.makedirs(fileDir)
-    
-    fileName = osp.join(fileDir,\
-                        "{}_{}_{}.txt".format(setID,repeat,size))
     topK = 30
     fn = open(fileName,"w")
     maxRegionsStr = findMaxRegions(topK,pyroidb,rawOutputs,y_test,X_idx,clsToSet)

@@ -109,6 +109,8 @@ def load_mixture_set(setID,repetition,final_size):
         if osp.exists(pklName) is True:
             fid = open(pklName,"rb")
             loaded = pickle.load(fid)
+            fid.close()
+
             train = loaded['train']
             test = loaded['test']
             print(pklName)
@@ -117,7 +119,6 @@ def load_mixture_set(setID,repetition,final_size):
                 annoCountsTe = test[1]
             roidbTr.extend(train[0])
             roidbTe.extend(test[0])
-            fid.close()
         else:
             raise ValueError("{} does not exists".format(pklName))
     return {"train":[roidbTr,annoCountsTr],"test":[roidbTe,annoCountsTe]}
@@ -162,15 +163,19 @@ def cropImageToAnnoRegion(im_orig,box):
     y1 = box[1]
     x2 = box[2]
     y2 = box[3]
-    return scaleImage(im_orig[y1:y2, x1:x2])
+    return scaleCroppedImage(im_orig[y1:y2, x1:x2])
     
-def scaleImage(im_orig):
-    target_size = cfg.CROPPED_IMAGE_SIZE 
+def scaleCroppedImage(im_orig):
+    return scaleImage(im_orig,cfg.CROPPED_IMAGE_SIZE)
+
+def scaleRawImage(im_orig):
+    return scaleImage(im_orig,cfg.RAW_IMAGE_SIZE)
+
+def scaleImage(im_orig,target_size):
     x_size,y_size = im_orig.shape[0:2]
     if x_size == 0 or y_size == 0:
+        print("WARNING: image's size 0 for an axis")
         return im_orig
-    im_scale_x = float(target_size) / x_size
-    im_scale_y = float(target_size) / y_size
     im = cv2.resize(im_orig, (target_size,target_size),
                     interpolation=cv2.INTER_CUBIC)
     return im
