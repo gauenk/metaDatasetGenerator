@@ -1,7 +1,9 @@
-import sys,os
+import sys,os,pickle
+import matplotlib.pyplot as plt
 import os.path as osp
 import numpy as np
-from core.config import cfg
+from core.config import cfg,iconicImagesFileFormat
+from ntd.hog_svm import plot_confusion_matrix,appendHOGtoRoidb,split_data, scale_data,train_SVM,findMaxRegions, make_confusion_matrix
 from datasets.ds_utils import computeTotalAnnosFromAnnoCount
 
 class PreviousCounts():
@@ -91,5 +93,48 @@ def get_bbox_info(roidb,size):
             idx += 1
     print("actual: {} | theoretical: {}".format(idx,size))
     return areas,widths,heights
+
+
+
+def saveNtdConfMats(cmRaw,cmCropped,ntdGameInfo):
+    fid = open(iconicImagesFileFormat().format("confMats_{}_{}_{}_{}.pkl".\
+                                               format(ntdGameInfo['setID'],
+                                                      ntdGameInfo['repeat'],
+                                                      ntdGameInfo['size'],
+                                                      cfg.uuid)),"wb")
+    pickle.dump({"raw":cmRaw,"cropped":cmCropped},fid)
+    fid.close()
+
+def plotNtdConfMats(cmRaw,cmCropped,cmDiff,ntdGameInfo,infix=None):
+
+    if infix in ntdGameInfo.keys():
+        appendStr = '{}_{}_{}_{}_{}'.format(ntdGameInfo['setID'],ntdGameInfo['size'],
+                                                 cfg.uuid,infix,ntdGameInfo[infix])
+    else:
+        appendStr = '{}_{}_{}_{}'.format(ntdGameInfo['setID'],ntdGameInfo['repeat'],
+                                         ntdGameInfo['size'],cfg.uuid)
+                                  
+    pathToRaw = osp.join(cfg.PATH_TO_NTD_OUTPUT, 'ntd_raw_{}'.format(appendStr))
+    pathToCropped = osp.join(cfg.PATH_TO_NTD_OUTPUT, 'ntd_cropped_{}'.format(appendStr))
+    pathToDiff = osp.join(cfg.PATH_TO_NTD_OUTPUT, 'ntd_diff_raw_cropped_{}'.format(appendStr))
+    plot_confusion_matrix(np.copy(cmRaw), cfg.clsToSet,
+                          pathToRaw, title="Raw Images",
+                          cmap = plt.cm.bwr_r,vmin=-100,vmax=100)
+    plot_confusion_matrix(np.copy(cmCropped), cfg.clsToSet,
+                          pathToCropped, title="Cropped Images",
+                          cmap = plt.cm.bwr_r,vmin=-100,vmax=100)
+    plot_confusion_matrix(np.copy(cmDiff), cfg.clsToSet, 
+                          pathToDiff,title="Raw - Cropped",
+                          cmap = plt.cm.bwr_r,vmin=-100,vmax=100)
+
+
+def printRoidbImageNamesToTextFile(roidb,postfix):
+    fid = open("output_{}.txt".format(postfix),"w+")
+    for sample in roidb:
+        fid.write(sample['image']+"\n")
+    fid.close()
+        
+
+
 
 

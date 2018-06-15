@@ -23,19 +23,22 @@ from sklearn.preprocessing import StandardScaler
 from skimage.feature import hog
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import confusion_matrix
-from datasets.ds_utils import cropImageToAnnoRegion,addRoidbField,clean_box
+from datasets.ds_utils import cropImageToAnnoRegion,addRoidbField,clean_box,scaleRawImage
 from sklearn.calibration import CalibratedClassifierCV as cccv
 import warnings
 warnings.filterwarnings('ignore')
 
 # cfg.DEBUG = True
 
-def HOGfromRoidbSample(sample,orient=9, pix_per_cell=8,
+def bboxHOGfromRoidbSample(sample,orient=9, pix_per_cell=8,
                        cell_per_block=2, hog_channel=0):
     features = []
-    if 'image' not in sample:
+    if 'image' not in sample.keys():
         print(sample)
         print(sample.keys())
+        print("WARINING [bboxHOGfromRoidbSample]: the\
+        image field is not available for the above sample")
+        return None
     img = cv2.imread(sample['image'])
     for box in sample['boxes']:
         box = clean_box(box,sample['width'],sample['height'])
@@ -48,6 +51,23 @@ def HOGfromRoidbSample(sample,orient=9, pix_per_cell=8,
             print('hog failed @ path {}'.format(sample['image']))
             return None
     return features
+
+def imageHOGfromRoidbSample(sample,orient=9, pix_per_cell=8,
+                       cell_per_block=2, hog_channel=0):
+    if 'image' not in sample.keys():
+        print(sample)
+        print(sample.keys())
+        print("WARINING [imageHOGfromRoidbSample]: the\
+        image field is not available for the above sample")
+        return None
+    img = cv2.imread(sample['image'])
+    try:
+        feature = scaleRawImage(img)
+    except Exception as e:
+        feature = None
+        print(e)
+        print('[imageHOGfromRoidbSample] hog failed @ path {}'.format(sample['image']))
+    return feature
 
 def HOGFromImage(image,orient=9, pix_per_cell=8,
                  spatial_size=(128,256), hist_bins=32,
@@ -65,9 +85,9 @@ def HOGFromImage(image,orient=9, pix_per_cell=8,
 def appendHOGtoRoidb(roidb):
     print("="*100)
     print("appending the HOG field to Roidb")
-    addRoidbField(roidb,"hog",HOGfromRoidbSample)
+    addRoidbField(roidb,"hog",bboxHOGfromRoidbSample)
+    addRoidbField(roidb,"hog_image",imageHOGfromRoidbSample)
     print("finished appending HOG")
-
 
 def make_confusion_matrix(model, X_test, y_test, clsToSet, normalize=True):
 
@@ -202,7 +222,7 @@ def extract_pyroidb_features(pyroidb, feat_type, clsToSet, calc_feat = False, sp
     for i in range(len(pyroidb)):
         try:
             file_features = []
-            inputs,target = pyroidb[i] # Read in each imageone by one
+            inputs,target = pyroidb[i] # Read in each image one by one
             if calc_feat == True:
                 img = img_features(inputs, feat_type, hist_bins, orient, pix_per_cell, cell_per_block)
                 if i == 0:
@@ -255,12 +275,27 @@ def split_data(train_size, test_size, l_feat,l_idx, y, clsToSet):
         x_train.append(feats[:train_size])
         x_test.append(feats[train_size:train_size+test_size])
 
+        toAdd = test_size - len(feats[train_size:train_size+test_size])
+        if toAdd > 0:
+            x_test.append([ None for _ in range(toAdd) ])
+
         indicies = l_idx[idx]
         trIdx = indicies[:train_size]
         teIdx = indicies[train_size:train_size+test_size]
-        te_idx.extend(teIdx)
+        print("teIdx: {}".format(len(teIdx)))
+
         y_train.extend(y[trIdx])
+
+        te_idx.extend(teIdx)
         y_test.extend(y[teIdx])
+
+        if toAdd != (test_size - len(teIdx)):
+            print("To add is not equal")
+
+        toAdd = test_size - len(teIdx)
+        if toAdd > 0:
+            te_idx.extend([ None for _ in range(toAdd) ])
+            y_test.extend([ idx for _ in range(toAdd) ])
 
     if cfg.DEBUG:
         for idx,name in enumerate(clsToSet):

@@ -48,10 +48,11 @@ class RoidbDataset(data.Dataset):
             print("FLIPPED")
             sys.exit()
 
-        box = sample['boxes'][annoIndex]
-
         # (x1,y1,x2,y2) bounds correction
-        if True:
+        box = None
+        if len(sample['boxes']) > 0:
+            box = sample['boxes'][annoIndex]
+        if box is not None:
             box = clean_box(box,sample['width'],sample['height'])
             
         # load inputs and targets

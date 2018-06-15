@@ -43,7 +43,7 @@ def parse_args():
     parser.add_argument('--rand', dest='randomize',
                         help='randomize (do not use a fixed seed)',
                         action='store_true')
-    parser.add_argument('--save', dest='save',
+    parser.add_argument('--save', dest='save',default=False,
                         help='save some samples with bboxes visualized?',
                         action='store_true')
     parser.add_argument('--createAnnoMap', dest='createAnnoMap',
@@ -195,7 +195,6 @@ if __name__ == '__main__':
        print_each_size(sizedRoidb)
     print("-="*50)
 
-
     # issue: we are getting zeros area for 5343 of bboxes for pascal_voc_2007
 
     path = osp.join(prefix_path,"areas.dat")
@@ -209,7 +208,7 @@ if __name__ == '__main__':
                            loader=roidbSampleImageAndBox,
                            transform=pyroidbTransform_cropImageToBox)
 
-    saveCaltechOneFromEach(roidb)
+    # saveCaltechOneFromEach(roidb)
     if args.save:
         index = imdb._get_roidb_index_at_size(50)
         print("saving 30 imdb annotations to output folder...")        
@@ -233,16 +232,10 @@ if __name__ == '__main__':
                                transform=pyroidbTransform_normalizeBox)
         annoMaps = annotationDensityPlot(pyroidb)
         annoMap = annoMaps[clsToSet.index(imdb.name)]
-        print(annoMap)
-        print(annoMap*100)
-        print(annoMap*255)
-        print(annoMap*255*100)
-        print("annoMap: max value: {}".format(annoMap.max()))
-        print("annoMap: min value: {}".format(annoMap.min()))
-
         annoMap /= annoMap.max()
         annoMap *= 255
-
+        print("annoMap: max value: {}".format(annoMap.max()))
+        print("annoMap: min value: {}".format(annoMap.min()))
         saveFilename = osp.join(cfg.PATH_TO_ANNO_ANALYSIS_OUTPUT,
                                 "annoMap_{}.png".format(imdb.name))
         

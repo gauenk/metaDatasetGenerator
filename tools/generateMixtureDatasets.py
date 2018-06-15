@@ -120,7 +120,6 @@ def getMixtureRoidb(imdbs,size,pc):
     mixedRoidb = [None for _ in range(8)]
     annoCounts = [None for _ in range(8)]
     for imdb in imdbs:
-        imdb = loadedImdbsTr[imdb.name]
         sizedRoidb,annoCount = imdb.get_roidb_at_size(size)
         mixedRoidb[imdb.config['setID']] = sizedRoidb
         annoCounts[imdb.config['setID']] = annoCount

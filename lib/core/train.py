@@ -7,14 +7,14 @@
 
 """Train a Fast R-CNN network."""
 
-import caffe
+#import caffe
 from core.config import cfg
 import vae_data_layer.roidb as rdl_roidb
 from utils.timer import Timer
 import numpy as np
 import os
 
-from caffe.proto import caffe_pb2
+# from caffe.proto import caffe_pb2
 import google.protobuf as pb2
 import google.protobuf.text_format
 

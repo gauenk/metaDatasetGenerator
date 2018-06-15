@@ -275,6 +275,9 @@ __C.MIXED_DATASET_SIZES = [10,50,100,250,500,1000,2000,5000]
 # The size of the input for images cropped to their annotations
 __C.CROPPED_IMAGE_SIZE = 100
 
+# The size of the input for raw images
+__C.RAW_IMAGE_SIZE = 300
+
 # the size of the 
 __C.CONFIG_DATASET_INDEX_DICTIONARY_PATH = "default_dataset_index.yml"
 

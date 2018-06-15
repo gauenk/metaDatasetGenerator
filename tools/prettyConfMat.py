@@ -20,11 +20,12 @@ import argparse
 import pprint
 import numpy as np
 import matplotlib.pyplot as plt
-import sys,os,cv2,pickle
+import sys,os,cv2,pickle,uuid
 # pytorch imports
 from datasets.pytorch_roidb_loader import RoidbDataset
 from numpy import transpose as npt
 from ntd.hog_svm import plot_confusion_matrix, extract_pyroidb_features,appendHOGtoRoidb,split_data, scale_data,train_SVM,findMaxRegions, make_confusion_matrix
+from utils.misc import *
 
 def parse_args():
     """
@@ -36,13 +37,13 @@ def parse_args():
                         default=None, type=str)
     parser.add_argument('--setID', dest='setID',
                         help='which 8 digit ID to read from',
-                        default='11111111', type=str)
+                        default=['11111111'],nargs='*',type=str)
     parser.add_argument('--repeat', dest='repeat',
                         help='which repeat to read from',
-                        default='1', type=str)
+                        default=[1],nargs='*',type=int)
     parser.add_argument('--size', dest='size',
                         help='which size to read from',
-                        default=250, type=int)
+                        default=[250],nargs='*',type=int)
     parser.add_argument('--save', dest='save',
                         help='save some samples with bboxes visualized?',
                         action='store_true')
@@ -63,69 +64,73 @@ def parse_args():
     args = parser.parse_args()
     return args
 
-def get_bbox_info(roidb,size):
-    areas = np.zeros((size))
-    widths = np.zeros((size))
-    heights = np.zeros((size))
-    actualSize = 0
-    idx = 0
-    for image in roidb:
-        if image['flipped'] is True: continue
-        bbox = image['boxes']
-        for box in bbox:
-            actualSize += 1
-            widths[idx] = box[2] - box[0]
-            heights[idx] = box[3] - box[1]
-            assert widths[idx] >= 0,"widths[{}] = {}".format(idx,widths[idx])
-            assert heights[idx] >= 0
-            areas[idx] = widths[idx] * heights[idx]
-            idx += 1
-    return areas,widths,heights
-
 
 if __name__ == '__main__':
     args = parse_args()
 
     print('Called with args:')
     print(args)
-
     if args.cfg_file is not None:
         cfg_from_file(args.cfg_file)
-
+    if not args.randomize:
+        np.random.seed(cfg.RNG_SEED)
     print('Using config:')
     pprint.pprint(cfg)
 
-    if not args.randomize:
-        np.random.seed(cfg.RNG_SEED)
+    ntdGameInfo = {}
+    ntdGameInfo['trainSize'] = 5
+    ntdGameInfo['testSize'] = 5
 
-    setID = args.setID
-    repeat = args.repeat
-    size = args.size
-    clsToSet = loadDatasetIndexDict()
+    cfg.DEBUG = False
+    cfg.uuid = str(uuid.uuid4())
 
-    
-    convMat_fn = "output/ntd/confMats_{}_{}_{}.pkl".format(setID,repeat,size)
-    convMat = pickle.load(open(convMat_fn,"rb"))
-    repeat = 100
-    print(convMat)
+    setID_l = args.setID
+    repeat_l = args.repeat
+    size_l = args.size
+    assert len(setID_l) == 1 and len(size_l) == 1,\
+        "code only works for one size and size currently"
 
-    path_to_save = osp.join(cfg.PATH_TO_NTD_OUTPUT, 'ntd_cropped_confusion_matrix_{}.png'.format(repeat))
-    cm_cropped = convMat['cropped']
-    plot_confusion_matrix(np.copy(cm_cropped), clsToSet, path_to_save, title="Cropped Images",
-                          show_plot=False)
+    numEl = len(setID_l) * len(repeat_l) * len(size_l)
+    rawMats = []
+    croppedMats = []
+    diffMats = []
 
-    path_to_save = osp.join(cfg.PATH_TO_NTD_OUTPUT, 'ntd_raw_confusion_matrix_{}.png'.format(repeat))
-    cm_raw = convMat['raw']
-    plot_confusion_matrix(np.copy(cm_raw), clsToSet, path_to_save, title="Raw Images")
+    for setID in setID_l:
+        for repeat in repeat_l:
+            for size in size_l:
+                ntdGameInfo['setID'] = setID
+                ntdGameInfo['size'] = size
+                ntdGameInfo['repeat'] = repeat
 
-    path_to_save = osp.join(cfg.PATH_TO_NTD_OUTPUT, 'ntd_diff_raw_cropped_confusion_matrix_{}.png'.format(repeat))
-    diff = cm_raw - cm_cropped
-    plot_confusion_matrix(np.copy(diff), clsToSet,
-                          path_to_save,
-                          cmap = plt.cm.bwr_r,
-                          title="Raw - Cropped",
-                          vmin=-100,vmax=100)
+                convMat_fn = "output/ntd/confMats_{}_{}_{}.pkl".format(setID,repeat,size)
+                convMat = pickle.load(open(convMat_fn,"rb"))
+                cmRaw = convMat['raw']
+                cmCropped = convMat['cropped']
+                cmDiff = cmRaw - cmCropped
+                plotNtdConfMats(cmRaw,cmCropped,cmDiff,ntdGameInfo)
 
+                rawMats.append(cmRaw)
+                croppedMats.append(cmCropped)
+                diffMats.append(cmDiff)
+
+    ntdGameInfo['ave'] = len(rawMats)
+    ntdGameInfo['std'] = len(rawMats)
+
+    rawMatsAve = np.array(rawMats).mean(axis=0)
+    print(rawMatsAve.shape)
+    croppedMatsAve = np.array(croppedMats).mean(axis=0)
+    diffMatsAve = np.array(diffMats).mean(axis=0)
+
+    plotNtdConfMats(rawMatsAve,croppedMatsAve,diffMatsAve,ntdGameInfo,"ave")
+
+    rawMatsStd = np.array(rawMats).std(axis=0)
+    croppedMatsStd = np.array(croppedMats).std(axis=0)
+    diffMatsStd = np.array(diffMats).std(axis=0)
+
+    plotNtdConfMats(rawMatsStd,croppedMatsStd,diffMatsStd,ntdGameInfo,"std")
+
+    print(rawMatsAve.shape)
+    print("\n\n -=-=-=- uuid: {} -=-=-=- \n\n".format(cfg.uuid))
 
     
 
