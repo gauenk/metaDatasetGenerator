@@ -270,7 +270,7 @@ __C.OBJ_DET.USE_GPU_NMS = True
 __C.OBJ_DET.BBOX_VERBOSE = True
 
 # The sizes used for creating the mixture datasets
-__C.MIXED_DATASET_SIZES = [10,50,100,250,500,1000,2000,5000]
+__C.MIXED_DATASET_SIZES = [10,100,1000]
 
 # The size of the input for images cropped to their annotations
 __C.CROPPED_IMAGE_SIZE = 100

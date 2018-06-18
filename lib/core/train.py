@@ -7,7 +7,7 @@
 
 """Train a Fast R-CNN network."""
 
-#import caffe
+# import caffe
 from core.config import cfg
 import vae_data_layer.roidb as rdl_roidb
 from utils.timer import Timer
