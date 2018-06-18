@@ -54,7 +54,7 @@ case $DATASET in
 	# You can probably use fewer iterations and reduce the
 	# time to the LR drop (set in the solver to 350,000 iterations).
 	TRAIN_IMDB="coco-train"
-	TEST_IMDB="coco-minival2014"
+	TEST_IMDB="coco-testdev2015"
 	PT_DIR="coco"
 	ITERS=490000
 	;;
