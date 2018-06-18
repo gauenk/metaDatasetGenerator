@@ -117,10 +117,11 @@ def get_bbox_info(roidb,size):
             actualSize += 1
             widths[idx] = box[2] - box[0]
             heights[idx] = box[3] - box[1]
-            assert widths[idx] >= 0,"widths[{}] = {}".format(idx,widths[idx])
-            assert heights[idx] >= 0
-            areas[idx] = widths[idx] * heights[idx]
-            idx += 1
+            # assert widths[idx] >= 0,"widths[{}] = {}".format(idx,widths[idx])
+            # assert heights[idx] >= 0
+            # areas[idx] = widths[idx] * heights[idx]
+            # idx += 1
+    print(actualSize)
     return areas,widths,heights
 
 def vis_dets(im, class_names, dets, _idx_, fn=None, thresh=0.5):

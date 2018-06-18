@@ -251,9 +251,7 @@ class RepoImdb(imdb):
         if self.roidb is None:
             raise ValueError("roidb must be loaded before 'compute_size_along_roidb' can be run")
         self._roidbSize = []
-        self._roidbSize.append(np.sum(self.roidb[0]['gt_classes'] \
-                                   == self.classes.index("person")))
+        self._roidbSize.append(len(self.roidb[0]['gt_classes']))
         for image in self.roidb[1:]:
-            newSize = self._roidbSize[-1] + \
-                      np.sum(image['gt_classes'] == self.classes.index("person"))
+            newSize = self._roidbSize[-1] + len(image['gt_classes'])
             self._roidbSize.append(newSize)

@@ -103,6 +103,7 @@ class xmlReader(object):
         #TODO: sun. "person model" is not accounted for (missing 17 annos)
         # find out what is happening to them
 
+        # handle the imagenet translation: nXXXXX stuff -> actual classname string
         if self._convertIdToCls is not None: cls = self._convertIdToCls[cls]
         # check if we need to convert annotation class to "person"
         if self._convertToPerson is not None and cls in self._convertToPerson:

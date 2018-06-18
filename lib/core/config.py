@@ -59,8 +59,8 @@ __C.DATASETS.MODEL = None
 #
 
 __C.TRAIN = edict()
-__C.PATH_YMLDATASETS = "helps"
-#__C.PATH_YMLDATASETS = "gauenk"
+#__C.PATH_YMLDATASETS = "helps"
+__C.PATH_YMLDATASETS = "gauenk"
 __C.PATH_MIXTURE_DATASETS = "./data/mixtureDatasets/"
 
 # Scales to use during training (can list multiple scales)
