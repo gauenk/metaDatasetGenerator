@@ -50,6 +50,27 @@ def printSaveBboxInfo(roidb,numAnnos,splitStr):
     
 
 def print_report(roidbTr,annoCountTr,roidbTe,annoCountTe,setID,repeat,size):
+    # legacy
+    printRoidbReport(roidbTr,annoCountTr,roidbTe,annoCountTe,setID,repeat,size)
+
+def printTrainTestRoidbReport(roidbTr,annoCountTr,roidbTe,annoCountTe,setID,repeat,size):
+
+    numAnnosTr = computeTotalAnnosFromAnnoCount(annoCountTr)
+    numAnnosTe = computeTotalAnnosFromAnnoCount(annoCountTe)
+
+    print("\n\n-=-=-=-=-=-=-=-=-\n\n")
+    print("Report:\n\n")
+    print("Mixture Dataset: {} {} {}\n\n".format(setID,repeat,size))
+    print_set_report(roidbTr,numAnnosTr,"train")
+    print_set_report(roidbTe,numAnnosTe,"test")
+    print("example [train] roidb:")
+    for k,v in roidbTr[10].items():
+        print("\t==> {},{}".format(k,type(v)))
+        print("\t\t{}".format(v))
+    printSaveBboxInfo(roidbTr,numAnnosTr,"train")
+    printSaveBboxInfo(roidbTe,numAnnosTe,"test")
+
+def printTrainTestRoidbDictReport(roidbTr,annoCountTr,roidbTe,annoCountTe,setID,repeat,size):
 
     numAnnosTr = computeTotalAnnosFromAnnoCount(annoCountTr)
     numAnnosTe = computeTotalAnnosFromAnnoCount(annoCountTe)
@@ -67,10 +88,14 @@ def print_report(roidbTr,annoCountTr,roidbTe,annoCountTe,setID,repeat,size):
     printSaveBboxInfo(roidbTe,numAnnosTe,"test")
 
     
-def print_set_report(roidb,numAnnos,splitStr):
+def printRoidbReport(roidb,numAnnos,splitStr):
     print("number of images [{}]: {}".format(splitStr,len(roidb)))
     print("number of annotations [{}]: {}".format(splitStr,numAnnos))
     print("size of roidb in memory [{}]: {}kB".format(splitStr,len(roidb) * sys.getsizeof(roidb[0])/1024.))
+
+def print_set_report(roidb,numAnnos,splitStr):
+    # legacy
+    printRoidbReport(roidb,numAnnos,splitStr)
 
 def get_bbox_info(roidb,size):
     areas = np.zeros((size))
@@ -94,14 +119,10 @@ def get_bbox_info(roidb,size):
     print("actual: {} | theoretical: {}".format(idx,size))
     return areas,widths,heights
 
-
-
-def saveNtdConfMats(cmRaw,cmCropped,ntdGameInfo):
-    fid = open(iconicImagesFileFormat().format("confMats_{}_{}_{}_{}.pkl".\
-                                               format(ntdGameInfo['setID'],
-                                                      ntdGameInfo['repeat'],
-                                                      ntdGameInfo['size'],
-                                                      cfg.uuid)),"wb")
+def saveNtdConfMats(cmRaw,cmCropped,ntdGameInfo,infix=None):
+    fn = "confMats_{}_{}_{}_{}.pkl".format(ntdGameInfo['setID'],ntdGameInfo['repeat'],
+                                           ntdGameInfo['size'],cfg.uuid)
+    fid = open(iconicImagesFileFormat().format(fn),"wb")
     pickle.dump({"raw":cmRaw,"cropped":cmCropped},fid)
     fid.close()
 
@@ -128,12 +149,48 @@ def plotNtdConfMats(cmRaw,cmCropped,cmDiff,ntdGameInfo,infix=None):
                           cmap = plt.cm.bwr_r,vmin=-100,vmax=100)
 
 
+def printRoidbDictImageNamesToTextFile(roidbDict,postfix):
+    fid = open("output_{}.txt".format(postfix),"w+")
+    for key in roidbDict.keys():
+        for idx,sample in enumerate(roidbDict[key]):
+            fid.write(sample['image']+"\n")
+    fid.close()
+    
 def printRoidbImageNamesToTextFile(roidb,postfix):
     fid = open("output_{}.txt".format(postfix),"w+")
     for sample in roidb:
+        print(sample['image'])
         fid.write(sample['image']+"\n")
     fid.close()
         
+def computeRoidbDictLens(roidbTrDict,roidbTeDict):
+    lenTr = 0
+    for roidb in roidbTrDict.values():
+        lenTr += len(roidb)
+    lenTe = 0
+    for roidb in roidbTeDict.values():
+        lenTe += len(roidb)
+
+    return lenTr,lenTe
+
+def flattenRoidbDict(roidbDict,numSamples=None):
+    roidbFlattened = []
+    for key,roidb in roidbDict.items():
+        print("{}: {} images".format(key,len(roidb)))
+        toExtend = roidb
+        if numSamples is not None:
+            index = cfg.DATASET_NAMES_ORDERED.index(key)
+            sizeToKeep = numSamples[index]
+            if sizeToKeep is not None:
+                print("[flattenRoidbdict] shortened roidb from {} to {}".format(len(roidb),
+                                                                                sizeToKeep))
+            else:
+                sizeToKeep = len(roidb)
+            toExtend = roidb[:sizeToKeep]
+        roidbFlattened.extend(toExtend)
+    return roidbFlattened
+
+
 
 
 

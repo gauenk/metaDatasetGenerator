@@ -58,12 +58,12 @@ def add_bbox_regression_targets(roidb):
         roidb[im_i]['bbox_targets'] = \
                 _compute_targets(rois, max_overlaps, max_classes)
 
-    if cfg.TRAIN.BBOX_NORMALIZE_TARGETS_PRECOMPUTED:
+    if cfg.TRAIN.OBJ_DET.BBOX_NORMALIZE_TARGETS_PRECOMPUTED:
         # Use fixed / precomputed "means" and "stds" instead of empirical values
         means = np.tile(
-                np.array(cfg.TRAIN.BBOX_NORMALIZE_MEANS), (num_classes, 1))
+                np.array(cfg.TRAIN.OBJ_DET.BBOX_NORMALIZE_MEANS), (num_classes, 1))
         stds = np.tile(
-                np.array(cfg.TRAIN.BBOX_NORMALIZE_STDS), (num_classes, 1))
+                np.array(cfg.TRAIN.OBJ_DET.BBOX_NORMALIZE_STDS), (num_classes, 1))
     else:
         # Compute values needed for means and stds
         # var(x) = E(x^2) - E(x)^2
@@ -91,7 +91,7 @@ def add_bbox_regression_targets(roidb):
     print stds[1:, :].mean(axis=0) # ignore bg class
 
     # Normalize targets
-    if cfg.TRAIN.BBOX_NORMALIZE_TARGETS:
+    if cfg.TRAIN.OBJ_DET.BBOX_NORMALIZE_TARGETS:
         print "Normalizing targets"
         for im_i in xrange(num_images):
             targets = roidb[im_i]['bbox_targets']
@@ -114,7 +114,7 @@ def _compute_targets(rois, overlaps, labels):
         # Bail if the image has no ground-truth ROIs
         return np.zeros((rois.shape[0], 5), dtype=np.float32)
     # Indices of examples for which we try to make predictions
-    ex_inds = np.where(overlaps >= cfg.TRAIN.BBOX_THRESH)[0]
+    ex_inds = np.where(overlaps >= cfg.TRAIN.OBJ_DET.BBOX_THRESH)[0]
 
     # Get IoU overlap between each ex ROI and gt ROI
     ex_gt_overlaps = bbox_overlaps(

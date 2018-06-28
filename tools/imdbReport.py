@@ -117,11 +117,10 @@ def get_bbox_info(roidb,size):
             actualSize += 1
             widths[idx] = box[2] - box[0]
             heights[idx] = box[3] - box[1]
-            # assert widths[idx] >= 0,"widths[{}] = {}".format(idx,widths[idx])
-            # assert heights[idx] >= 0
-            # areas[idx] = widths[idx] * heights[idx]
-            # idx += 1
-    print(actualSize)
+            assert widths[idx] >= 0,"widths[{}] = {}".format(idx,widths[idx])
+            assert heights[idx] >= 0
+            areas[idx] = widths[idx] * heights[idx]
+            idx += 1
     return areas,widths,heights
 
 def vis_dets(im, class_names, dets, _idx_, fn=None, thresh=0.5):
@@ -165,6 +164,21 @@ if __name__ == '__main__':
 
     imdb, roidb = get_roidb(args.imdb_name)
     numAnnos = imdb.roidb_num_bboxes_at(-1)
+
+    # HACK
+    for idx,sample in enumerate(roidb):
+        if idx == 11:
+            print(sample)
+            pyroidb = RoidbDataset([sample],[0,1,2,3,4,5,6,7],
+                                   loader=roidbSampleImageAndBox,
+                                   transform=pyroidbTransform_cropImageToBox)
+            idx = 0
+            for bimg,target in pyroidb:
+                fn = "saveForpaper_{}.png".format(idx)
+                cv2.imwrite(fn,bimg)                
+                idx += 1
+            break
+
     print("\n\n-=-=-=-=-=-=-=-=-\n\n")
 
     print("Report:\n\n")
@@ -192,8 +206,7 @@ if __name__ == '__main__':
     print("mixed datasets roidbsize")
     for size in [50,100,500,1000]:
        sizedRoidb,actualSize = imdb.get_roidb_at_size(size)
-       print("size: {}".format(size))
-       print_each_size(sizedRoidb)
+       print("@ anno-set-size: {} | num images {} | num annos {}".format(size,len(sizedRoidb),actualSize))
     print("-="*50)
 
     # issue: we are getting zeros area for 5343 of bboxes for pascal_voc_2007
@@ -210,6 +223,8 @@ if __name__ == '__main__':
                            transform=pyroidbTransform_cropImageToBox)
 
     # saveCaltechOneFromEach(roidb)
+    print(imdb._get_roidb_index_at_size(5000))
+    print(imdb.roidbSize[1000])
     if args.save:
         index = imdb._get_roidb_index_at_size(50)
         print("saving 30 imdb annotations to output folder...")        

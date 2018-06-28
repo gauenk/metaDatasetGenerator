@@ -129,12 +129,18 @@ class imdb(object):
 
     def shuffle_roidb(self):
         if self._roidb is not None:
-            npr.shuffle(self._roidb)
-            self._roidbSize = []
+            c = list(zip(self.roidb,self._image_index))
+            npr.shuffle(c)
+            self._roidb, self._image_index = zip(*c)
             self.compute_size_along_roidb()
 
     def compute_size_along_roidb(self):
         raise NotImplementedError
+
+    def resizeRoidbByAnnoSize(self,newSize):
+        self._roidb,_ = self.get_roidb_at_size(cfg.TRAIN.CLIP_SIZE)
+        self._image_index = self._image_index[:len(self._roidb)]
+        self.compute_size_along_roidb()
 
     def evaluate_detections(self, all_boxes, output_dir=None):
         """
@@ -155,7 +161,7 @@ class imdb(object):
         num_images = self.num_images
         widths = self._get_widths()
         for i in range(num_images):
-            boxes = self.roidb[i]['boxes'].copy()
+            boxes = self.roidb[i]['boxes'].copy().astype(np.int64)
             oldx1 = boxes[:, 0].copy()
             oldx2 = boxes[:, 2].copy()
             boxes[:, 0] = widths[i] - oldx2
@@ -165,6 +171,10 @@ class imdb(object):
             boxes[:, 0] = boxes[:, 0] * (boxes[:, 0] > 0)
             boxes[:, 2] = boxes[:, 2] * (boxes[:, 2] > 0)
 
+            if not (boxes[:, 2] >= boxes[:, 0]).all():
+                print(i)
+                print(self.roidb[i])
+                print(boxes)
             assert (boxes[:, 2] >= boxes[:, 0]).all()
             entry = {'boxes' : boxes,
                      'gt_overlaps' : self.roidb[i]['gt_overlaps'],

@@ -22,7 +22,6 @@ from utils.misc import *
 from ntd.ntd_utils import *
 from ntd.hog_svm import plot_confusion_matrix, extract_pyroidb_features,appendHOGtoRoidb,split_data, scale_data,train_SVM,findMaxRegions, make_confusion_matrix
 
-
 def parse_args():
     """
     Parse input arguments
@@ -48,10 +47,10 @@ def parse_args():
                         action='store_true')
     parser.add_argument('--modelRaw', dest='modelRaw',
                         help='give the path to a fit model',
-                        default=None, type=str)
+                        default=[], nargs='*', type=str)
     parser.add_argument('--modelCropped', dest='modelCropped',
-                        help='give the path to a fit model',
-                        default=None, type=str)
+                       help='give the path to a fit model',
+                        default=[], nargs='*', type=str)
 
     if len(sys.argv) == 1:
         parser.print_help()
@@ -77,8 +76,8 @@ if __name__ == '__main__':
     cfg.DEBUG = False
     cfg.uuid = str(uuid.uuid4())
     ntdGameInfo = {}
-    ntdGameInfo['trainSize'] = 10
-    ntdGameInfo['testSize'] = 10
+    ntdGameInfo['trainSize'] = 1000
+    ntdGameInfo['testSize'] = 1000
     ntdGameInfo['Raw'] = {}
     ntdGameInfo['Cropped'] = {}
     ntdGameInfo['Raw']['trainSize'] = 300
@@ -86,28 +85,57 @@ if __name__ == '__main__':
     ntdGameInfo['Cropped']['trainSize'] = 300
     ntdGameInfo['Cropped']['testSize'] = 300
 
+    modelParams = {}
+    modelParams['modelType'] = "dl"
+    modelParams['dl_arch'] = "vgg16"
+    modelParams['modelType'] = "svm"
 
     setID_l = args.setID
     repeat_l = args.repeat
     size_l = args.size
 
+    cmRaw_l = []
+    cmCropped_l = []
+    cmDiff_l = []
     for setID in setID_l:
         for repeat in repeat_l:
             for size in size_l:
+
+
                 ntdGameInfo['setID'] = setID
                 ntdGameInfo['repeat'] = repeat
                 ntdGameInfo['size'] = size
+                print("REAPEAT {}".format(repeat))
 
-                roidbTr,roidbTe = prepareMixedDataset(setID,repeat,size)
+                # force size to be 5000 so at least 1000 images are in each mixedset
+                # HACK
+                roidbTrDict,roidbTeDict,roidbTrDict1k,roidbTeDict1k,dsHasTest,annoSizes = prepareMixedDataset(setID,repeat,5000)
+                ntdGameInfo["dsHasTest"] = dsHasTest
+                print(dsHasTest)
+                print(annoSizes)
+
+
+                modelParams['modelFn'] = None
+                if len(args.modelRaw) > repeat: modelParams['modelFn'] = args.modelRaw[repeat]
+                roidbTr = flattenRoidbDict(roidbTrDict)
+                roidbTe = flattenRoidbDict(roidbTeDict)
                 print("roidb length of:\ntrain: {}\ntest: {}\n".format(len(roidbTr),len(roidbTe)))
-                cmRaw,modelRaw = genConfRaw(args.modelRaw, roidbTr, roidbTe, ntdGameInfo)
-                # cmCropped,modelCropped = genConfCropped(args.modelCropped, roidbTr, roidbTe, ntdGameInfo)
-                print(cmRaw)
-                cmCropped = cmRaw
-                cmDiff = cmRaw - cmCropped
+                cmRaw,modelRaw = genConfRaw(modelParams, roidbTr, roidbTe, ntdGameInfo)
 
+                modelParams['modelFn'] = None
+                if len(args.modelCropped) > repeat: modelParams['modelFn'] = args.modelCropped[repeat]
+                roidbTr = flattenRoidbDict(roidbTrDict1k)
+                roidbTe = flattenRoidbDict(roidbTeDict1k)
+                print("roidb length of:\ntrain: {}\ntest: {}\n".format(len(roidbTr),len(roidbTe)))
+                cmCropped,modelCropped = genConfCropped(modelParams, roidbTr, roidbTe, ntdGameInfo)
+
+                cmDiff = cmRaw - cmCropped
                 saveNtdConfMats(cmRaw,cmCropped,ntdGameInfo)
                 plotNtdConfMats(cmRaw,cmCropped,cmDiff,ntdGameInfo)
-    print("\n\n -=-=-=- uuid: {} -=-=-=- \n\n".format(cfg.uuid))
+                cmRaw_l.append(cmRaw)
+                cmCropped_l.append(cmCropped)
+                cmDiff_l.append(cmDiff)
 
+    saveNtdSummaryStats(cmRaw_l,cmCropped_l,cmDiff_l)
+    print("\n\n -=-=-=- uuid: {} -=-=-=- \n\n".format(cfg.uuid))
    

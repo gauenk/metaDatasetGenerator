@@ -63,6 +63,9 @@ __C.TRAIN = edict()
 __C.PATH_YMLDATASETS = "gauenk"
 __C.PATH_MIXTURE_DATASETS = "./data/mixtureDatasets/"
 
+# limit the number of annotations in a dataset
+cfg.TRAIN.CLIP_SIZE = None
+
 # Scales to use during training (can list multiple scales)
 # Each scale is the pixel size of an image's shortest side
 __C.TRAIN.SCALES = (600,)
@@ -73,7 +76,7 @@ __C.TRAIN.MAX_SIZE = 1000
 #__C.TRAIN.MAX_SIZE = 64
 
 # Images to use per minibatch
-__C.TRAIN.IMS_PER_BATCH = 2
+__C.TRAIN.IMS_PER_BATCH = 1
 
 # Use horizontally-flipped images during training?
 __C.TRAIN.USE_FLIPPED = False
@@ -270,7 +273,8 @@ __C.OBJ_DET.USE_GPU_NMS = True
 __C.OBJ_DET.BBOX_VERBOSE = True
 
 # The sizes used for creating the mixture datasets
-__C.MIXED_DATASET_SIZES = [10,100,1000]
+#__C.MIXED_DATASET_SIZES = [10,1000,5000]
+__C.MIXED_DATASET_SIZES = [50,1000,5000]
 
 # The size of the input for images cropped to their annotations
 __C.CROPPED_IMAGE_SIZE = 100
@@ -293,21 +297,27 @@ __C.PATH_TO_ANNO_ANALYSIS_OUTPUT = "./output/annoAnalysis/"
 # output for cross dataset generalization
 __C.PATH_TO_X_DATASET_GEN = "./output/xDatasetGen/"
 
+# bool for computing image statistics in rdl_load
+__C.COMPUTE_IMG_STATS = True
 
 
-def get_output_dir(imdb, net=None):
+
+def get_output_dir(imdb_name, net=None):
     """Return the directory where experimental artifacts are placed.
     If the directory does not exist, it is created.
 
     A canonical path is built using the name from an imdb and a network
     (if not None).
     """
-    outdir = osp.abspath(osp.join(__C.ROOT_DIR, 'output', __C.EXP_DIR, imdb.name))
+    if type(imdb_name) is not str:
+        imdb_name = imdb_name.name
+    outdir = osp.abspath(osp.join(__C.ROOT_DIR, 'output', __C.EXP_DIR, imdb_name))
     if net is not None:
         outdir = osp.join(outdir, net.name)
     if not os.path.exists(outdir):
         os.makedirs(outdir)
     return outdir
+
 
 def _merge_a_into_b(a, b):
     """Merge config dictionary a into config dictionary b, clobbering the
@@ -397,6 +407,8 @@ def createFilenameID(setID,r,size):
     return osp.join(cfg.PATH_MIXTURE_DATASETS,setID,r,size)
 
 def loadDatasetIndexDict():
+    # legacy
+    return __C.DATASET_NAMES_ORDERED
     fn = osp.join(__C.ROOT_DIR,"./lib/datasets/ymlConfigs",cfg.CONFIG_DATASET_INDEX_DICTIONARY_PATH)
     import yaml
     with open(fn, 'r') as f:
@@ -408,5 +420,5 @@ def loadDatasetIndexDict():
         indToCls.remove(None)
     return indToCls
 
-__C.clsToSet = loadDatasetIndexDict()
+__C.clsToSet = __C.DATASET_NAMES_ORDERED
 

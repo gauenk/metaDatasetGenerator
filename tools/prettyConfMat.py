@@ -100,14 +100,19 @@ if __name__ == '__main__':
             for size in size_l:
                 ntdGameInfo['setID'] = setID
                 ntdGameInfo['size'] = size
-                ntdGameInfo['repeat'] = repeat
+                ntdGameInfo['repeat'] = 222 # repeat
 
+                """
                 convMat_fn = "output/ntd/confMats_{}_{}_{}.pkl".format(setID,repeat,size)
                 convMat = pickle.load(open(convMat_fn,"rb"))
                 cmRaw = convMat['raw']
                 cmCropped = convMat['cropped']
+                """
+                cmRaw = np.array([31,19,10,1,21,13,5,0,18,21,21,2,12,20,4,1,23,12,23,1,17,18,5,1,0,0,0,100,0,0,0,0,11,9,8,0,61,7,2,1,15,15,16,1,13,33,4,4,2,0,1,0,3,1,92,0,12,6,6,2,3,4,3,65]).reshape(8,8)
+                cmCropped = np.array([20,14,18,9,8,12,8,11,12,20,20,8,9,14,7,11,16,19,19,8,10,13,7,9,8,8,8,49,6,6,8,8,8,10,10,4,42,12,5,8,19,16,15,7,8,17,7,11,12,8,11,18,9,7,26,9,11,13,12,9,14,11,9,21]).reshape(8,8)
                 cmDiff = cmRaw - cmCropped
                 plotNtdConfMats(cmRaw,cmCropped,cmDiff,ntdGameInfo)
+                sys.exit()
 
                 rawMats.append(cmRaw)
                 croppedMats.append(cmCropped)

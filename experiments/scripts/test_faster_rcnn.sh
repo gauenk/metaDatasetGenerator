@@ -118,7 +118,7 @@ else
     if [ "${DATASET}" == "pascal_voc_2012" ]; then
 	DATASET="pascal_voc"
     fi
-    DEF=models/${DATASET}/${NET}/faster_rcnn_end2end/test.prototxt
+    DEF=models/${DATASET}/${NET}/faster_rcnn_end2end/test_only_people.prototxt
 fi
 
 ./tools/test_net.py --gpu ${GPU_ID} \

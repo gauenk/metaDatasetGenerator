@@ -12,5 +12,5 @@ weight_decay: 0.0005
 # function
 snapshot: 0
 # We still use the snapshot prefix, though
-snapshot_prefix: "pascal_voc_0712"
+snapshot_prefix: "coco_0"
 iter_size: 2
