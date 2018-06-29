@@ -14,7 +14,7 @@ matplotlib.use("Agg")
 
 from core.config import cfg, cfg_from_file, cfg_from_list, get_output_dir, loadDatasetIndexDict,iconicImagesFileFormat
 from datasets.factory import get_repo_imdb
-from datasets.ds_utils import load_mixture_set,print_each_size,computeTotalAnnosFromAnnoCount,cropImageToAnnoRegion,roidbSampleHOG,roidbSampleImage
+from datasets.ds_utils import load_mixture_set,print_each_size,computeTotalAnnosFromAnnoCount,cropImageToAnnoRegion,roidbSampleHOG,roidbSampleImage,roidbSampleImageHOG
 import os.path as osp
 import datasets.imdb
 import argparse
@@ -25,7 +25,7 @@ import sys,os,cv2,pickle,uuid
 # pytorch imports
 from datasets.pytorch_roidb_loader import RoidbDataset
 from numpy import transpose as npt
-from ntd.hog_svm import plot_confusion_matrix, extract_pyroidb_features,appendHOGtoRoidb,split_data, scale_data,train_SVM,findMaxRegions, make_confusion_matrix
+from ntd.hog_svm import plot_confusion_matrix, extract_pyroidb_features,appendHOGtoRoidb,split_data, scale_data,train_SVM,findMaxRegions, make_confusion_matrix,appendHOGtoRoidbDict,split_tr_te_data
 from utils.misc import *
 
 def train_model(model, criterion, optimizer, scheduler, num_epochs=25):
@@ -121,7 +121,7 @@ def mangleTestingData(l_feat_te,l_idx_te,y_te,X_test,y_test,X_idx):
     "test" section of the mixed dataset from the "train" to the "test" features
 
     testIndex: the index from the 
-    yIndicies: a python dictionary; {"setID": list of indicies associated with the set}
+    yIndicies: a python dictionary; {"setID": list of indicies associated with the set; the indicies are the location of a sample from the set in the original testing set X_test}
        -> an element in the list gives index of the next "setID" in the current testing data
        ->
     l_feat_te: a list of hog features. 
@@ -151,89 +151,197 @@ def mangleTestingData(l_feat_te,l_idx_te,y_te,X_test,y_test,X_idx):
     dsIndicies = [ 0 for _ in range(len(l_idx_te)) ]
     for setID in y_te:
         if setID not in yIndicies.keys():
-            yIndicies[setID] = list(np.where(y_test == setID)[0])
+            yIndicies[setID] = list(np.where(y_test == setID)[0]) # find where the setID's are
             print("{}: {}".format(setID,len(yIndicies[setID])))
         if len(yIndicies[setID]) == 0: continue
-        dsIdx = dsIndicies[setID]
-        testIndex = yIndicies[setID][0]
-        X_test[testIndex] = l_feat_te[setID][dsIdx]
-        X_idx[testIndex] = {"idx":int(l_idx_te[setID][dsIdx]),"split":"test"}
-        dsIndicies[setID] += 1
-        yIndicies[setID].remove(testIndex)
+        dsIdx = dsIndicies[setID] # index for l_feat_te
+        testIndex = yIndicies[setID][0] # index for x_test
+        X_test[testIndex] = l_feat_te[setID][dsIdx] # replace sample content
+        X_idx[testIndex] = {"idx":int(l_idx_te[setID][dsIdx]),"split":"test"} # replace the lookup
+        dsIndicies[setID] += 1 # incriment
+        yIndicies[setID].remove(testIndex) # "incriment" index by removing element
     print(dsIndicies)
     
 def roidbToSVMData(roidbTr,roidbTe,train_size,test_size,loaderSettings):
-    l_feat_tr,l_idx_tr,y_tr = roidbToFeatures(roidbTr,pyloader=loaderSettings['pyloader'],
+    ds_feat_tr,l_idx_tr,y_tr = roidbToFeatures(roidbTr,pyloader=loaderSettings['pyloader'],
                                               calcHog=loaderSettings['calcHog'],
                                               roidbSizes=loaderSettings['roidbSizes'])
+    
+    """
     X_train, X_test, y_train, y_test, X_idx = split_data(train_size, test_size, \
                                                          l_feat_tr,l_idx_tr, y_tr,\
-                                                         cfg.clsToSet)
-    l_feat_te,l_idx_te,y_te = roidbToFeatures(roidbTe,pyloader=loaderSettings['pyloader'],
+                                                         loaderSettings['dsHasTest'])
+    """
+    ds_feat_te,l_idx_te,y_te = roidbToFeatures(roidbTe,pyloader=loaderSettings['pyloader'],
                                               calcHog=loaderSettings['calcHog'],
                                               roidbSizes=loaderSettings["roidbSizes"])
-    for idx,feat in enumerate(l_feat_tr):
-        print("{}: {}".format(idx,len(feat)))
-    for idx,feat in enumerate(l_feat_te):
-        print("{}: {}".format(idx,len(feat)))
+    X_train, X_test, y_train, y_test, testing_idx = split_tr_te_data(ds_feat_tr,l_idx_tr,y_tr,
+                                                                     ds_feat_te,l_idx_te,y_te,
+                                                                     train_size, test_size,
+                                                                     loaderSettings['dsHasTest'])
+
+    print("-=-=- training dataset counts -=-=-")
+    for idx,feat in enumerate(ds_feat_tr):
+        print("{}: {}, {}".format(cfg.DATASET_NAMES_ORDERED[idx],len(feat),np.sum(y_train==idx)))
+    print("-=-=- testing dataset counts -=-=-")
+    for idx,feat in enumerate(ds_feat_te):
+        print("{}: {}, {}".format(cfg.DATASET_NAMES_ORDERED[idx],len(feat),np.sum(y_test==idx)))
 
     # this is a work-around for the loading of a "testing" mixed dataset... overwrites the original split from the training data
 
-    #mangleTestingData(l_feat_te,l_idx_te,y_te,X_test,y_test,X_idx)
+    #mangleTestingData(l_feat_te,l_idx_te,y_te,X_test,y_test,testing_idx)
     X_train, X_test = scale_data(X_train, X_test)
     print(X_train.shape)
     print(y_train.shape)
-    return X_train, X_test, y_train, y_test, X_idx
+    if X_train.shape[0] != y_train.shape[0]:
+        raise ValueError("number of examples for x and y are different")
+    return X_train, X_test, y_train, y_test, testing_idx
         
-def prepareMixedDataset(setID,repeat,size):
+def prepareMixedDataset(setID,repeat,size,addHOG=True):
     mixedData = load_mixture_set(setID,repeat,size)
-    roidbTr,annoCountTr,roidbTe,annoCountTe = mixedData["train"][0],mixedData["train"][1],mixedData["test"][0],mixedData["test"][1]
-    printRoidbImageNamesToTextFile(roidbTr,"train_{}".format(setID))
-    printRoidbImageNamesToTextFile(roidbTe,"test_{}".format(setID))
-
+    roidbTrDict,annoCountTr,roidbTrDict1k = mixedData["train"][0],mixedData["train"][1],mixedData["train"][2]
+    roidbTeDict,annoCountTe,roidbTeDict1k = mixedData["test"][0],mixedData["test"][1],mixedData['test'][2]
+    printRoidbDictImageNamesToTextFile(roidbTrDict,"train_{}".format(setID))
+    printRoidbDictImageNamesToTextFile(roidbTeDict,"test_{}".format(setID))
+    # does the dataset have a "testing" split?
+    
+    dsHasTest = [ (i is not None) and (j is not None) for i,j in zip(annoCountTr[size],
+                                                                     annoCountTe[size]) ]
     # cropped hog image input
-    appendHOGtoRoidb(roidbTr)
-    appendHOGtoRoidb(roidbTe)
+    if addHOG:
+        appendHOGtoRoidbDict(roidbTrDict,size)
+        appendHOGtoRoidbDict(roidbTeDict,size)
+        appendHOGtoRoidbDict(roidbTrDict1k,1000)
+        appendHOGtoRoidbDict(roidbTeDict1k,1000)
 
-    print("annoCountTr: {}".format(annoCountTr))
-    print("annoCountTe: {}".format(annoCountTe))
-    print_report(roidbTr,annoCountTr,roidbTe,annoCountTe,setID,repeat,size)
+
+    print("annoCountTr: {}".format(annoCountTr[size]))
+    print("annoCountTe: {}".format(annoCountTe[size]))
+    # print_report(roidbTr,annoCountTr,roidbTe,annoCountTe,setID,repeat,size)
+    annoSizes = {}
+    annoSizes['train'] = annoCountTr
+    annoSizes['test'] = annoCountTe
 
     print("-="*50)
 
-    return roidbTr,roidbTe
+    return roidbTrDict,roidbTeDict,roidbTrDict1k,roidbTeDict1k,dsHasTest,annoSizes
 
-def loadModel(modelFn,modelStr,setID,repeat,size,X_train,y_train):
+def loadSvmModel(modelParams,dataType,setID,repeat,size,X_train,y_train):
+    modelFn = modelParams['modelFn']
     if modelFn is not None:
         model = pickle.load(open(modelFn,"rb"))
     else:
         model = train_SVM(X_train,y_train)
-        pickle.dump(model,open(iconicImagesFileFormat().format("model{}_{}_{}_{}.pkl".format(modelStr,setID,repeat,size)),"wb"))
+        fn = iconicImagesFileFormat().format("model{}_svm_{}_{}_{}.pkl".format(dataType,setID,repeat,size))
+        pickle.dump(model,open(fn,"wb"))
+        print(" saved model to {}".format(fn))
+        
     print("\n\n-=- model loaded -=-\n\n")
     return model
 
-def genConfCropped(modelFn,roidbTr,roidbTe,ntdGameInfo):
+def loadDlModel(modelParams,dataType,setID,repeat,size,X_train,y_train):
+    pass
+
+def genConfCropped(modelParams,roidbTr,roidbTe,ntdGameInfo):
     loaderSettings = {}
     loaderSettings['pyloader'] = roidbSampleHOG
     loaderSettings['calcHog'] = False
     loaderSettings['roidbSizes'] = None
-    return genConf(modelFn,"Cropped",roidbTr,roidbTe,loaderSettings,ntdGameInfo)
+    loaderSettings['dsHasTest'] = ntdGameInfo['dsHasTest'] # todo: kind of gross here
+    return genConf(modelParams,"Cropped",roidbTr,roidbTe,loaderSettings,ntdGameInfo)
 
-def genConfRaw(modelFn,roidbTr,roidbTe,ntdGameInfo):
+def genConfRaw(modelParams,roidbTr,roidbTe,ntdGameInfo):
     loaderSettings = {}
-    loaderSettings['pyloader'] = roidbSampleImage
-    loaderSettings['calcHog'] = True
+    loaderSettings['pyloader'] = roidbSampleImageHOG
+    loaderSettings['calcHog'] = False
     loaderSettings['roidbSizes'] = np.arange(len(roidbTr)) + 1
-    return genConf(modelFn,"Raw",roidbTr,roidbTe,loaderSettings,ntdGameInfo)
+    loaderSettings['dsHasTest'] = ntdGameInfo['dsHasTest'] # todo: kind of gross here
+    return genConf(modelParams,"Raw",roidbTr,roidbTe,loaderSettings,ntdGameInfo)
 
-def genConf(modelFn,modelStr,roidbTr,roidbTe,loaderSettings,ntdGameInfo):
-    X_train, X_test, y_train, y_test, X_idx = roidbToSVMData(roidbTr,roidbTe,\
+def genConfSVM(modelParams,dataType,roidbTr,roidbTe,loaderSettings,ntdGameInfo):
+    X_train, X_test, y_train, y_test, X_idx = roidbToSVMData(roidbTr,roidbTe,
                                                              ntdGameInfo['trainSize'],
                                                              ntdGameInfo['testSize'],
                                                              loaderSettings)
-    model = loadModel(modelFn,modelStr,ntdGameInfo['setID'],ntdGameInfo['repeat'],
+    model = loadSvmModel(modelParams,dataType,ntdGameInfo['setID'],ntdGameInfo['repeat'],
+                      ntdGameInfo['size'],X_train,y_train)
+    print(X_test.shape)
+    print(y_test.shape)
+    print("accuracy on test data {}".format(model.score(X_test,y_test)))
+    print(make_confusion_matrix(model, X_train, y_train, cfg.clsToSet))
+    print("-"*50)
+    return make_confusion_matrix(model, X_test, y_test, cfg.clsToSet),model
+
+def genConfDl(modelParams,dataType,roidbTr,roidbTe,loaderSettings,ntdGameInfo):
+    X_train, X_test, y_train, y_test, X_idx = roidbToDlData(roidbTr,roidbTe,
+                                                             ntdGameInfo['trainSize'],
+                                                             ntdGameInfo['testSize'],
+                                                             loaderSettings)
+    model = loadDlModel(modelParams,dataType,ntdGameInfo['setID'],ntdGameInfo['repeat'],
                       ntdGameInfo['size'],X_train,y_train)
     print("accuracy on test data {}".format(model.score(X_test,y_test)))
     return make_confusion_matrix(model, X_test, y_test, cfg.clsToSet),model
+
+def genConf(modelParams,dataType,roidbTr,roidbTe,loaderSettings,ntdGameInfo):
+    modelType = modelParams['modelType']
+    if modelType == "svm":
+        return genConfSVM(modelParams,dataType,roidbTr,roidbTe,loaderSettings,ntdGameInfo)
+    elif modelType == "dl":
+        return genConfDl(modelParams,dataType,roidbTr,roidbTe,loaderSettings,ntdGameInfo)
+    else:
+        print("Uknown model type of {}".format(modelType))
+    return None
+
+def saveNtdSummaryStats(cmRaw_l,cmCropped_l,cmDiff_l):
+
+    import scipy.stats as ss
+
+    cmRaw_l = np.array(cmRaw_l)
+    cmCropped_l = np.array(cmCropped_l)
+    cmDiff_l = np.array(cmDiff_l)
+
+    cmRaw_mean = np.mean(cmRaw_l,axis=0)
+    cmCropped_mean = np.mean(cmCropped_l,axis=0)
+    cmDiff_mean = np.mean(cmDiff_l,axis=0)
+
+    cmRaw_std = np.std(cmRaw_l,axis=0)
+    cmCropped_std = np.std(cmCropped_l,axis=0)
+    cmDiff_std = np.std(cmDiff_l,axis=0)
+
+    
+    paired_tTest_num = cmRaw_mean - cmCropped_mean
+    paired_tTest_denom = np.sqrt( (cmRaw_std**2 + cmCropped_std**2) / len(cmRaw_l) )
+    # we know it's two tailed, but computing as one is more efficient
+    t_values = np.abs(paired_tTest_num) / paired_tTest_denom
+    print(t_values)
+    p_values = ss.t.sf(t_values,len(cmRaw_l)-1)
+
+    def saveMat(fn,mat):
+        fid = open(iconicImagesFileFormat().format(fn),"wb")
+        pickle.dump(mat,fid)
+        fid.close()
+        
+    saveId_l = ["rawMean","rawStd","croppedMean","croppedStd","diffMean","diffStd","pValues"]
+    plotTitle_l = ["Raw Images","Raw Std", "Cropped Images", "Cropped Std","Raw - Cropped","Raw - Cropped (Std)", "P-Values"]
+    confMatStat = [cmRaw_mean,cmRaw_std,cmCropped_mean,cmCropped_std,cmDiff_mean,cmDiff_std,p_values]
+    for saveId,plotTitle,matStat in zip(saveId_l,plotTitle_l,confMatStat):
+        appendStr = "{}_{}".format(saveId,cfg.uuid)
+        pklFn = "ntd_stats_{}.pkl".format(appendStr)
+        saveMat(pklFn,matStat)
+        pathToPlot = osp.join(cfg.PATH_TO_NTD_OUTPUT, 'ntd_stats_{}.png'.format(appendStr))
+        plot_confusion_matrix(np.copy(matStat), cfg.clsToSet,
+                              pathToPlot, title=plotTitle,
+                              cmap = plt.cm.bwr_r,vmin=-100,vmax=100)
+    print(p_values)
+
+    
+    
+
+    
+
+
+
+
+
 
 

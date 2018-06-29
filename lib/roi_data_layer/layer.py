@@ -147,7 +147,7 @@ class RoIDataLayer(caffe.Layer):
         # timer.tic()
         blobs = self._get_next_minibatch()
         # print(timer.toc())
-        print(blobs['data'].shape)
+        # print(blobs['data'].shape)
 
         for blob_name, blob in blobs.iteritems():
             top_ind = self._name_to_top_map[blob_name]

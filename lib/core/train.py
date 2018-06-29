@@ -7,14 +7,15 @@
 
 """Train a Fast R-CNN network."""
 
-# import caffe
+import caffe
 from core.config import cfg
-import vae_data_layer.roidb as rdl_roidb
+import roi_data_layer.roidb as rdl_roidb
+import vae_data_layer.roidb as vae_rdl_roidb
 from utils.timer import Timer
 import numpy as np
 import os
 
-# from caffe.proto import caffe_pb2
+from caffe.proto import caffe_pb2
 import google.protobuf as pb2
 import google.protobuf.text_format
 
@@ -35,6 +36,12 @@ class SolverWrapper(object):
             # RPN can only use precomputed normalization because there are no
             # fixed statistics to compute a priori
             assert cfg.TRAIN.OBJ_DET.BBOX_NORMALIZE_TARGETS_PRECOMPUTED
+
+        if cfg.TRAIN.OBJ_DET.BBOX_REG:
+            print 'Computing bounding-box regression targets...'
+            self.bbox_means, self.bbox_stds = \
+                    rdl_roidb.add_bbox_regression_targets(roidb)
+            print 'done'
 
         self.solver = caffe.SGDSolver(solver_prototxt)
         
@@ -125,13 +132,19 @@ class SolverWrapper(object):
 
 def get_training_roidb(imdb):
     """Returns a roidb (Region of Interest database) for use in training."""
+    if cfg.TRAIN.CLIP_SIZE:
+        imdb.resizeRoidbByAnnoSize(cfg.TRAIN.CLIP_SIZE)
+
     if cfg.TRAIN.USE_FLIPPED:
         print('Appending horizontally-flipped training examples...')
         imdb.append_flipped_images() # 
         print('done')
 
     print('Preparing training data...')
-    rdl_roidb.prepare_roidb(imdb) # gets image sizes.. might be nice
+    if cfg.COMPUTE_IMG_STATS:
+        rdl_roidb.prepare_roidb(imdb) # gets image sizes.. might be nice
+    else:
+        vae_rdl_roidb.prepare_roidb(imdb)
     print('done')
 
     return imdb.roidb

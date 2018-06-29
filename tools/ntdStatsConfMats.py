@@ -1,13 +1,7 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
-"""
-Created on Tue Mar 13 21:32:08 2018
-
-@author: zkapach
-"""
 import matplotlib
 matplotlib.use("Agg")
-
 
 import _init_paths
 from core.train import get_training_roidb
@@ -24,8 +18,9 @@ import sys,os,cv2,pickle,uuid
 # pytorch imports
 from datasets.pytorch_roidb_loader import RoidbDataset
 from numpy import transpose as npt
-from ntd.hog_svm import plot_confusion_matrix, extract_pyroidb_features,appendHOGtoRoidb,split_data, scale_data,train_SVM,findMaxRegions, make_confusion_matrix
 from utils.misc import *
+from ntd.ntd_utils import *
+from ntd.hog_svm import plot_confusion_matrix, extract_pyroidb_features,appendHOGtoRoidb,split_data, scale_data,train_SVM,findMaxRegions, make_confusion_matrix
 
 def parse_args():
     """
@@ -52,10 +47,10 @@ def parse_args():
                         action='store_true')
     parser.add_argument('--modelRaw', dest='modelRaw',
                         help='give the path to a fit model',
-                        default=None, type=str)
+                        default=[], nargs='*', type=str)
     parser.add_argument('--modelCropped', dest='modelCropped',
-                        help='give the path to a fit model',
-                        default=None, type=str)
+                       help='give the path to a fit model',
+                        default=[], nargs='*', type=str)
 
     if len(sys.argv) == 1:
         parser.print_help()
@@ -64,8 +59,16 @@ def parse_args():
     args = parser.parse_args()
     return args
 
+def loadMat(fn):
+    print(iconicImagesFileFormat().format(fn))
+    fid = open(iconicImagesFileFormat().format(fn),"rb")
+    mats = pickle.load(fid)
+    fid.close()
+    return mats["raw"],mats["cropped"]
 
+    
 if __name__ == '__main__':
+    
     args = parse_args()
 
     print('Called with args:')
@@ -77,68 +80,49 @@ if __name__ == '__main__':
     print('Using config:')
     pprint.pprint(cfg)
 
-    ntdGameInfo = {}
-    ntdGameInfo['trainSize'] = 5
-    ntdGameInfo['testSize'] = 5
-
     cfg.DEBUG = False
     cfg.uuid = str(uuid.uuid4())
+    ntdGameInfo = {}
+    ntdGameInfo['trainSize'] = 1000
+    ntdGameInfo['testSize'] = 1000
+    ntdGameInfo['Raw'] = {}
+    ntdGameInfo['Cropped'] = {}
+    ntdGameInfo['Raw']['trainSize'] = 300
+    ntdGameInfo['Raw']['testSize'] = 300
+    ntdGameInfo['Cropped']['trainSize'] = 300
+    ntdGameInfo['Cropped']['testSize'] = 300
+
+    modelParams = {}
+    modelParams['modelType'] = "dl"
+    modelParams['dl_arch'] = "vgg16"
+    modelParams['modelType'] = "svm"
 
     setID_l = args.setID
     repeat_l = args.repeat
     size_l = args.size
-    assert len(setID_l) == 1 and len(size_l) == 1,\
-        "code only works for one size and size currently"
+    load_uuid = "b3381b04-66df-4430-97b3-22c0419a827f"
 
-    numEl = len(setID_l) * len(repeat_l) * len(size_l)
-    rawMats = []
-    croppedMats = []
-    diffMats = []
-
+    cmRaw_l = []
+    cmCropped_l = []
+    cmDiff_l = []
     for setID in setID_l:
         for repeat in repeat_l:
             for size in size_l:
+
+
                 ntdGameInfo['setID'] = setID
+                ntdGameInfo['repeat'] = repeat
                 ntdGameInfo['size'] = size
-                ntdGameInfo['repeat'] = 222 # repeat
-
-                """
-                convMat_fn = "output/ntd/confMats_{}_{}_{}.pkl".format(setID,repeat,size)
-                convMat = pickle.load(open(convMat_fn,"rb"))
-                cmRaw = convMat['raw']
-                cmCropped = convMat['cropped']
-                """
-                cmRaw = np.array([31,19,10,1,21,13,5,0,18,21,21,2,12,20,4,1,23,12,23,1,17,18,5,1,0,0,0,100,0,0,0,0,11,9,8,0,61,7,2,1,15,15,16,1,13,33,4,4,2,0,1,0,3,1,92,0,12,6,6,2,3,4,3,65]).reshape(8,8)
-                cmCropped = np.array([20,14,18,9,8,12,8,11,12,20,20,8,9,14,7,11,16,19,19,8,10,13,7,9,8,8,8,49,6,6,8,8,8,10,10,4,42,12,5,8,19,16,15,7,8,17,7,11,12,8,11,18,9,7,26,9,11,13,12,9,14,11,9,21]).reshape(8,8)
+                print("REAPEAT {}".format(repeat))
+                
+                matPkl = "confMats_{}_{}_{}_{}.pkl".format(setID,repeat,size,load_uuid)
+                cmRaw, cmCropped = loadMat(matPkl)
                 cmDiff = cmRaw - cmCropped
-                plotNtdConfMats(cmRaw,cmCropped,cmDiff,ntdGameInfo)
-                sys.exit()
 
-                rawMats.append(cmRaw)
-                croppedMats.append(cmCropped)
-                diffMats.append(cmDiff)
+                cmRaw_l.append(cmRaw)
+                cmCropped_l.append(cmCropped)
+                cmDiff_l.append(cmDiff)
 
-    ntdGameInfo['ave'] = len(rawMats)
-    ntdGameInfo['std'] = len(rawMats)
-
-    rawMatsAve = np.array(rawMats).mean(axis=0)
-    print(rawMatsAve.shape)
-    croppedMatsAve = np.array(croppedMats).mean(axis=0)
-    diffMatsAve = np.array(diffMats).mean(axis=0)
-
-    plotNtdConfMats(rawMatsAve,croppedMatsAve,diffMatsAve,ntdGameInfo,"ave")
-
-    rawMatsStd = np.array(rawMats).std(axis=0)
-    croppedMatsStd = np.array(croppedMats).std(axis=0)
-    diffMatsStd = np.array(diffMats).std(axis=0)
-
-    plotNtdConfMats(rawMatsStd,croppedMatsStd,diffMatsStd,ntdGameInfo,"std")
-
-    print(rawMatsAve.shape)
+    saveNtdSummaryStats(cmRaw_l,cmCropped_l,cmDiff_l)
     print("\n\n -=-=-=- uuid: {} -=-=-=- \n\n".format(cfg.uuid))
-
-    
-
-
-
-
+   

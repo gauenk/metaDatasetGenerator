@@ -1,10 +1,8 @@
 #!/bin/bash
 
 # ON KENT's PC
-# ./experiments/scripts/test_faster_rcnn.sh 0 VGG16 pascal_voc ~/Documents/ML/models/py-faster-rcnn/output/downloaded_pascal/VGG16_faster_rcnn_final.caffemodel
-
-set -x
-set -e
+# ./experiments/scripts/trainFrcnnModel.sh GPU NET DATASET CAFFEMODEL
+# ./experiments/scripts/trainFrcnnModel.sh 0 VGG16 pascal_voc ~/Documents/ML/models/py-faster-rcnn/output/downloaded_pascal/VGG16_faster_rcnn_final.caffemodel
 
 export PYTHONUNBUFFERED="True"
 
@@ -15,6 +13,18 @@ DATASET=$3
 NET_FINAL=$4
 CORG_DIR=$5
 VIS_DIR=$6
+PT_DIR=$DATASET
+
+# Usage:
+if [ "$DATASET" == "" ] || [ "$NET" == "" ] || [ "$DATASET" == "" ]
+then
+    echo "Usage: ./experiments/scripts/verifyDatasetLoad.sh GPU NET DATASET [CAFFEMODEL]"
+    echo "example: ./experiments/scripts/verifyDatasetLoad.sh 0 VGG16 pascal_voc"
+    exit 1
+fi
+
+set -x
+set -e
 
 array=( $@ )
 len=${#array[@]}
@@ -53,8 +63,8 @@ case $DATASET in
 	# This is a very long and slow training schedule
 	# You can probably use fewer iterations and reduce the
 	# time to the LR drop (set in the solver to 350,000 iterations).
-	TRAIN_IMDB="coco-train"
-	TEST_IMDB="coco-testdev2015"
+	TRAIN_IMDB="coco-train2014"
+	TEST_IMDB="coco-val2014"
 	PT_DIR="coco"
 	ITERS=490000
 	;;
@@ -99,34 +109,12 @@ case $DATASET in
 	;;
 esac
 
-# original command -- set here for testing with associated prototxt to caffemodel
-# ./tools/test_net.py --gpu ${GPU_ID} \
-# 		    --vis ${VIS_DIR} \
-#   --def models/${PT_DIR}/${NET}/faster_rcnn_end2end/test.prototxt \
-#   --net ${NET_FINAL} \
-#   --imdb ${TEST_IMDB} \
-#   --cfg experiments/cfgs/faster_rcnn_end2end.yml \
-#   ${EXTRA_ARGS}
-
-# CORG says: "The original model is trained on the loaded corg file."
-
-if [ "${CORG_DIR}" != "" ]; then
-    echo "corg"
-    DEF=models/${CORG_DIR}/${NET}/faster_rcnn_end2end/test_corg.prototxt
-else
-    echo "NOT corg"
-    if [ "${DATASET}" == "pascal_voc_2012" ]; then
-	DATASET="pascal_voc"
-    fi
-    DEF=models/${DATASET}/${NET}/faster_rcnn_end2end/test_only_people.prototxt
-fi
-
-./tools/test_net.py --gpu ${GPU_ID} \
-		    --vis ${VIS_DIR} \
-  --def ${DEF} \
-  --net ${NET_FINAL} \
-  --imdb ${TEST_IMDB}"-default" \
+./tools/train_net.py --gpu ${GPU_ID} \
+  --solver ./models/${NET}/faster_rcnn_end2end/solver.prototxt \
+  --weights data/faster_rcnn_models/downloaded_imagenet/${NET}.v2.caffemodel \
+  --imdb ${TRAIN_IMDB}"-default" \
+  --iters ${ITERS} \
   --cfg experiments/cfgs/faster_rcnn_end2end.yml \
+  --imdb_size 15000 \
   ${EXTRA_ARGS}
-  #--def models/imagenet/${NET}/faster_rcnn_end2end/test.prototxt \
-
+  #--solver ./models/${PT_DIR}/${NET}/faster_rcnn_end2end/solver.prototxt \

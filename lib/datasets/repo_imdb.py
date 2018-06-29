@@ -90,10 +90,11 @@ class RepoImdb(imdb):
         fn = osp.join(self._local_path,"ymlConfigs" ,self._configName + ".yml")
         with open(fn, 'r') as f:
             yaml_cfg = edict(yaml.load(f))
-        fn = osp.join(self._local_path,"ymlConfigs" ,
-                      yaml_cfg['CONFIG_DATASET_INDEX_DICTIONARY_PATH'])
-        with open(fn, 'r') as f:
-            setID = edict(yaml.load(f))[self._datasetName]
+        # fn = osp.join(self._local_path,"ymlConfigs" ,
+        #               yaml_cfg['CONFIG_DATASET_INDEX_DICTIONARY_PATH'])
+        # with open(fn, 'r') as f:
+        #     setID = edict(yaml.load(f))[self._datasetName]
+        setID = cfg.DATASET_NAMES_ORDERED.index(self._datasetName)
         self.config = {'cleanup'     : yaml_cfg['CONFIG_CLEANUP'],
                        'use_salt'    : yaml_cfg['CONFIG_USE_SALT'],
                        'use_diff'    : yaml_cfg['CONFIG_USE_DIFFICULT'],
@@ -225,14 +226,33 @@ class RepoImdb(imdb):
         print(cache_file)
         if osp.exists(cache_file):
             with open(cache_file, 'rb') as fid:
-                roidb = pickle.load(fid)
+                roidb_info = pickle.load(fid)
+                roidb = roidb_info["gt_roidb"]
+                filtered_image_index = roidb_info["fii"]
+                if filtered_image_index:
+                    print("loading a filtered imdb")
+                    self._image_index = list(filtered_image_index)
             print('{} gt roidb loaded from {}'.format(self.name, cache_file))
             return roidb
 
         gt_roidb = [self.load_annotation(index)
                     for index in self._image_index]
+
+        # filter samples with no bounding box annotations:
+        print("filtering empty samples from roidb")
+        toRemove = []
+        for idx,sample in enumerate(gt_roidb):
+            if len(sample['gt_classes']) == 0:
+                toRemove.append(idx)
+        numFiltered = len(toRemove)
+        filtered_image_index = list(self._image_index)
+        for idx in sorted(toRemove,reverse=True):
+            del gt_roidb[idx]
+            del filtered_image_index[idx]
+        print("filtered {} samples".format(numFiltered))
+        self._image_index = filtered_image_index
         with open(cache_file, 'wb') as fid:
-            pickle.dump(gt_roidb, fid)
+            pickle.dump({"gt_roidb":gt_roidb,"fii":filtered_image_index}, fid)
         print('wrote gt roidb to {}'.format(cache_file))
         return gt_roidb
 
@@ -251,9 +271,7 @@ class RepoImdb(imdb):
         if self.roidb is None:
             raise ValueError("roidb must be loaded before 'compute_size_along_roidb' can be run")
         self._roidbSize = []
-        self._roidbSize.append(np.sum(self.roidb[0]['gt_classes'] \
-                                   == self.classes.index("person")))
+        self._roidbSize.append(len(self.roidb[0]['gt_classes']))
         for image in self.roidb[1:]:
-            newSize = self._roidbSize[-1] + \
-                      np.sum(image['gt_classes'] == self.classes.index("person"))
+            newSize = self._roidbSize[-1] + len(image['gt_classes'])
             self._roidbSize.append(newSize)
