@@ -130,9 +130,6 @@ def plot_confusion_matrix(cm, classes, path_to_save,
                 }
 
     fig, ax = plt.subplots()
-
-    print(cm)
-
     
     # todo: uncomement below
     cm = cm * 100
@@ -299,7 +296,7 @@ def extract_pyroidb_features(pyroidb, feat_type, clsToSet, calc_feat = False, sp
                     print(img)
                 l_feat[target].extend(img)
             else:
-                l_feat[target].append(HOGFromImage(inputs))
+                l_feat[target].append(inputs)
             l_idx[target].append(i)
             y.append(target)
         except Exception as e:
@@ -385,11 +382,10 @@ def dealwithKittiQuickly(feats_tr,y_tr,feats_te,y_te,train_size,test_size,tr_idx
     yTr = []
     yTe = []
     idxTe = []
-    if totalSize < (train_size + test_size):
+    if True:
         # our actual case
-
-        xTr.append(feats_tr[:train_size])
-        trIdx = l_idx_tr[idx][:train_size]
+        xTr = feats_tr[:train_size]
+        trIdx = tr_idx[:train_size]
         yTr.extend(y_tr[trIdx])
 
         # we "break" if we have to do both....
@@ -397,18 +393,18 @@ def dealwithKittiQuickly(feats_tr,y_tr,feats_te,y_te,train_size,test_size,tr_idx
         # if addFromTest > 0:
         #     xTr.append(feats_te[:addFromTest])
 
-        xTe.append(feats_te[:test_size])
-        teIdx = l_idx_te[idx][:test_size]
+        xTe = list(feats_te[:test_size])
+        teIdx = te_idx[:test_size]
         yTe.extend(y_te[teIdx])
         idxTe.extend([{"idx":idx,"split":"test"} for idx in teIdx])
         addFromTrain = test_size - len(xTe)
         if addFromTrain > 0:
-            xTr.append(feats_tr[len(xTr):len(xTr)+addFromTest])
-            teIdx = l_idx_tr[idx][len(xTr):len(xTr)+addFromTest]
+            xTe.extend(feats_tr[len(xTr):len(xTr)+addFromTrain])
+            teIdx = tr_idx[len(xTr):len(xTr)+addFromTrain]
             yTe.extend(y_tr[teIdx])
             idxTe.extend([{"idx":idx,"split":"train"} for idx in teIdx])
         
-    return xTr,xTe,yTr,yTe,idxTe
+    return np.array(xTr),np.array(xTe),yTr,yTe,idxTe
     
 def split_tr_te_data(ds_feat_tr,l_idx_tr,y_tr,
                      ds_feat_te,l_idx_te,y_te,
@@ -433,42 +429,32 @@ def split_tr_te_data(ds_feat_tr,l_idx_tr,y_tr,
         feats_te = ds_feat_te[idx]
         if ds == "kitti":
 
+            print("Kiiti")
             x_tr_k,x_te_k,y_tr_k,y_te_k,te_idx_k = dealwithKittiQuickly(feats_tr,y_tr,
                                                                         feats_te,y_te,
                                                                         train_size,
                                                                         test_size,
-                                                                        l_idx_tr,l_idx_te)
-            print("kitti stats")
-            print(len(x_tr_k),len(x_tr_k[0]))
-            print(len(x_te_k),len(x_te_k[0]))
-            print(len(y_tr_k),len(y_tr_k[0]))
-            print(len(y_te_k),len(y_te_k[0]))
-            print(len(x_train))
-            print(len(x_test))
-            print(len(y_train))
-            print(len(y_test))
+                                                                        l_idx_tr[idx],
+                                                                        l_idx_te[idx])
             x_train.append(x_tr_k)
             x_test.append(x_te_k)
             y_train.extend(y_tr_k)
             y_test.extend(y_te_k)
             te_idx.extend(te_idx_k)
-            print(len(x_train))
-            print(len(x_test))
-            print(len(y_train))
-            print(len(y_test))
 
         elif not dsHasTest[idx]:
             ds_train_size = min(len(feats_tr)/2,train_size)
             ds_test_size = ds_train_size
-
             x_train.append(feats_tr[:ds_train_size])
             x_test.append(feats_tr[ds_train_size:ds_train_size+ds_test_size])
 
             trIdx = l_idx_tr[idx][:ds_train_size]
             teIdx = l_idx_tr[idx][ds_train_size:ds_train_size+ds_test_size]
 
+            print("{} has Train {} Test {}".format(ds,len(trIdx),
+                                                   len(teIdx)))
             y_train.extend(y_tr[trIdx])
-            y_test.extend(y_te[teIdx])
+            y_test.extend(y_tr[teIdx])
             te_idx.extend([{"idx":idx,"split":"train"} for idx in teIdx])
         else:
             ds_train_size = train_size

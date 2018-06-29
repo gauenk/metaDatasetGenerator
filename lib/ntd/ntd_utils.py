@@ -193,6 +193,8 @@ def roidbToSVMData(roidbTr,roidbTe,train_size,test_size,loaderSettings):
     X_train, X_test = scale_data(X_train, X_test)
     print(X_train.shape)
     print(y_train.shape)
+    if X_train.shape[0] != y_train.shape[0]:
+        raise ValueError("number of examples for x and y are different")
     return X_train, X_test, y_train, y_test, testing_idx
         
 def prepareMixedDataset(setID,repeat,size,addHOG=True):
@@ -309,29 +311,28 @@ def saveNtdSummaryStats(cmRaw_l,cmCropped_l,cmDiff_l):
     
     paired_tTest_num = cmRaw_mean - cmCropped_mean
     paired_tTest_denom = np.sqrt( (cmRaw_std**2 + cmCropped_std**2) / len(cmRaw_l) )
-    t_values = paired_tTest_num / paired_tTest_denom
+    # we know it's two tailed, but computing as one is more efficient
+    t_values = np.abs(paired_tTest_num) / paired_tTest_denom
+    print(t_values)
     p_values = ss.t.sf(t_values,len(cmRaw_l)-1)
 
     def saveMat(fn,mat):
         fid = open(iconicImagesFileFormat().format(fn),"wb")
-        pickle.dump({"raw":cmRaw,"cropped":cmCropped},fid)
+        pickle.dump(mat,fid)
         fid.close()
         
-    fn = "statSumm_{}_{}.pkl".format("rawMean",cfg.uuid)
-    saveMat(fn,cmRaw_mean)
-    fn = "statSumm_{}_{}.pkl".format("rawStd",cfg.uuid)
-    saveMat(fn,cmRaw_std)
-    fn = "statSumm_{}_{}.pkl".format("croppedMean",cfg.uuid)
-    saveMat(fn,cmCropped_mean)
-    fn = "statSumm_{}_{}.pkl".format("croppedStd",cfg.uuid)
-    saveMat(fn,cmCropped_std)
-    fn = "statSumm_{}_{}.pkl".format("diffMean",cfg.uuid)
-    saveMat(fn,cmDiff_mean)
-    fn = "statSumm_{}_{}.pkl".format("diffStd",cfg.uuid)
-    saveMat(fn,cmDiff_std)
-    fn = "statSumm_{}_{}.pkl".format("pValues",cfg.uuid)
+    saveId_l = ["rawMean","rawStd","croppedMean","croppedStd","diffMean","diffStd","pValues"]
+    plotTitle_l = ["Raw Images","Raw Std", "Cropped Images", "Cropped Std","Raw - Cropped","Raw - Cropped (Std)", "P-Values"]
+    confMatStat = [cmRaw_mean,cmRaw_std,cmCropped_mean,cmCropped_std,cmDiff_mean,cmDiff_std,p_values]
+    for saveId,plotTitle,matStat in zip(saveId_l,plotTitle_l,confMatStat):
+        appendStr = "{}_{}".format(saveId,cfg.uuid)
+        pklFn = "ntd_stats_{}.pkl".format(appendStr)
+        saveMat(pklFn,matStat)
+        pathToPlot = osp.join(cfg.PATH_TO_NTD_OUTPUT, 'ntd_stats_{}.png'.format(appendStr))
+        plot_confusion_matrix(np.copy(matStat), cfg.clsToSet,
+                              pathToPlot, title=plotTitle,
+                              cmap = plt.cm.bwr_r,vmin=-100,vmax=100)
     print(p_values)
-    saveMat(fn,p_values)
 
     
     
