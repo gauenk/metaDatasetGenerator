@@ -313,8 +313,8 @@ def test_net(net, imdb, max_per_image=100, thresh=1/80., vis=False):
         im = cv2.imread(imdb.image_path_at(i))
         _t['im_detect'].tic()
         scores, boxes, im_rotates = im_detect(net, im, box_proposals)
-        print("image id: {}".format(imdb.image_index[i]))
-        print_net_activiation_data(net,["data","conv1_2","rpn_cls_prob_reshape","rois"])
+        # print("image id: {}".format(imdb.image_index[i]))
+        # print_net_activiation_data(net,["data","conv1_2","rpn_cls_prob_reshape","rois"])
 
         if cfg._DEBUG.core.test: print(imdb.image_index[i])
         _t['im_detect'].toc()
