@@ -8,6 +8,8 @@ export PYTHONUNBUFFERED="True"
 
 GPU_ID=$1
 DATASET=$2
+SOLVER_STATE=$3
+WEIGHTS=$4
 PT_DIR=$DATASET
 
 # Usage:
@@ -104,12 +106,23 @@ case $DATASET in
 	;;
 esac
 
+if [ "$WEIGHTS" == "" ]
+then
+    WEIGHTS="None"
+fi
+if [ "$SOLVER_STATE" == "" ]
+then
+    SOLVER_STATE="None"
+fi
+ITERS=4000000
+
 ./tools/train_net.py --gpu ${GPU_ID} \
   --solver ./models/vae/full/solver.prototxt \
-  --solver_state ./vae_full_iter_16000.solverstate \
+  --weights ${WEIGHTS} \
   --imdb ${TRAIN_IMDB}"-default" \
   --iters ${ITERS} \
   --cfg experiments/cfgs/train_vae.yml \
   --imdb_size 15000 \
+  --solver_state ${SOLVER_STATE} \
   ${EXTRA_ARGS}
   #--solver ./models/${PT_DIR}/${NET}/faster_rcnn_end2end/solver.prototxt \

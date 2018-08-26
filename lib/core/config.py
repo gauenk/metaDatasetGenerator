@@ -45,7 +45,6 @@ __C.DATASETS.ANNOTATION_TYPE = ""
 __C.DATASETS.PARSE_ANNOTATION_REGEX = None
 __C.DATASETS.CONVERT_TO_PERSON = None
 __C.DATASETS.IMAGE_INDEX_TO_IMAGE_PATH = None
-__C.DATASETS.ONLY_PERSON = False
 __C.DATASETS.USE_IMAGE_SET = None
 __C.DATASETS.CONVERT_ID_TO_CLS_FILE = None
 __C.DATASETS.USE_IMAGE_SET = None
@@ -82,7 +81,7 @@ __C.TRAIN.IMS_PER_BATCH = 1
 __C.TRAIN.USE_FLIPPED = False
 
 # Iterations between snapshots
-__C.TRAIN.SNAPSHOT_ITERS = 500
+__C.TRAIN.SNAPSHOT_ITERS = 5000
 
 # solver.prototxt specifies the snapshot path prefix, this adds an optional
 # infix to yield the path: <prefix>[_<infix>]_iters_XYZ.caffemodel
@@ -164,6 +163,10 @@ __C.TRAIN.OBJ_DET.RPN_BBOX_INSIDE_WEIGHTS = (1.0, 1.0, 1.0, 1.0)
 # Set to -1.0 to use uniform example weighting
 __C.TRAIN.OBJ_DET.RPN_POSITIVE_WEIGHT = -1.0
 
+# VAE Options
+
+__C.TRAIN.VAE = edict()
+__C.TRAIN.VAE.BATCH_SIZE = __C.TRAIN.IMS_PER_BATCH
 
 #
 # Testing options
@@ -221,8 +224,23 @@ __C.DATASET_NAMES_ORDERED = ['coco', 'imagenet', 'pascal_voc', 'caltech', 'inria
 
 # For print statements
 __C.DEBUG = False
+__C._DEBUG = edict()
+__C._DEBUG.utils = edict()
+__C._DEBUG.utils.misc = False
+__C._DEBUG.core = edict()
+__C._DEBUG.core.config = False
+__C._DEBUG.core.test = False
+__C._DEBUG.datasets = edict()
+__C._DEBUG.datasets.repo_imdb = False
+__C._DEBUG.datasets.evaluators = edict()
+__C._DEBUG.datasets.evaluators.bbox_utils = False
+__C._DEBUG.datasets.evaluators.bboxEvaluator = False
+__C._DEBUG.datasets.repo_imdb = False
+__C._DEBUG.rpn = edict()
+__C._DEBUG.rpn.proposal_layer = False
 
-# Pixel mean values (BGR order) as a (1, 1, 3) array
+
+# pixel mean values (BGR order) as a (1, 1, 3) array
 # We use the same pixel mean for all networks even though it's not exactly what
 # they were trained with
 __C.PIXEL_MEANS = np.array([[[102.9801, 115.9465, 122.7717]]])
@@ -300,7 +318,11 @@ __C.PATH_TO_X_DATASET_GEN = "./output/xDatasetGen/"
 # bool for computing image statistics in rdl_load
 __C.COMPUTE_IMG_STATS = True
 
+# how much should we rotate each image?
+__C.ROTATE_IMAGE = 0
 
+# should we write the results?
+__C.WRITE_RESULTS = True
 
 def get_output_dir(imdb_name, net=None):
     """Return the directory where experimental artifacts are placed.

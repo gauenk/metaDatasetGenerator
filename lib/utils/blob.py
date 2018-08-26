@@ -43,3 +43,20 @@ def prep_im_for_blob(im, pixel_means, target_size, max_size):
                     interpolation=cv2.INTER_LINEAR)
 
     return im, im_scale
+
+def prep_im_for_vae_blob(im, pixel_means, target_size, max_size):
+    # disregard the asepct ratio
+    # assume target size for all axis
+    """Mean subtract and scale an image for use in a blob."""
+    im = im.astype(np.float32, copy=False)
+    im -= pixel_means
+    im_shape = im.shape
+    im_scale = [0,0]
+    im_scale[0] = float(target_size) / float(im_shape[0])
+    im_scale[0] = float(target_size) / float(im_shape[1])
+
+    im = cv2.resize(im, (target_size,target_size),
+                    interpolation=cv2.INTER_LINEAR)
+
+    return im, im_scale
+

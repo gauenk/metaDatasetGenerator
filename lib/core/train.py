@@ -114,6 +114,7 @@ class SolverWrapper(object):
         last_snapshot_iter = -1
         timer = Timer()
         model_paths = []
+        print(self.solver.iter,max_iters)
         while self.solver.iter < max_iters:
             # Make one SGD update
             timer.tic()
@@ -132,6 +133,8 @@ class SolverWrapper(object):
 
 def get_training_roidb(imdb):
     """Returns a roidb (Region of Interest database) for use in training."""
+    _ = imdb.roidb # initially load the roidb
+
     if cfg.TRAIN.CLIP_SIZE:
         imdb.resizeRoidbByAnnoSize(cfg.TRAIN.CLIP_SIZE)
 
@@ -174,7 +177,7 @@ def filter_roidb(roidb):
     return filtered_roidb
 
 def train_net(solver_prototxt, roidb, output_dir,
-              pretrained_model=None, solver_state=None, max_iters=40000):
+              pretrained_model=None, solver_state=None, max_iters=400000):
     """Train *any* object detection network."""
 
     #roidb = filter_roidb(roidb)

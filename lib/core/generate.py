@@ -26,12 +26,13 @@ class GenerateWrapper(object):
     use to unnormalize the learned bounding-box regression weights.
     """
 
-    def __init__(self, net, output_dir):
+    def __init__(self, net, output_dir, output_size):
         """Initialize the SolverWrapper."""
         self.output_dir = output_dir
         self.net = net
         self.current_sample_count = 0
         self.display = 2
+        self.output_size = output_size
 
     def save_sample_set(self,imgs):
         for i in range(imgs.shape[0]):
@@ -67,7 +68,8 @@ class GenerateWrapper(object):
             
             blobs_out = self.net.forward()
             BATCH_SIZE = blobs_out["decode1neuron"].shape[0]
-            imgs = blobs_out["decode1neuron"].reshape(BATCH_SIZE,30,30,3) * 255
+            imgs = blobs_out["decode1neuron"].reshape(BATCH_SIZE,self.output_size,
+                                                      self.output_size,3) * 255
             self.save_sample_set(imgs)
             timer.toc()
             if self.current_sample_count % (10 * self.display) == 0:
@@ -75,10 +77,10 @@ class GenerateWrapper(object):
 
         return model_paths
 
-def generate_from_net(net, output_dir, numberOfSamples=10):
+def generate_from_net(net, output_dir, output_size = 100, numberOfSamples=10):
     """Train *any* object detection network."""
 
-    gw = GenerateWrapper(net,output_dir)
+    gw = GenerateWrapper(net, output_dir, output_size)
     print('Generating...')
     model_paths = gw.generate(numberOfSamples)
     print('done generating')

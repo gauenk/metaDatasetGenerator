@@ -12,5 +12,5 @@ weight_decay: 0.005
 # function
 snapshot: 0
 # We still use the snapshot prefix, though
-snapshot_prefix: "vae_full"
+snapshot_prefix: "vae_full_size_100"
 iter_size: 2

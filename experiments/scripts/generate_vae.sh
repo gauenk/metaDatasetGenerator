@@ -9,12 +9,9 @@ set -e
 export PYTHONUNBUFFERED="True"
 
 GPU_ID=$1
-NET=$2
-NET_lc=${NET,,}
-DATASET=$3
-NET_FINAL=$4
-CORG_DIR=$5
-VIS_DIR=$6
+DATASET=$2
+NET_FINAL=$3
+VIS_DIR=$5
 
 array=( $@ )
 len=${#array[@]}

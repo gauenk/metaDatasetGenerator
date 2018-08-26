@@ -3,6 +3,8 @@
 # ON KENT's PC
 # ./experiments/scripts/test_faster_rcnn.sh 0 VGG16 pascal_voc ~/Documents/ML/models/py-faster-rcnn/output/downloaded_pascal/VGG16_faster_rcnn_final.caffemodel
 
+outputFile="./output/faster_rcnn/rotation.txt"
+
 set -x
 set -e
 
@@ -33,7 +35,8 @@ case $DATASET in
 	;;
     pascal_voc)
 	TRAIN_IMDB="pascal_voc-trainval"
-	TEST_IMDB="pascal_voc-minival"
+	#TEST_IMDB="pascal_voc-test"
+	TEST_IMDB="pascal_voc-vshort"
 	PT_DIR="pascal_voc"
 	ITERS=120000
 	;;
@@ -54,8 +57,7 @@ case $DATASET in
 	# You can probably use fewer iterations and reduce the
 	# time to the LR drop (set in the solver to 350,000 iterations).
 	TRAIN_IMDB="coco-train"
-	#TEST_IMDB="coco-testdev2015"
-	TEST_IMDB="coco-minival2014"
+	TEST_IMDB="coco-testdev2015"
 	PT_DIR="coco"
 	ITERS=490000
 	;;
@@ -122,12 +124,37 @@ else
     DEF=models/${DATASET}/${NET}/faster_rcnn_end2end/test_only_people.prototxt
 fi
 
-./tools/test_net.py --gpu ${GPU_ID} \
-		    --vis ${VIS_DIR} \
-  --def ${DEF} \
-  --net ${NET_FINAL} \
-  --imdb ${TEST_IMDB}"-default" \
-  --cfg experiments/cfgs/faster_rcnn_end2end.yml \
-  ${EXTRA_ARGS}
-  #--def models/imagenet/${NET}/faster_rcnn_end2end/test.prototxt \
+
+ROTATION=(0 5 10 15 20 25 30 35 40 45 50 55 60 65 70 75 80 85 90)
+#ROTATION=(5 10 15 20 25 30 35 40 45 50 55 60 65 70 75 80 85 90)
+for i in "${ROTATION[@]}"
+do
+    echo "TESTING FOR ROTATION @ "$i
+    ./tools/test_net.py --gpu ${GPU_ID} \
+			--vis ${VIS_DIR} \
+			--def ${DEF} \
+			--net ${NET_FINAL} \
+			--imdb ${TEST_IMDB}"-default" \
+			--cfg experiments/cfgs/faster_rcnn_end2end.yml \
+			--rotate $i
+done
+
+
+set +x
+set +e
+
+#rm $outputFile
+
+for i in "${ROTATION[@]}"
+do
+    if [ "$i" == "0" ]
+    then
+	continue
+    fi
+    fn=($(ls | grep "results_faster-rcnn_${i}_${PT_DIR}*"))
+    value=$(head -n2 $fn | tail -n1 | cut -d':' -f2 | cut -d'	' -f2 | sed -e 's/\s*//g')
+    echo $value $i >> $outputFile
+done
+
+gnuplot -c ./experiments/scripts/line.gp "$outputFile" 0
 

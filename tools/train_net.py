@@ -1,12 +1,5 @@
 #!/usr/bin/env python
 
-# --------------------------------------------------------
-# Img2Vec
-# Copyright (c) 2018 GTINC
-# Licensed under The MIT License [see LICENSE for details]
-# Written by Kent Gauen
-# --------------------------------------------------------
-
 """Train an Img2Vec network on a "region of interest" database."""
 
 import _init_paths
@@ -34,7 +27,7 @@ def parse_args():
                         default=None, type=str)
     parser.add_argument('--iters', dest='max_iters',
                         help='number of iterations to train',
-                        default=40000, type=int)
+                        default=400000, type=int)
     parser.add_argument('--weights', dest='pretrained_model',
                         help='initialize with pretrained model weights',
                         default=None, type=str)
@@ -59,6 +52,9 @@ def parse_args():
     parser.add_argument('--set', dest='set_cfgs',
                         help='set config keys', default=None,
                         nargs=argparse.REMAINDER)
+    parser.add_argument('--solver_state', dest='solver_state',
+                        help='initialize with a previous solver state',
+                        default=None, type=str)
 
     # mixed dataset parameters
     parser.add_argument('--setID', dest='setID',
@@ -150,11 +146,14 @@ if __name__ == '__main__':
     print(args)
 
     if args.cfg_file is not None:
+        print("SET CFG FILE")
         cfg_from_file(args.cfg_file)
     if args.set_cfgs is not None:
         cfg_from_list(args.set_cfgs)
 
     cfg.GPU_ID = args.gpu_id
+    if args.solver_state == "None": args.solver_state = None
+    if args.pretrained_model == "None": args.pretrained_model = None
 
     print('Using config:')
     pprint.pprint(cfg)
@@ -189,6 +188,7 @@ if __name__ == '__main__':
     print '{:d} roidb entries'.format(len(roidb))
     print 'Output will be saved to `{:s}`'.format(output_dir)
     train_net(args.solver, roidb, output_dir,
+              solver_state=args.solver_state,
               pretrained_model=args.pretrained_model,
               max_iters=args.max_iters)
     

@@ -1,26 +1,18 @@
 #!/bin/bash
+# Usage:
+# ./experiments/scripts/rotGtBaseline.sh
 
-# ON KENT's PC
-# ./experiments/scripts/test_faster_rcnn.sh 0 VGG16 pascal_voc ~/Documents/ML/models/py-faster-rcnn/output/downloaded_pascal/VGG16_faster_rcnn_final.caffemodel
+echo "This script generates a baseline accuracury for rotating an image."
+
+outputFile="./output/faster_rcnn/rotGtBaseline.txt"
+rm $outputFile
 
 set -x
 set -e
 
 export PYTHONUNBUFFERED="True"
 
-GPU_ID=$1
-NET=$2
-NET_lc=${NET,,}
-DATASET=$3
-NET_FINAL=$4
-CORG_DIR=$5
-VIS_DIR=$6
-
-array=( $@ )
-len=${#array[@]}
-EXTRA_ARGS=${array[@]:6:$len}
-EXTRA_ARGS_SLUG=${EXTRA_ARGS// /_}
-
+DATASET=$1
 
 case $DATASET in
     imagenet)
@@ -33,7 +25,8 @@ case $DATASET in
 	;;
     pascal_voc)
 	TRAIN_IMDB="pascal_voc-trainval"
-	TEST_IMDB="pascal_voc-minival"
+	#TEST_IMDB="pascal_voc-test"
+	TEST_IMDB="pascal_voc-vshort"
 	PT_DIR="pascal_voc"
 	ITERS=120000
 	;;
@@ -54,8 +47,7 @@ case $DATASET in
 	# You can probably use fewer iterations and reduce the
 	# time to the LR drop (set in the solver to 350,000 iterations).
 	TRAIN_IMDB="coco-train"
-	#TEST_IMDB="coco-testdev2015"
-	TEST_IMDB="coco-minival2014"
+	TEST_IMDB="coco-testdev2015"
 	PT_DIR="coco"
 	ITERS=490000
 	;;
@@ -100,34 +92,20 @@ case $DATASET in
 	;;
 esac
 
-# original command -- set here for testing with associated prototxt to caffemodel
-# ./tools/test_net.py --gpu ${GPU_ID} \
-# 		    --vis ${VIS_DIR} \
-#   --def models/${PT_DIR}/${NET}/faster_rcnn_end2end/test.prototxt \
-#   --net ${NET_FINAL} \
-#   --imdb ${TEST_IMDB} \
-#   --cfg experiments/cfgs/faster_rcnn_end2end.yml \
-#   ${EXTRA_ARGS}
+ROTATION=(0 5 10 15 20 25 30 35 40 45 50 55 60 65 70 75 80 85 90)
 
-# CORG says: "The original model is trained on the loaded corg file."
+#ROTATION=(0 15 30 45 60 75 90)
+for i in "${ROTATION[@]}"
+do
+    echo "TESTING FOR ROTATION @ "$i
+    ./tools/reval.py --imdb "$TEST_IMDB"-default ./output/faster_rcnn_end2end/pascal_voc/pascal_voc_2012_iter_70000/ --gt --rot $i
 
-if [ "${CORG_DIR}" != "" ]; then
-    echo "corg"
-    DEF=models/${CORG_DIR}/${NET}/faster_rcnn_end2end/test_corg.prototxt
-else
-    echo "NOT corg"
-    if [ "${DATASET}" == "pascal_voc_2012" ]; then
-	DATASET="pascal_voc"
-    fi
-    DEF=models/${DATASET}/${NET}/faster_rcnn_end2end/test_only_people.prototxt
-fi
+done
 
-./tools/test_net.py --gpu ${GPU_ID} \
-		    --vis ${VIS_DIR} \
-  --def ${DEF} \
-  --net ${NET_FINAL} \
-  --imdb ${TEST_IMDB}"-default" \
-  --cfg experiments/cfgs/faster_rcnn_end2end.yml \
-  ${EXTRA_ARGS}
-  #--def models/imagenet/${NET}/faster_rcnn_end2end/test.prototxt \
 
+for i in "${ROTATION[@]}"
+do
+    fn=($(ls | grep "results_faster-rcnn_${i}_${PT_DIR}*"))
+    value=$(head -n2 $fn | tail -n1 | cut -d':' -f2 | cut -d'	' -f2 | sed -e 's/\s*//g')
+    echo $value $i >> $outputFile
+done

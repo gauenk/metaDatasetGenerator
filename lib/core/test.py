@@ -11,6 +11,7 @@ from core.config import cfg, get_output_dir
 from fast_rcnn.bbox_transform import clip_boxes, bbox_transform_inv
 import argparse
 from utils.timer import Timer
+from utils.misc import getRotationScale,toRadians,getRotationInfo,print_net_activiation_data
 import numpy as np
 import cv2
 import caffe
@@ -39,6 +40,7 @@ def _get_image_blob(im):
 
     processed_ims = []
     im_scale_factors = []
+    im_rotate_factors = []
 
     for target_size in cfg.TEST.SCALES:
         im_scale_x = float(target_size) / float(im_size_min)
@@ -54,16 +56,27 @@ def _get_image_blob(im):
         
         im = cv2.resize(im_orig, None, None, fx=im_scale_x, fy=im_scale_y,
                         interpolation=cv2.INTER_LINEAR)
+        M = None
+        if cfg._DEBUG.core.test: print("[pre-process] im.shape",im.shape)
+        if cfg.ROTATE_IMAGE != -1:
+        #if cfg.ROTATE_IMAGE !=  0:
+            rows,cols = im.shape[:2]
+            if cfg._DEBUG.core.test: print("cols,rows",cols,rows)
+            rotationMat, scale = getRotationInfo(cfg.ROTATE_IMAGE,cols,rows)
+            im = cv2.warpAffine(im,rotationMat,(cols,rows),scale)
+            im_rotate_factors.append([cfg.ROTATE_IMAGE,cols,rows])
         if cfg.SSD == True:
             im_scale_factors.append([im_scale_x,im_scale_y])
         else:
             im_scale_factors.append(im_scale_x)
+        if cfg._DEBUG.core.test: print("[post-process] im.shape",im.shape)
         processed_ims.append(im)
 
     # Create a blob to hold the input images
     blob = im_list_to_blob(processed_ims)
 
-    return blob, np.array(im_scale_factors)
+    return blob, np.array(im_scale_factors),im_rotate_factors
+
 
 def _get_rois_blob(im_rois, im_scale_factors):
     """Converts RoIs into network inputs.
@@ -110,10 +123,10 @@ def _project_im_rois(im_rois, scales):
 def _get_blobs(im, rois):
     """Convert an image and RoIs within that image into network inputs."""
     blobs = {'data' : None, 'rois' : None}
-    blobs['data'], im_scale_factors = _get_image_blob(im)
+    blobs['data'], im_scale_factors,im_rotate_factors = _get_image_blob(im)
     if not cfg.TEST.OBJ_DET.HAS_RPN:
         blobs['rois'] = _get_rois_blob(rois, im_scale_factors)
-    return blobs, im_scale_factors
+    return blobs, im_scale_factors,im_rotate_factors
 
 def im_detect(net, im, boxes=None):
     """Detect object classes in an image given object proposals.
@@ -128,7 +141,8 @@ def im_detect(net, im, boxes=None):
             background as object category 0)
         boxes (ndarray): R x (4*K) array of predicted bounding boxes
     """
-    blobs, im_scales = _get_blobs(im, boxes)
+    if cfg._DEBUG.core.test: print("im.shape",im.shape)
+    blobs, im_scales, im_rotates = _get_blobs(im, boxes)
 
     # When mapping from image ROIs to feature map ROIs, there's some aliasing
     # (some distinct image ROIs get mapped to the same feature ROI).
@@ -212,7 +226,17 @@ def im_detect(net, im, boxes=None):
         scores = scores[inv_index, :]
         pred_boxes = pred_boxes[inv_index, :]
 
-    return scores, pred_boxes
+    # we don't want to fix the original image orientation since the bboxes
+    # are predicted for the rotated version. instead we correct this issue
+    # by rotating the groundtruth
+    # # rotate boxes back to the original image orientation...
+    # if cfg.ROTATE_IMAGE:
+    #     # i think it's just one right now...
+    #     M = im_rotates[0]
+    #     Minv = cv2.invertAffineTransform(M)
+    # print(pred_boxes.shape)
+
+    return scores, pred_boxes, im_rotates
 
 def vis_detections(im, class_name, dets, thresh=0.3):
     """Visual debugging of detections."""
@@ -272,6 +296,8 @@ def test_net(net, imdb, max_per_image=100, thresh=1/80., vis=False):
     if not cfg.TEST.OBJ_DET.HAS_RPN:
         roidb = imdb.roidb
 
+    im_rotates_all = dict.fromkeys(imdb.image_index)
+
     for i in xrange(num_images):
         # filter out any ground truth boxes
         if cfg.TEST.OBJ_DET.HAS_RPN:
@@ -286,11 +312,17 @@ def test_net(net, imdb, max_per_image=100, thresh=1/80., vis=False):
 
         im = cv2.imread(imdb.image_path_at(i))
         _t['im_detect'].tic()
-        scores, boxes = im_detect(net, im, box_proposals)
+        scores, boxes, im_rotates = im_detect(net, im, box_proposals)
+        print("image id: {}".format(imdb.image_index[i]))
+        print_net_activiation_data(net,["data","conv1_2","rpn_cls_prob_reshape","rois"])
+
+        if cfg._DEBUG.core.test: print(imdb.image_index[i])
         _t['im_detect'].toc()
 
         _t['misc'].tic()
         # skip j = 0, because it's the background class
+        im_rotates_all[imdb.image_index_at(i)] = im_rotates
+
         for j in xrange(1, imdb.num_classes):
             inds = np.where(scores[:, j] > thresh)[0]
             cls_scores = scores[inds, j]
@@ -314,23 +346,27 @@ def test_net(net, imdb, max_per_image=100, thresh=1/80., vis=False):
                     all_boxes[j][i] = all_boxes[j][i][keep, :]
         _t['misc'].toc()
 
-        print 'im_detect: {:d}/{:d} {:.3f}s {:.3f}s' \
-              .format(i + 1, num_images, _t['im_detect'].average_time,
-                      _t['misc'].average_time)
+        # print 'im_detect: {:d}/{:d} {:.3f}s {:.3f}s' \
+        #       .format(i + 1, num_images, _t['im_detect'].average_time,
+        #               _t['misc'].average_time)
+
+    detection_object = {}
+    detection_object["all_boxes"] = all_boxes
+    detection_object["im_rotates_all"] = im_rotates_all
 
     det_file = os.path.join(output_dir, 'detections.pkl')
     print(det_file)
     with open(det_file, 'wb') as f:
-        cPickle.dump(all_boxes, f, cPickle.HIGHEST_PROTOCOL)
+        cPickle.dump(detection_object, f, cPickle.HIGHEST_PROTOCOL)
 
-    print(len(all_boxes))
-    for i in range(len(all_boxes)):
-        n = 0
-        for j in range(len(all_boxes[i])):
-            n += len(all_boxes[i][j])
-        print("{}: {}".format(i,n))
+    # print(len(all_boxes))
+    # for i in range(len(all_boxes)):
+    #     n = 0
+    #     for j in range(len(all_boxes[i])):
+    #         n += len(all_boxes[i][j])
+    #     print("{}: {}".format(i,n))
 
     #return all_boxes,output_dir
     print 'Evaluating detections'
-    imdb.evaluate_detections(all_boxes, output_dir)
+    imdb.evaluate_detections(detection_object, output_dir)
     

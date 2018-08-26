@@ -4,6 +4,10 @@
 
 """Test an object detection network on an image database."""
 
+import matplotlib
+matplotlib.use('Agg')
+import matplotlib.pyplot as plt
+
 import _init_paths
 from core.test import test_net
 from core.config import cfg, cfg_from_file, cfg_from_list
@@ -12,10 +16,6 @@ import caffe
 import argparse
 import pprint
 import time, os, sys
-
-import matplotlib
-matplotlib.use('Agg')
-import matplotlib.pyplot as plt
 
 
 def parse_args():
@@ -49,6 +49,9 @@ def parse_args():
     parser.add_argument('--num_dets', dest='max_per_image',
                         help='max number of detections per image',
                         default=100, type=int)
+    parser.add_argument('--rotate', dest='rotate',
+                        help='how much should we rotate each image?',
+                        default=0, type=int)
 
     if len(sys.argv) == 1:
         parser.print_help()
@@ -69,6 +72,7 @@ if __name__ == '__main__':
         cfg_from_list(args.set_cfgs)
 
     cfg.GPU_ID = args.gpu_id
+    cfg.ROTATE_IMAGE = args.rotate
 
     print('Using config:')
     pprint.pprint(cfg)

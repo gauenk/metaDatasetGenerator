@@ -24,7 +24,7 @@ import pprint
 import numpy as np
 import numpy.random as npr
 import sys,os,cv2,uuid
-from anno_analysis.metrics import annotationDensityPlot,plotDensityPlot
+from anno_analysis.metrics import annotationDensityPlot,plotDensityPlot,computeAnnoMapListEntropy
 
 # pytorch imports
 from datasets.pytorch_roidb_loader import RoidbDataset
@@ -165,6 +165,7 @@ if __name__ == '__main__':
     imdb, roidb = get_roidb(args.imdb_name)
     numAnnos = imdb.roidb_num_bboxes_at(-1)
 
+    """
     # HACK
     for idx,sample in enumerate(roidb):
         if idx == 11:
@@ -178,6 +179,7 @@ if __name__ == '__main__':
                 cv2.imwrite(fn,bimg)                
                 idx += 1
             break
+    """
 
     print("\n\n-=-=-=-=-=-=-=-=-\n\n")
 
@@ -223,6 +225,7 @@ if __name__ == '__main__':
                            transform=pyroidbTransform_cropImageToBox)
 
     # saveCaltechOneFromEach(roidb)
+    """
     print(imdb._get_roidb_index_at_size(5000))
     print(imdb.roidbSize[1000])
     if args.save:
@@ -240,6 +243,7 @@ if __name__ == '__main__':
                                                                i))
             print(fn)
             vis_dets(im,cls,boxes,i,fn=fn)
+    """
 
     if args.createAnnoMap:
         clsToSet = loadDatasetIndexDict()
@@ -247,6 +251,8 @@ if __name__ == '__main__':
                                loader=roidbSampleBox,
                                transform=pyroidbTransform_normalizeBox)
         annoMaps = annotationDensityPlot(pyroidb)
+        entropies = computeAnnoMapListEntropy(annoMaps)
+        print(entropies)
         annoMap = annoMaps[clsToSet.index(imdb.name)]
         annoMap /= annoMap.max()
         annoMap *= 255

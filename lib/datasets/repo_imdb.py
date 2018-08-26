@@ -44,6 +44,7 @@ class RepoImdb(imdb):
                       "ymlDatasets", cfg.PATH_YMLDATASETS,
                       self._datasetName + ".yml")
         cfgData_from_file(fn)
+        self._pathResults = cfgData['PATH_TO_RESULTS']
         assert self._datasetName == cfgData['EXP_DATASET'], "dataset name is not correct."
         self._set_classes(cfgData['CLASSES'],cfgData['CONVERT_TO_PERSON'],cfgData['ONLY_PERSON'])
         self._num_classes = len(self._classes)
@@ -109,6 +110,9 @@ class RepoImdb(imdb):
         index = self._image_index[i]
         return self.imgReader.image_path_from_index(index)
 
+    def image_index_at(self,i):
+        return self._image_index[i]
+        
     def _set_classes(self,classFilename,convertToPerson,onlyPerson):
         _classes = self._load_classes(classFilename)
         assert _classes[0] == "__background__","Background class must be first index"
@@ -166,8 +170,9 @@ class RepoImdb(imdb):
 
     def _update_image_index(self,newImageIndex):
         self._image_index = newImageIndex
-        self.imgReader._image_index = newImageIndex     
-
+        self.imgReader._image_index = newImageIndex
+        self.evaluator.image_index = newImageIndex
+        
     def _load_image_index(self):
         """
         Load the indexes listed in this dataset's image set file.
@@ -193,22 +198,29 @@ class RepoImdb(imdb):
             classes = [line.rstrip() for line in f]
         return classes
 
-    def evaluate_detections(self, all_boxes, output_dir=None):
+    def evaluate_detections(self, detection_object, output_dir=None):
         """
+        detection_object is a diction with two keys:
+        "all_boxes" and "im_rotates_all"
+
         all_boxes is a list of length number-of-classes.
         Each list element is a list of length number-of-images.
         Each of those list elements is either an empty list []
         or a numpy array of detection.
 
         all_boxes[class][image] = [] or np.array of shape #dets x 5
+
+        im_rotates_all is a list of the rotation matricies for transforming
+        the groundtruth polygon into a rotated version of the polygon to compare 
+        with the predicted polygon.
         """
-        self.evaluator.evaluate_detections(all_boxes,output_dir)
+        self.evaluator.evaluate_detections(detection_object,output_dir)
         if self.config['cleanup']:
             for cls in self._classes:
                 if cls == '__background__':
                     continue
                 filename = self._get_results_file_template().format(cls)
-                os.remove(filename)
+                #os.remove(filename)
 
     def _get_results_file_template(self):
         # example: VOCdevkit/results/VOC2007/Main/<comp_id>_det_test_aeroplane.txt
@@ -231,7 +243,7 @@ class RepoImdb(imdb):
                 filtered_image_index = roidb_info["fii"]
                 if filtered_image_index:
                     print("loading a filtered imdb")
-                    self._image_index = list(filtered_image_index)
+                    self._update_image_index(list(filtered_image_index))
             print('{} gt roidb loaded from {}'.format(self.name, cache_file))
             return roidb
 
@@ -250,7 +262,7 @@ class RepoImdb(imdb):
             del gt_roidb[idx]
             del filtered_image_index[idx]
         print("filtered {} samples".format(numFiltered))
-        self._image_index = filtered_image_index
+        self._update_image_index(list(filtered_image_index))
         with open(cache_file, 'wb') as fid:
             pickle.dump({"gt_roidb":gt_roidb,"fii":filtered_image_index}, fid)
         print('wrote gt roidb to {}'.format(cache_file))

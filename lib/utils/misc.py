@@ -1,4 +1,4 @@
-import sys,os,pickle
+import sys,os,pickle,uuid,cv2
 import matplotlib.pyplot as plt
 import os.path as osp
 import numpy as np
@@ -190,8 +190,122 @@ def flattenRoidbDict(roidbDict,numSamples=None):
         roidbFlattened.extend(toExtend)
     return roidbFlattened
 
+def vis_dets(im, class_names, dets, _idx_, fn=None, thresh=0.5):
+    """Draw detected bounding boxes."""
+    im = im[:, :, (2, 1, 0)]
+    fig, ax = plt.subplots(figsize=(12, 12))
+    ax.imshow(im, aspect='equal')
+    for i in range(len(dets)):
+        bbox = dets[i, :4]
+        
+        
+        ax.add_patch(
+            plt.Rectangle((bbox[0], bbox[1]),
+                          bbox[2] - bbox[0],
+                          bbox[3] - bbox[1], fill=False,
+                          edgecolor='red', linewidth=3.5)
+        )
+        
+    plt.axis('off')
+    plt.tight_layout()
+    plt.draw()
+    if fn is None:
+        plt.savefig("img_{}_{}.png".format(_idx_,str(uuid.uuid4())))
+    else:
+        plt.savefig(fn.format(_idx_,str(uuid.uuid4())))
 
 
+def toRadians(angle):
+    return (np.pi/180 * angle)
+
+def getRotationScale(M,rows,cols):
+    a = np.array([cols,0,1])
+    ta = np.matmul(M,a)
+    if cfg._DEBUG.utils.misc: print("[getRotationScale] ta",ta)
+    rotate_y = 2 * (-ta[1]) + rows
+    scale = (rows) / ( rotate_y )
+    return scale
+
+def getRotationInfo(angle,cols,rows):
+    if cfg._DEBUG.utils.misc: print("cols,rows",cols,rows)
+    rotationMat = cv2.getRotationMatrix2D((cols/2,rows/2),\
+                                          angle,1.0)
+    scale = getRotationScale(rotationMat,rows,cols)
+    if cfg._DEBUG.utils.misc: print("scale: {}".format(scale))
+    rotationMat = cv2.getRotationMatrix2D((cols/2,rows/2),\
+                                          angle,scale)
+    return rotationMat,scale
+
+def addImgBorder(img,border=255):
+    img[0,:,:] = border
+    img[-1,:,:] = border
+    img[:,0,:] = border
+    img[:,-1,:] = border
+
+def getImageWithBorder(_img,border=255,rotation=None):
+    img = _img.copy()
+    if cfg._DEBUG.utils.misc: print("[save_image_with_border] rotation",rotation)
+    if rotation:
+        angle,cols,rows = rotation[0],rotation[1],rotation[2]
+        rotationMat,scale = getRotationInfo(angle,cols,rows)
+        if cfg._DEBUG.utils.misc: print("[utils/misc.py] rotationMat",rotationMat)
+        img_blank = np.zeros(img.shape,dtype=np.uint8)
+        addImgBorder(img_blank,border=border)
+        if cfg._DEBUG.utils.misc: print(img_blank.shape)
+        img_blank = cv2.warpAffine(img_blank,rotationMat,(cols,rows),scale)
+        img += img_blank
+    addImgBorder(img,border=border)
+    return img
+
+def save_image_with_border(fn,_img,border=255,rotation=None):
+    img = getImageWithBorder(_img,border=border,rotation=rotation)
+    cv2.imwrite(fn,img)
+
+def save_image_of_overlap_bboxes(fn,img_bb1,img_bb2,rot1,rot2):
+    img = np.zeros(img_bb1.shape)
+
+    inter = np.bitwise_and(img_bb1.astype(np.bool),img_bb2.astype(np.bool))
+    union = np.bitwise_or(img_bb1.astype(np.bool),img_bb2.astype(np.bool))
+    overlap = np.sum(inter) / float(np.sum(union))
+
+    img1 = getImageWithBorder(img_bb1,border=255,rotation=rot1)
+    img2 = getImageWithBorder(img_bb2,border=255,rotation=rot2)
+    img[:,:,0] = npBoolToUint8(inter)[:,:,0] # blue
+    img[:,:,1] = img1[:,:,1] # green; the guess
+    img[:,:,2] = img2[:,:,2] # red; the groundtruth
+    cv2.putText(img,'{:0.2f}'.format(overlap),(0,60),cv2.FONT_HERSHEY_SIMPLEX, 2, (255,255,255,255))
+    cv2.imwrite(fn,img)
+
+def npBoolToUint8(a):
+    return a.astype(np.uint8)*255
+
+def centerAndScaleBBox(bbox,rotMat,scale):
+    if cfg._DEBUG.utils.misc: print("[centerAndScaleBBox] before bbox",bbox)
+
+    cx = np.mean([bbox[0],bbox[2]])
+    cy = np.mean([bbox[1],bbox[3]])
+    center = np.array([cx,cy,1])
+    new_center = np.matmul(rotMat,center)
+
+    x_len = bbox[2] - bbox[0]
+    y_len = bbox[3] - bbox[1]
+
+    x1 = int(new_center[0] - 0.5 * scale * x_len)
+    x2 = int(new_center[0] + 0.5 * scale * x_len)
+    y1 = int(new_center[1] - 0.5 * scale * y_len)
+    y2 = int(new_center[1] + 0.5 * scale * y_len)
+    new_bbox = [x1,y1,x2,y2]
+    if cfg._DEBUG.utils.misc: print("[centerAndScaleBBox] after bbox",new_bbox)
+
+    return new_bbox
+
+
+def print_net_activiation_data(net,layers_to_print):
+    print("-"*50)
+    for name,blob in net.blobs.items():
+        if name in layers_to_print:
+            print("{}: {}".format(name,blob.data.shape))
+    print("-"*50)
 
 
 
