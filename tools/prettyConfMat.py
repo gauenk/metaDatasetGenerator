@@ -103,6 +103,7 @@ if __name__ == '__main__':
                 ntdGameInfo['repeat'] = repeat
 
                 convMat_fn = "output/ntd/confMats_{}_{}_{}.pkl".format(setID,repeat,size)
+                convMat_fn = "output/ntd/confMats_11111111_0_1000_4b142eec-0ae2-4ed5-9435-4440a8228b63.pkl"
                 convMat = pickle.load(open(convMat_fn,"rb"))
                 cmRaw = convMat['raw']
                 cmCropped = convMat['cropped']
