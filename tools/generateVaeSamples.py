@@ -184,9 +184,10 @@ if __name__ == '__main__':
     """
 
     
+    outputSize = 50
     #sys.exit()
     output_dir = "./output/vae/samples"
     # print '{:d} roidb entries'.format(len(roidb))
     print 'Output will be saved to `{:s}`'.format(output_dir)
-    generate_from_net(net, output_dir, numberOfSamples=10)
+    generate_from_net(net, output_dir, output_size = outputSize, numberOfSamples=30)
     

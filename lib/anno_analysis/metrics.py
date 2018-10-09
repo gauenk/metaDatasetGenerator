@@ -22,18 +22,34 @@ def annotationDensityPlot(pyroidb):
         ymin = int(box[1])
         xmax = int(box[2])
         ymax = int(box[3])
-        # why "-1"?
-        # if clsToSet[cls] == "kitti":
-        #     print(ymin)
         matr[cls, ymin:ymax, xmin:xmax] += 1
         cls_count[cls] += 1
     for idx,cls in enumerate(cls_count):
         if cls == 0: continue
         print("{}: {}".format(clsToSet[idx],cls))
-        matr[idx,...] /= cls
+        print(np.sum(matr[idx,...]))
+        print(np.max(matr[idx,...]))
+        matr[idx,...] /= np.sum(matr[idx,...])
+        print(np.sum(matr[idx,...]))
+        print(np.max(matr[idx,...]))
     return matr
 
-    
+def computeAnnoMapListEntropy(mats):
+    entropies = np.zeros((len(cfg.DATASET_NAMES_ORDERED))).astype(np.float64)
+    for idx,cls in enumerate(cfg.DATASET_NAMES_ORDERED):
+        print("{}: {}".format(idx,cls))
+        print(np.sum(mats[idx,...]))
+        if np.all(mats[idx,...] == 0): entropies[idx] = 0
+        else: entropies[idx] = comupteMapEntropy(mats[idx,...])
+    return entropies
+
+def comupteMapEntropy(mat):
+    entropy = 0
+    for i in range(mat.shape[0]):
+        for j in range(mat.shape[1]):
+            if mat[i,j] == 0: continue
+            entropy = - mat[i,j] * np.log( mat[i,j] )
+    return entropy
 
 def metric_1(matr,k):
     """

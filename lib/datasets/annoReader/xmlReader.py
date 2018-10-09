@@ -16,7 +16,7 @@ import xml.etree.ElementTree as ET
 class xmlReader(object):
     """Image database."""
 
-    def __init__(self, annoPath, classes , datasetName, setID, bboxOffset = 0, useDiff = True, convertToPerson=None, convertIdToCls = None):
+    def __init__(self, annoPath, classes , datasetName, setID, bboxOffset = 0, useDiff = True, convertToPerson = None, convertIdToCls = None, is_image_index_flattened = False):
         """
         __init__ function for annoReader [annotationReader]
 
@@ -30,6 +30,7 @@ class xmlReader(object):
         self.useDiff = useDiff
         self._classToIndex = self._create_classToIndex(classes)
         self._convertIdToCls = convertIdToCls
+        self._is_image_index_flattened = is_image_index_flattened
 
     def _create_classToIndex(self,classes):
         return dict(zip(classes, range(self.num_classes)))
@@ -39,9 +40,12 @@ class xmlReader(object):
         load annotations depending on how the annotation should be loaded
 
         """
-        return self._load_xml_annotation(index)
+        if self._is_image_index_flattened:
+            return self._load_single_bbox_xml_annotation(index)
+        else:
+            return self._load_bbox_xml_annotation(index)
 
-    def _load_xml_annotation(self, index):
+    def _load_bbox_xml_annotation(self, index):
         """
         requires the following format @ 
         <PATH_TO_ANNOTATIONS>/*xml
@@ -97,6 +101,69 @@ class xmlReader(object):
                 'seg_areas' : seg_areas,
                 'set': self._setID}
                 #'set': self._datasetName}
+
+    def _load_single_bbox_xml_annotation(self, index):
+
+        """
+        requires the following format @ 
+        <PATH_TO_ANNOTATIONS>/*xml
+        """
+        bbox_index = int(index.split('_')[-1])
+        image_index = '_'.join(index.split('_')[:-1])
+        filename = os.path.join(self._annoPath, image_index + '.xml')
+        tree = ET.parse(filename)
+        objs = tree.findall('object')
+        if not self.useDiff:
+            # Exclude the samples labeled as difficult
+            objs = [
+                obj for obj in objs if int(obj.find('difficult').text) == 0]
+
+        # set the number of objects
+        num_objs = 0
+        for ix, obj in enumerate(objs):
+            if self._find_cls(obj) != -1:
+                num_objs+=1
+                
+        boxes = np.zeros((1, 4), dtype=np.uint16)
+        gt_classes = np.zeros((1), dtype=np.int32)
+        overlaps = np.zeros((1, self.num_classes), dtype=np.float32)
+        # "Seg" area for pascal is just the box area
+        seg_areas = np.zeros((1), dtype=np.float32)
+
+        # Load object bounding boxes into a data frame.
+        ix = 0
+        for obj in objs:
+            bbox = obj.find('bndbox')
+            cls = self._find_cls(obj)
+            if cls == -1:
+                continue
+            if ix != bbox_index:
+                ix += 1
+                continue
+            # Make pixel indexes 0-based
+            x1 = float(bbox.find('xmin').text) - self._bboxOffset
+            y1 = float(bbox.find('ymin').text) - self._bboxOffset
+            x2 = float(bbox.find('xmax').text) - self._bboxOffset
+            y2 = float(bbox.find('ymax').text) - self._bboxOffset
+            # handle scaling caltech; annos were modified for YOLO
+            x1,y1,x2,y2 = self._handle_caltech_helps_vs_gauenk(*[x1, y1, x2, y2])
+            boxes[0, :] = [x1, y1, x2, y2]
+            gt_classes[0] = cls
+            overlaps[0, cls] = 1.0
+            seg_areas[0] = (x2 - x1 + 1) * (y2 - y1 + 1)
+            break
+
+        overlaps = scipy.sparse.csr_matrix(overlaps)
+
+        return {'boxes' : boxes,
+                'gt_classes': gt_classes,
+                'gt_overlaps' : overlaps,
+                'flipped' : False,
+                'seg_areas' : seg_areas,
+                'set': self._setID}
+                #'set': self._datasetName}
+
+
 
     def _find_cls(self,obj):
         cls = obj.find('name').text.lower().strip()

@@ -1,4 +1,7 @@
 EXP_DIR: faster_rcnn_end2end
+TASK: "object_detection"
+WRITE_RESULTS: True
+# SAVE_ACTIVITY_VECTOR_BLOBS: !!python/list ["conv2_1","conv2_2"]
 TRAIN:
   OBJ_DET:
     HAS_RPN: True
@@ -7,7 +10,7 @@ TRAIN:
     RPN_BATCHSIZE: 256
     BBOX_NORMALIZE_TARGETS_PRECOMPUTED: True
     BG_THRESH_LO: 0.0
-  IMS_PER_BATCH: 1
+  BATCH_SIZE: 1
   USE_PREFETCH: False
   USE_FLIPPED: True
 TEST:

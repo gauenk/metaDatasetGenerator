@@ -131,6 +131,7 @@ class ProposalLayer(caffe.Layer):
 
         # 3. remove predicted boxes with either height or width < threshold
         # (NOTE: convert min_size to input image scale stored in im_info[2])
+        dbprint("proposal.shape",proposals.shape)
         keep = _filter_boxes(proposals, min_size * im_info[2])
         proposals = proposals[keep, :]
         scores = scores[keep]
@@ -142,6 +143,7 @@ class ProposalLayer(caffe.Layer):
             order = order[:pre_nms_topN]
         proposals = proposals[order, :]
         scores = scores[order]
+        dbprint("proposal.shape",proposals.shape)
 
         # 6. apply nms (e.g. threshold = 0.7)
         # 7. take after_nms_topN (e.g. 300)
@@ -159,6 +161,7 @@ class ProposalLayer(caffe.Layer):
         blob = np.hstack((batch_inds, proposals.astype(np.float32, copy=False)))
         top[0].reshape(*(blob.shape))
         top[0].data[...] = blob
+        dbprint("blob.shape",blob.shape)
 
         # [Optional] output scores blob
         if len(top) > 1:
@@ -179,3 +182,8 @@ def _filter_boxes(boxes, min_size):
     hs = boxes[:, 3] - boxes[:, 1] + 1
     keep = np.where((ws >= min_size) & (hs >= min_size))[0]
     return keep
+
+def dbprint(msg,*args):
+    if cfg._DEBUG.rpn.proposal_layer:
+        print("[rpn/proposal_layer]: " + str(msg),args)
+

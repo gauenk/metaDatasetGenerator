@@ -10,8 +10,11 @@
 import caffe
 from core.config import cfg
 import roi_data_layer.roidb as rdl_roidb
+import cls_data_layer.roidb as cls_roidb
+import alcls_data_layer.roidb as alcls_roidb
 import vae_data_layer.roidb as vae_rdl_roidb
 from utils.timer import Timer
+from datasets import ds_utils
 import numpy as np
 import os
 
@@ -27,17 +30,18 @@ class SolverWrapper(object):
     """
 
     def __init__(self, solver_prototxt, roidb, output_dir,
-                 pretrained_model=None, solver_state=None):
+                 pretrained_model=None, solver_state=None,al_net=None):
         """Initialize the SolverWrapper."""
         self.output_dir = output_dir
 
         if (cfg.TRAIN.OBJ_DET.HAS_RPN and cfg.TRAIN.OBJ_DET.BBOX_REG and
-            cfg.TRAIN.OBJ_DET.BBOX_NORMALIZE_TARGETS):
+            cfg.TRAIN.OBJ_DET.BBOX_NORMALIZE_TARGETS and
+            cfg.TASK == "object_detection"):
             # RPN can only use precomputed normalization because there are no
             # fixed statistics to compute a priori
             assert cfg.TRAIN.OBJ_DET.BBOX_NORMALIZE_TARGETS_PRECOMPUTED
 
-        if cfg.TRAIN.OBJ_DET.BBOX_REG:
+        if cfg.TRAIN.OBJ_DET.BBOX_REG and cfg.TASK == 'object_detection':
             print 'Computing bounding-box regression targets...'
             self.bbox_means, self.bbox_stds = \
                     rdl_roidb.add_bbox_regression_targets(roidb)
@@ -58,7 +62,22 @@ class SolverWrapper(object):
         with open(solver_prototxt, 'rt') as f:
             pb2.text_format.Merge(f.read(), self.solver_param)
 
-        self.solver.net.layers[0].set_roidb(roidb)
+        if cfg.TASK == "object_detection":
+            self.solver.net.layers[0].set_roidb(roidb)
+        elif cfg.TASK == "classification" or cfg.TASK == "regeneration":
+            person_records = ds_utils.loadEvaluationRecords("person")
+            # write_keys_to_csv(person_records)
+            # write_roidb_ids_to_csv(roidb)
+            # sys.exit()
+            tmp = person_records.keys()
+            print(len(tmp),len(roidb))
+            print("they don't need to be equal")
+            print("the left number has a one-to-many mapping")
+            if self.solver.net.layers[0].name == "AlclsDataLayer":
+                self.solver.net.layers[0].set_roidb(roidb, person_records,al_net)
+            else:
+                self.solver.net.layers[0].set_roidb(roidb, person_records)
+
 
     def snapshot(self):
         """Take a snapshot of the network after unnormalizing the learned
@@ -94,9 +113,9 @@ class SolverWrapper(object):
         print('Wrote snapshot to: {:s}'.format(filename))
 
         # save solverstate 
-        # filename = (self.solver_param.snapshot_prefix + infix +
-        #             '_iter_{:d}'.format(self.solver.iter) + '.solverstate')
-        # filename = os.path.join(self.output_dir, filename)
+        filename = (self.solver_param.snapshot_prefix + infix +
+                    '_iter_{:d}'.format(self.solver.iter) + '.solverstate')
+        filename = os.path.join(self.output_dir, filename)
 
         self.solver.save(str(filename))
 
@@ -114,12 +133,15 @@ class SolverWrapper(object):
         last_snapshot_iter = -1
         timer = Timer()
         model_paths = []
+        print("iteration {}/{}".format(self.solver.iter,max_iters))
         while self.solver.iter < max_iters:
             # Make one SGD update
             timer.tic()
             self.solver.step(1)
             timer.toc()
+
             if self.solver.iter % (10 * self.solver_param.display) == 0:
+                self.view_sigmoid_output()
                 print('speed: {:.3f}s / iter'.format(timer.average_time))
 
             if self.solver.iter % cfg.TRAIN.SNAPSHOT_ITERS == 0:
@@ -130,8 +152,82 @@ class SolverWrapper(object):
             model_paths.append(self.snapshot())
         return model_paths
 
+    def print_the_last_layer(self):
+        net = self.solver.net
+        labels = net.blobs['labels']
+        loss_cls = net.blobs['loss_cls']
+        print(labels.data,loss_cls.data)
+
+    def print_gradient(self):
+        net = self.solver.net
+        print(dir(net))
+        net.forward()
+        print(net.layer_dict.keys())
+        print("-- gradients --")
+        # print(net.layer_dict.keys())
+        # # grads = net.layer_dict['input-data'].blobs[0].diff
+        # # print(np.sum(grads),"data")
+        grads = net.layer_dict['conv1_1'].blobs[0].diff
+        print(np.sum(grads),"conv1_1")
+        grads = net.layer_dict['_fc6'].blobs[0].diff
+        print(np.sum(grads),"fc6")
+
+        grads = net.layer_dict['_fc7'].blobs[0].diff
+        print(np.sum(grads),"fc7")
+        grads = net.layer_dict['cls_score'].blobs[0].diff
+        print(np.sum(grads),"cls_score")
+        
+        # blob = net.layer_dict['_fc7'].blobs[0].data
+        # print(blob,"fc7")
+        # blob = net.layer_dict['cls_score'].blobs[0].data
+        # print(blob,"cls_score")
+        
+        # grads = net.layer_dict['sm_cls'].blobs[0].diff
+        # print(np.sum(grads),"sm_cls")
+
+    def test_SoftmaxLoss(self):
+        net = self.solver.net
+        #print(net.blobs.keys())
+        # for i in range(30):
+        #     print("shape @ {}: {}".format(i,net.blobs[i].shape))
+        # print(dir(net))
+        # print(len(net.blobs))
+        # print(dir(net.layer_dict['cls_score']))
+        # sys.exit()
+        #print(net.layer_dict.keys())
+        lp = caffe_pb2.LayerParameter()
+        lp.type = "Sigmoid"
+        layer = caffe.create_layer(lp)
+        data = net.blobs['cls_score'].data
+        bottom = [caffe.Blob(data.shape)]
+        bottom[0].data[...] = data
+        top = [caffe.Blob([])]
+        layer.SetUp(bottom, top)
+        layer.Reshape(bottom, top)
+        layer.Forward(bottom, top)
+        print("data",data,"top[0].data",top[0].data)
+        print(net.blobs['labels'].data - top[0].data)
+
+    def view_sigmoid_output(self):
+        net = self.solver.net
+        lp = caffe_pb2.LayerParameter()
+        lp.type = "Sigmoid"
+        layer = caffe.create_layer(lp)
+        bottom = [net.blobs['cls_score']]
+        top = [caffe.Blob([])]
+        labels = net.blobs['labels'].data
+        layer.SetUp(bottom, top)
+        layer.Reshape(bottom, top)
+        layer.Forward(bottom, top)
+        np.set_printoptions(precision=3,suppress=True)
+        print("Sigmoid output v.s. Labels: ")
+        print(np.c_[top[0].data, labels])
+
+
 def get_training_roidb(imdb):
     """Returns a roidb (Region of Interest database) for use in training."""
+    _ = imdb.roidb # initially load the roidb
+
     if cfg.TRAIN.CLIP_SIZE:
         imdb.resizeRoidbByAnnoSize(cfg.TRAIN.CLIP_SIZE)
 
@@ -141,11 +237,12 @@ def get_training_roidb(imdb):
         print('done')
 
     print('Preparing training data...')
-    if cfg.COMPUTE_IMG_STATS:
+    if cfg.TASK == "object_detection":
         rdl_roidb.prepare_roidb(imdb) # gets image sizes.. might be nice
-    else:
+    elif cfg.TASK == "classification":
+        cls_roidb.prepare_roidb(imdb)
+    elif cfg.TASK == "regeneration":
         vae_rdl_roidb.prepare_roidb(imdb)
-    print('done')
 
     return imdb.roidb
 
@@ -174,13 +271,15 @@ def filter_roidb(roidb):
     return filtered_roidb
 
 def train_net(solver_prototxt, roidb, output_dir,
-              pretrained_model=None, solver_state=None, max_iters=40000):
+              pretrained_model=None, solver_state=None, max_iters=400000,
+              al_net=None):
     """Train *any* object detection network."""
 
     #roidb = filter_roidb(roidb)
     sw = SolverWrapper(solver_prototxt, roidb, output_dir,
                        pretrained_model=pretrained_model,
-                       solver_state=solver_state)
+                       solver_state=solver_state,
+                       al_net=al_net)
     print('Solving...')
     model_paths = sw.train_model(max_iters)
     print('done solving')

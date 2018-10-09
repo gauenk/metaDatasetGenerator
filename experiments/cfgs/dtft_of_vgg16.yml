@@ -1,0 +1,17 @@
+EXP_DIR: faster_rcnn_end2end
+TASK: "object_detection"
+WRITE_RESULTS: True
+TRAIN:
+  OBJ_DET:
+    HAS_RPN: True
+    PROPOSAL_METHOD: gt
+    RPN_POSITIVE_OVERLAP: 0.7
+    RPN_BATCHSIZE: 256
+    BBOX_NORMALIZE_TARGETS_PRECOMPUTED: True
+    BG_THRESH_LO: 0.0
+  BATCH_SIZE: 1
+  USE_PREFETCH: False
+  USE_FLIPPED: True
+TEST:
+  OBJ_DET:
+    HAS_RPN: True

@@ -1,0 +1,18 @@
+EXP_DIR: classification
+TASK: "classification"
+WRITE_RESULTS: True
+PIXEL_MEANS: !!python/list [[[103.939, 116.779, 123.68]]]
+CLS_PROBS: "prob"
+TRAIN:
+   BATCH_SIZE: 10
+   CLS:
+      BATCH_SIZE: 10
+   MAX_SIZE: 224
+   SCALES: !!python/list [224,]
+TEST:
+   BATCH_SIZE: 1
+   SCALES: !!python/list [224,]
+   MAX_SIZE: 224
+   CLASSIFICATION:
+      TASK: "tp_fn"
+      PROPOSAL_METHOD: gt

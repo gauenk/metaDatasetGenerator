@@ -12,7 +12,7 @@ import _init_paths
 from utils.misc import PreviousCounts
 from core.train import get_training_roidb, train_net
 from core.config import cfg, cfg_from_file, cfg_from_list, get_output_dir, createFilenameID, createPathRepeat, createPathSetID
-from datasets.ds_utils import print_each_size,printPyroidbSetCounts,roidbSampleBox,roidbSampleImageAndBox
+from datasets.ds_utils import print_each_size,printPyroidbSetCounts,roidbSampleBox,roidbSampleImageAndBox,combine_roidb,combineOnlyNewRoidbs
 from datasets.factory import get_repo_imdb
 from ntd.hog_svm import appendHOGtoRoidb
 import datasets.imdb
@@ -30,10 +30,10 @@ from datasets.pytorch_roidb_loader import RoidbDataset
 #imdb_names = {"coco":1,"pacsal_voc":2,"imagenet":3,"caltech":4,"cam2":5,"inria":6,"sun":7,"kitti":8}
 
 # baby sized sets for debug
-#train_imdb_names = ["coco-minival2014-default","pascal_voc-medium-default","imagenet-very_short_train-default","cam2-train-default","caltech-train_50_filter-default","kitti-train-default","sun-all-default","inria-all-default"]
+train_imdb_names = ["coco-minival2014-default","pascal_voc-medium-default","imagenet-very_short_train-default","cam2-train-default","caltech-train_50_filter-default","kitti-train-default","sun-all-default","inria-all-default"]
 
 # actual sets
-train_imdb_names = ["coco-train2014-default","imagenet-train2014-default","pascal_voc-trainval-default","caltech-train-default","inria-all-default","sun-all-default","kitti-train-default","cam2-all-default"]
+#train_imdb_names = ["coco-train2014-default","imagenet-train2014-default","pascal_voc-trainval-default","caltech-train-default","inria-all-default","sun-all-default","kitti-train-default","cam2-all-default"]
 test_imdb_names = ["coco-val2014-default","imagenet-val1-default","pascal_voc-test-default","caltech-test-default","inria-all-default","sun-all-default","kitti-val-default","cam2-all-default"]
 indexToImdbName = cfg.DATASET_NAMES_ORDERED
 datasetSizes = cfg.MIXED_DATASET_SIZES
@@ -157,7 +157,7 @@ def clearBboxHOGFtsFromRoidb(roidb):
         sample['hog'] = None
 
 def addHOGtoNewRoidbSamples(roidbs,pc,size):
-    onlyNewSamples = combineOnlyNew(roidbs,pcTr)
+    onlyNewSamples = combineOnlyNewRoidbs(roidbs,pcTr)
     if size > 1000: clearBboxHOGFtsFromRoidb(onlyNewSamples)
     appendHOGtoRoidb(onlyNewSamples,size)
     return onlyNewSamples
@@ -215,25 +215,6 @@ def loadDatasetsToMemory():
         if tr_imdb_name == te_imdb_name: continue
         imdb, roidb = get_roidb(te_imdb_name)
         loadedImdbsTe[imdb.name] = imdb
-
-def combined_roidb(roidbs):
-    # assumes ordering of roidbs
-    roidb = []
-    for r in roidbs:
-        # skips "None"; shouldn't impact the outcome
-        if r is None: continue
-        roidb.extend(r)
-        print_each_size(roidb)
-    return roidb
-
-def combineOnlyNew(roidbs,pc):
-    # assumes ordering of roidbs
-    newRoidb = []
-    print(pc)
-    for idx,roidb in enumerate(roidbs):
-        if roidb is None: continue
-        newRoidb.extend(roidb[pc[idx]:])
-    return newRoidb
 
 def print_imdb_report():
     for key,imdb in loadedImdbsTr.items():

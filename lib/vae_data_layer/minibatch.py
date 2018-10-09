@@ -11,7 +11,7 @@ import numpy as np
 import numpy.random as npr
 import cv2,sys
 from core.config import cfg
-from utils.blob import prep_im_for_vae_blob, im_list_to_blob
+from utils.blob import prep_im_for_vae_blob, prep_im_for_blob, im_list_to_blob, _get_cropped_image_blob
 
 def get_minibatch(roidb, num_classes):
     """Given a roidb, construct a minibatch sampled from it."""
@@ -53,6 +53,7 @@ def _get_image_blob(roidb, scale_inds):
     im_scales = []
     for i in xrange(num_images):
         im = cv2.imread(roidb[i]['image'])
+        #print("[vae_data_layer/minibatch.py/_get_image_blob]: im.shape",im.shape)
         if roidb[i]['flipped']:
             im = im[:, ::-1, :]
         target_size = cfg.TRAIN.SCALES[scale_inds[i]]

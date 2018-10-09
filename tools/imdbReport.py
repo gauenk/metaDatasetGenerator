@@ -13,6 +13,7 @@ import matplotlib
 matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 import _init_paths
+from utils.misc import createNoisyBox,vis_dets
 from core.train import get_training_roidb
 from core.config import cfg, cfg_from_file, cfg_from_list, get_output_dir,loadDatasetIndexDict
 from datasets.factory import get_repo_imdb
@@ -24,7 +25,7 @@ import pprint
 import numpy as np
 import numpy.random as npr
 import sys,os,cv2,uuid
-from anno_analysis.metrics import annotationDensityPlot,plotDensityPlot
+from anno_analysis.metrics import annotationDensityPlot,plotDensityPlot,computeAnnoMapListEntropy
 
 # pytorch imports
 from datasets.pytorch_roidb_loader import RoidbDataset
@@ -44,8 +45,12 @@ def parse_args():
                         help='randomize (do not use a fixed seed)',
                         action='store_true')
     parser.add_argument('--save', dest='save',default=False,
-                        help='save some samples with bboxes visualized?',
+                        help='save some sample images',
                         action='store_true')
+    parser.add_argument('--save_noise', dest='save_noise', type=int,
+                        default=0,help='save some samples with *noisy* bboxes visualized?')
+    parser.add_argument('--save_box', dest='save_box', default=True,
+                        action='store_false',help='save some samples with bboxes visualized')
     parser.add_argument('--createAnnoMap', dest='createAnnoMap',
                         help='save a created annotation map',
                         action='store_true')
@@ -123,30 +128,6 @@ def get_bbox_info(roidb,size):
             idx += 1
     return areas,widths,heights
 
-def vis_dets(im, class_names, dets, _idx_, fn=None, thresh=0.5):
-    """Draw detected bounding boxes."""
-    im = im[:, :, (2, 1, 0)]
-    fig, ax = plt.subplots(figsize=(12, 12))
-    ax.imshow(im, aspect='equal')
-    for i in range(len(dets)):
-        bbox = dets[i, :4]
-        
-        
-        ax.add_patch(
-            plt.Rectangle((bbox[0], bbox[1]),
-                          bbox[2] - bbox[0],
-                          bbox[3] - bbox[1], fill=False,
-                          edgecolor='red', linewidth=3.5)
-        )
-        
-    plt.axis('off')
-    plt.tight_layout()
-    plt.draw()
-    if fn is None:
-        plt.savefig("img_{}_{}.png".format(_idx_,str(uuid.uuid4())))
-    else:
-        plt.savefig(fn.format(_idx_,str(uuid.uuid4())))
-
 if __name__ == '__main__':
     args = parse_args()
 
@@ -165,6 +146,7 @@ if __name__ == '__main__':
     imdb, roidb = get_roidb(args.imdb_name)
     numAnnos = imdb.roidb_num_bboxes_at(-1)
 
+    """
     # HACK
     for idx,sample in enumerate(roidb):
         if idx == 11:
@@ -178,6 +160,14 @@ if __name__ == '__main__':
                 cv2.imwrite(fn,bimg)                
                 idx += 1
             break
+    """
+
+    # idx = imdb.image_index.index("000035")
+    # boxes = roidb[idx]["boxes"]
+    # im_path = imdb.image_path_at(idx)
+    # im = cv2.imread(im_path)
+    # vis_dets(im,1,boxes,0,fn=None)
+
 
     print("\n\n-=-=-=-=-=-=-=-=-\n\n")
 
@@ -193,11 +183,12 @@ if __name__ == '__main__':
         print("\t\t{}".format(v))
 
     print("computing bbox info...")
-    areas, widths, heights = get_bbox_info(roidb,numAnnos)
+    if cfg.DATASETS.ANNOTATION_CLASS == "object_detection":
+       areas, widths, heights = get_bbox_info(roidb,numAnnos)
 
-    print("ave area: {} | std. area: {}".format(np.mean(areas),np.std(areas,dtype=np.float64)))
-    print("ave width: {} | std. width: {}".format(np.mean(widths),np.std(widths,dtype=np.float64)))
-    print("ave height: {} | std. height: {}".format(np.mean(heights),np.std(heights,dtype=np.float64)))
+       print("ave area: {} | std. area: {}".format(np.mean(areas),np.std(areas,dtype=np.float64)))
+       print("ave width: {} | std. width: {}".format(np.mean(widths),np.std(widths,dtype=np.float64)))
+       print("ave height: {} | std. height: {}".format(np.mean(heights),np.std(heights,dtype=np.float64)))
     prefix_path = cfg.IMDB_REPORT_OUTPUT_PATH
     if osp.exists(prefix_path) is False:
         os.makedirs(prefix_path)
@@ -223,23 +214,44 @@ if __name__ == '__main__':
                            transform=pyroidbTransform_cropImageToBox)
 
     # saveCaltechOneFromEach(roidb)
-    print(imdb._get_roidb_index_at_size(5000))
-    print(imdb.roidbSize[1000])
+
+    # print(imdb._get_roidb_index_at_size(5000))
+    # print(imdb.roidbSize[1000])
     if args.save:
-        index = imdb._get_roidb_index_at_size(50)
-        print("saving 30 imdb annotations to output folder...")        
+        try:
+            index = imdb._get_roidb_index_at_size(30)
+        except:
+            index = imdb._get_roidb_index_at_size(-1)
+        if index == -1:
+            index = len(imdb.roidbSize)
+        print("saving {} imdb annotations to output folder...".format(index))
         print(prefix_path)
         for i in range(index):
+            print(roidb[i])
+            
             boxes = roidb[i]['boxes']
             if len(boxes) == 0: continue
-            im = cv2.imread(roidb[i]['image'])
+            #img_path = roidb[i]['image']
+            img_path = imdb.image_path_at(i)
+            im = cv2.imread(img_path)
             if roidb[i]['flipped']:
                 im = im[:, ::-1, :]
             cls = roidb[i]['gt_classes']
-            fn = osp.join(prefix_path,"{}_{}.png".format(imdb.name,
-                                                               i))
-            print(fn)
-            vis_dets(im,cls,boxes,i,fn=fn)
+
+            if args.save_box:
+                if args.save_noise > 0:
+                    for j in range(4):
+                        fn = osp.join(prefix_path,"{}_{}_{}.png".format(imdb.name,i,j))
+                        n_boxes = boxes + createNoisyBox(30)
+                        vis_dets(im,cls,n_boxes,i,fn=fn)
+                else:
+                    fn = osp.join(prefix_path,"{}_{}.png".format(imdb.name,i))
+                    vis_dets(im,cls,boxes,i,fn=fn)
+            else:
+                fn = osp.join(prefix_path,"{}_{}.png".format(imdb.name,i))
+                vis_dets(im,cls,None,i,fn=fn)
+                
+        print("done saving")
 
     if args.createAnnoMap:
         clsToSet = loadDatasetIndexDict()
@@ -247,6 +259,8 @@ if __name__ == '__main__':
                                loader=roidbSampleBox,
                                transform=pyroidbTransform_normalizeBox)
         annoMaps = annotationDensityPlot(pyroidb)
+        entropies = computeAnnoMapListEntropy(annoMaps)
+        print(entropies)
         annoMap = annoMaps[clsToSet.index(imdb.name)]
         annoMap /= annoMap.max()
         annoMap *= 255

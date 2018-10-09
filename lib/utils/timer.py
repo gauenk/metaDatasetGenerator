@@ -30,3 +30,14 @@ class Timer(object):
             return self.average_time
         else:
             return self.diff
+    def __str__(self):
+        return "-=-=- Timer Info -=-=-\n\
+        Total Time: {}\n\
+        Calls: {}\n\
+        Start Time: {}\n\
+        Diff: {}\n\
+        Average Time: {}\n".format(self.total_time,
+                                   self.calls,
+                                   self.start_time,
+                                   self.diff,
+                                   self.average_time)

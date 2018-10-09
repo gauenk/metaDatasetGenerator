@@ -63,10 +63,12 @@ class imdb(object):
         for idx,rsize in enumerate(self.roidbSize):
             #print("idx,rsize,gsize",idx,rsize,gsize)
             if rsize >= gsize: return idx
-        return -1
+        return -1 
 
     def get_roidb_at_size(self,gsize):
         rindex = self._get_roidb_index_at_size(gsize)
+        print(rindex)
+        print(len(self.roidbSize))
         if rindex == -1:
             print("\n\nWARNING: imdb [{:s}] may be too small @ {}\n\n".\
                   format(self.name,self.roidbSize[rindex]))
@@ -123,7 +125,7 @@ class imdb(object):
     def load_annotation(self,i):
         raise NotImplementedError
 
-    def shuffle_image_index(self):
+    def _shuffle_image_index(self):
         if len(self._image_index) != 0:
             npr.shuffle(self._image_index)
 
@@ -142,14 +144,21 @@ class imdb(object):
         self._image_index = self._image_index[:len(self._roidb)]
         self.compute_size_along_roidb()
 
-    def evaluate_detections(self, all_boxes, output_dir=None):
+    def evaluate_detections(self, detection_object, output_dir=None):
         """
+        detection_object is a diction with two keys:
+        "all_boxes" and "im_rotates_all"
+
         all_boxes is a list of length number-of-classes.
         Each list element is a list of length number-of-images.
         Each of those list elements is either an empty list []
         or a numpy array of detection.
 
         all_boxes[class][image] = [] or np.array of shape #dets x 5
+
+        im_rotates_all is a list of the rotation matricies for transforming
+        the groundtruth polygon into a rotated version of the polygon to compare 
+        with the predicted polygon.
         """
         raise NotImplementedError
 
@@ -158,6 +167,15 @@ class imdb(object):
                 for i in xrange(self.num_images)]
 
     def append_flipped_images(self):
+        if cfg.DATASETS.ANNOTATION_CLASS == "object_detection":
+            self.append_flipped_images_bbox()
+        elif cfg.DATASETS.ANNOTATION_CLASS == "classification":
+            self.append_flipped_images_cls()
+        else:
+            print("ERROR: the cfg.DATASETS.ANNOTATION_CLASS is not recognized.")
+            sys.exit()
+
+    def append_flipped_images_bbox(self):
         num_images = self.num_images
         widths = self._get_widths()
         for i in range(num_images):
@@ -180,6 +198,16 @@ class imdb(object):
                      'gt_overlaps' : self.roidb[i]['gt_overlaps'],
                      'gt_classes' : self.roidb[i]['gt_classes'],
                      'flipped' : True,
+                     'set': self.roidb[i]['set']}
+            self.roidb.append(entry)
+        self._update_image_index(self._image_index * 2)
+        
+    def append_flipped_images_cls(self):
+        num_images = self.num_images
+        widths = self._get_widths()
+        for i in range(num_images):
+            entry = {'gt_classes' : self.roidb[i]['gt_classes'],
+                     'flipped': True,
                      'set': self.roidb[i]['set']}
             self.roidb.append(entry)
         self._update_image_index(self._image_index * 2)

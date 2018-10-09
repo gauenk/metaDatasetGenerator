@@ -14,6 +14,7 @@ import vae_data_layer.roidb as vae_rdl_roidb
 from utils.timer import Timer
 import numpy as np
 import os,sys,cv2
+from utils.blob import blob_list_im
 
 from caffe.proto import caffe_pb2
 import google.protobuf as pb2
@@ -26,16 +27,19 @@ class GenerateWrapper(object):
     use to unnormalize the learned bounding-box regression weights.
     """
 
-    def __init__(self, net, output_dir):
+    def __init__(self, net, output_dir, output_size):
         """Initialize the SolverWrapper."""
         self.output_dir = output_dir
         self.net = net
         self.current_sample_count = 0
         self.display = 2
+        self.output_size = output_size
 
     def save_sample_set(self,imgs):
         for i in range(imgs.shape[0]):
-            self.save_sample(imgs[i])
+            sq_img = np.squeeze(imgs[i])
+            print(sq_img.shape)
+            self.save_sample(sq_img)
 
     def save_sample(self,img):
         """Take a snapshot of the network after unnormalizing the learned
@@ -47,6 +51,9 @@ class GenerateWrapper(object):
                     '_net_{:s}_{:d}'.format(self.net.name,self.current_sample_count) + '.png')
         filename = os.path.join(self.output_dir, filename)
         # save output as image
+        if cfg.GENERATE.THRESHOLD:
+            img = np.where(img > cfg.GENERATE.THRESHOLD,255,0)
+            
         cv2.imwrite(filename,img)
         print('Wrote sample to: {:s}'.format(filename))
         
@@ -66,8 +73,14 @@ class GenerateWrapper(object):
             timer.tic()
             
             blobs_out = self.net.forward()
-            BATCH_SIZE = blobs_out["decode1neuron"].shape[0]
-            imgs = blobs_out["decode1neuron"].reshape(BATCH_SIZE,30,30,3) * 255
+            BATCH_SIZE = blobs_out["generated_images"].shape[0]
+            #BATCH_SIZE = blobs_out["decode1neuron"].shape[0]
+            blobs = blobs_out["generated_images"] * 255
+            imgs = blob_list_im(blobs)
+            # imgs = img.reshape(BATCH_SIZE,self.output_size,
+            #                                           self.output_size,3) * 255
+            print("imgs.shape",imgs.shape)
+            
             self.save_sample_set(imgs)
             timer.toc()
             if self.current_sample_count % (10 * self.display) == 0:
@@ -75,10 +88,10 @@ class GenerateWrapper(object):
 
         return model_paths
 
-def generate_from_net(net, output_dir, numberOfSamples=10):
+def generate_from_net(net, output_dir, output_size = 100, numberOfSamples=10):
     """Train *any* object detection network."""
 
-    gw = GenerateWrapper(net,output_dir)
+    gw = GenerateWrapper(net, output_dir, output_size)
     print('Generating...')
     model_paths = gw.generate(numberOfSamples)
     print('done generating')
