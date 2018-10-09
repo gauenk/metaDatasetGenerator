@@ -3,7 +3,7 @@
 # Written by Kent Gauen
 # --------------------------------------------------------
 
-import os,glob
+import os,glob,sys
 import os.path as osp
 import PIL
 import pickle
@@ -13,6 +13,7 @@ from datasets.imdb import imdb
 import scipy.sparse
 from core.config import cfg,cfgData,cfgData_from_file
 from easydict import EasyDict as edict
+from datasets.evaluators.classification import classificationEvaluator
 from datasets.evaluators.bboxEvaluator import bboxEvaluator
 from datasets.imageReader.rawReader import rawReader
 from datasets.annoReader.xmlReader import xmlReader
@@ -24,6 +25,8 @@ class RepoImdb(imdb):
 
     def __init__(self, datasetName, imageSet, configName):
         imdb.__init__(self, datasetName)
+        cfg.CALLING_DATASET_NAME = datasetName
+        cfg.CALLING_IMAGESET_NAME = imageSet
         self._local_path = os.path.dirname(__file__)
         self._datasetName = datasetName
         self._configName = configName
@@ -35,11 +38,13 @@ class RepoImdb(imdb):
         self._roidb = None
         self._roidb_handler = self.gt_roidb
         self._roidbSize = []
+        self.is_image_index_flattened = False
         self._parseDatasetFile()
 
     def _parseDatasetFile(self):
         self._resetDataConfig()
         self._setupConfig()
+        print(self.config)
         fn = osp.join(self._local_path,
                       "ymlDatasets", cfg.PATH_YMLDATASETS,
                       self._datasetName + ".yml")
@@ -58,7 +63,7 @@ class RepoImdb(imdb):
         if not self._checkImageSet():
             raise ValueError("imageSet path {} doesn't exist".format(self._imageSetPath))
 
-        self._image_index = self._load_image_index()
+        self._image_index = None#self._load_image_index()
 
         self._set_id_to_cls()
 
@@ -73,6 +78,7 @@ class RepoImdb(imdb):
                                                cfgData['IMAGE_TYPE'],
                                                cfgData['USE_IMAGE_SET'],
         )
+        self._image_index = self._load_image_index()
 
     def _resetDataConfig(self):
         cfgData.CONVERT_ID_TO_CLS_FILE = None
@@ -95,18 +101,24 @@ class RepoImdb(imdb):
         #               yaml_cfg['CONFIG_DATASET_INDEX_DICTIONARY_PATH'])
         # with open(fn, 'r') as f:
         #     setID = edict(yaml.load(f))[self._datasetName]
-        setID = cfg.DATASET_NAMES_ORDERED.index(self._datasetName)
+        try:
+            setID = cfg.DATASET_NAMES_ORDERED.index(self._datasetName)
+        except:
+            setID = cfg.DATASET_NAMES_ORDERED.index(self._datasetName.split("_")[0])
         self.config = {'cleanup'     : yaml_cfg['CONFIG_CLEANUP'],
                        'use_salt'    : yaml_cfg['CONFIG_USE_SALT'],
                        'use_diff'    : yaml_cfg['CONFIG_USE_DIFFICULT'],
                        'rpn_file'    : yaml_cfg['CONFIG_RPN_FILE'],
                        'min_size'    : yaml_cfg['CONFIG_MIN_SIZE'],
+                       'flatten_image_index' : yaml_cfg['CONFIG_FLATTEN_IMAGE_INDEX'],
                        'setID'       : setID}
         
     def image_path_at(self, i):
         """
         Return the absolute path to image i in the image sequence.
         """
+        # if self._roidb is None:
+        #     self._roidb = self.roidb_handler()
         index = self._image_index[i]
         return self.imgReader.image_path_from_index(index)
 
@@ -115,10 +127,14 @@ class RepoImdb(imdb):
         
     def _set_classes(self,classFilename,convertToPerson,onlyPerson):
         _classes = self._load_classes(classFilename)
-        assert _classes[0] == "__background__","Background class must be first index"
-
-        if onlyPerson:
+        print(_classes)
+        if cfg.TASK == 'object_detection':
+            assert _classes[0] == "__background__","Background class must be first index"
+        
+        if onlyPerson and cfg.TASK == 'object_detection':
             _classes = ["__background__","person"]
+        elif onlyPerson:
+            _classes = ["person"]
 
         if convertToPerson is not None and not onlyPerson:
             # ensure person is in classes
@@ -130,7 +146,6 @@ class RepoImdb(imdb):
                 if _class in convertToPerson:
                     classes.remove(_class)
             _classes = classes
-
         self._classes = _classes        
 
     def _createAnnoReader(self,annoPath,annoType,cleanRegex,convertToPerson,useImageSet):
@@ -140,21 +155,28 @@ class RepoImdb(imdb):
         if annoType == "xml": return xmlReader(path,self.classes,self._datasetName,
                                                self.config['setID'],
                                                convertToPerson=convertToPerson,
-                                               convertIdToCls = self._convertIdToCls)
+                                               convertIdToCls = self._convertIdToCls,
+                                               is_image_index_flattened = self.is_image_index_flattened)
         elif annoType == "txt": return txtReader(path,self.classes,self._datasetName,
                                                  self.config['setID'],cleanRegex=cleanRegex,
                                                  convertToPerson=convertToPerson,
-                                                 convertIdToCls = self._convertIdToCls)
+                                                 convertIdToCls = self._convertIdToCls,
+                                                 is_image_index_flattened =  self.is_image_index_flattened)
+        elif annoType == "cls_txt": return txtReader(path,self.classes,self._datasetName,
+                                                     self.config['setID'],anno_type='cls',
+                                                     is_image_index_flattened =  self.is_image_index_flattened)
         elif annoType == "json": return jsonReader(path,self.classes,self._datasetName,
                                                    self.config['setID'],self._image_set,
                                                    convertToPerson=convertToPerson,
-                                                   convertIdToCls = self._convertIdToCls)
+                                                   convertIdToCls = self._convertIdToCls,
+                                                   is_image_index_flattened =  self.is_image_index_flattened)
 
     def _createImgReader(self,imgPath,imgType,useImageSet):
         path = imgPath
         if useImageSet:
             path = osp.join(path,self._image_set)
-        return rawReader(path,imgType)
+        return rawReader(path,imgType,
+                         is_image_index_flattened = self.is_image_index_flattened)
 
     def _createEvaluator(self,annoPath):
         if self.config['use_salt']: self._salt = str(uuid.uuid4())
@@ -162,16 +184,32 @@ class RepoImdb(imdb):
         cachedir = self._cachedir
         if not osp.isdir(cachedir):
             os.makedirs(cachedir)
-        return bboxEvaluator(self._datasetName,self.classes,
-                             self._compID, "_" + self._salt,
+        if cfg.TASK == 'object_detection':
+            return bboxEvaluator(self._datasetName,self.classes,
+                             self._compID, self._salt,
                              cachedir, self._imageSetPath,
                              self._image_index,annoPath,
                              self.load_annotation)
+        elif cfg.TASK == 'classification':
+            return classificationEvaluator(self._datasetName,self.classes,
+                             self._compID, self._salt,
+                             cachedir, self._imageSetPath,
+                             self._image_index,annoPath,
+                             self.load_annotation)
+        else:
+            print("\n\n\nNo Evaluator Included\n\n\n")
+            return None
 
     def _update_image_index(self,newImageIndex):
         self._image_index = newImageIndex
-        self.imgReader._image_index = newImageIndex
-        self.evaluator.image_index = newImageIndex
+        if self.imgReader: self.imgReader._image_index = newImageIndex
+        if self.evaluator: self.evaluator.image_index = newImageIndex
+        
+    def _update_is_image_index_flattened(self,state):
+        self.is_image_index_flattened = state
+        if self.annoReader: self.annoReader._is_image_index_flattened = state
+        if self.evaluator: self.evaluator._is_image_index_flattened = state
+        if self.imgReader: self.imgReader._is_image_index_flattened = state
         
     def _load_image_index(self):
         """
@@ -184,6 +222,19 @@ class RepoImdb(imdb):
             'Path does not exist: {}'.format(image_set_file)
         with open(image_set_file) as f:
             image_index = [x.strip().split()[0] for x in f.readlines()]
+        self._image_index = image_index
+        if cfg.DATASETS.ANNOTATION_CLASS == "classification" and self.config['flatten_image_index']:
+            print("\n\n\n Possible Error: ANNOTATION_CLASS is 'classification'\
+            while 'flatten_image_index' is True\n\n\n\n")
+        if self.config['flatten_image_index']:
+            newImageIndex = []
+            for idx,image_id in enumerate(image_index):
+                image_count = self.count_bboxes_at(idx)
+                id_list = [ image_id + "_{}".format(jdx) for jdx in range(image_count) ]
+                newImageIndex.extend(id_list)
+            image_index = newImageIndex
+            self._update_is_image_index_flattened(True)
+        self._update_image_index(image_index)
         return image_index
 
     def count_bboxes_at(self,i):
@@ -233,14 +284,28 @@ class RepoImdb(imdb):
         Return the database of ground-truth regions of interest.
         This function loads/saves from/to a cache file to speed up future calls.
         """
+        if self.is_image_index_flattened is False and self.config['flatten_image_index'] is True:
+            print("Image Index has not yet been flattened")
+            sys.exit()
+
         cache_file = osp.join(self.cache_path,\
-                              '{}_{}_gt_roidb.pkl'.format(self.name,self._image_set))
+                              '{}_{}_{}_gt_roidb.pkl'.format(self.name,self._image_set,self._configName))
         print(cache_file)
         if osp.exists(cache_file):
             with open(cache_file, 'rb') as fid:
                 roidb_info = pickle.load(fid)
                 roidb = roidb_info["gt_roidb"]
                 filtered_image_index = roidb_info["fii"]
+                self.is_image_index_flattened = roidb_info['is_image_index_flattened']
+                if self.config['flatten_image_index'] != self.is_image_index_flattened:
+                    print("\n\n\nERROR: Flattened image index loaded but not asked for. Exiting.")
+                    sys.exit()
+                self._update_is_image_index_flattened(self.is_image_index_flattened)
+                print(len(roidb),len(filtered_image_index),len(self.image_index))
+                if self.config['flatten_image_index']:
+                    print("loading: imdb image index flattened")
+                else:
+                    print("loading: imdb image index not flattened")
                 if filtered_image_index:
                     print("loading a filtered imdb")
                     self._update_image_index(list(filtered_image_index))
@@ -252,10 +317,18 @@ class RepoImdb(imdb):
 
         # filter samples with no bounding box annotations:
         print("filtering empty samples from roidb")
+        gt_roidb,filtered_image_index = self.filterSamples(gt_roidb)
+        with open(cache_file, 'wb') as fid:
+            pickle.dump({"gt_roidb":gt_roidb,"fii":filtered_image_index,'is_image_index_flattened':self.is_image_index_flattened}, fid)
+        print('wrote gt roidb to {}'.format(cache_file))
+        return gt_roidb
+        
+    def filterSamples(self,gt_roidb):
         toRemove = []
-        for idx,sample in enumerate(gt_roidb):
-            if len(sample['gt_classes']) == 0:
-                toRemove.append(idx)
+        if cfg.DATASETS.ANNOTATION_CLASS == "object_detection":
+           for idx,sample in enumerate(gt_roidb):
+               if len(sample['gt_classes']) == 0:
+                   toRemove.append(idx)
         numFiltered = len(toRemove)
         filtered_image_index = list(self._image_index)
         for idx in sorted(toRemove,reverse=True):
@@ -263,10 +336,7 @@ class RepoImdb(imdb):
             del filtered_image_index[idx]
         print("filtered {} samples".format(numFiltered))
         self._update_image_index(list(filtered_image_index))
-        with open(cache_file, 'wb') as fid:
-            pickle.dump({"gt_roidb":gt_roidb,"fii":filtered_image_index}, fid)
-        print('wrote gt roidb to {}'.format(cache_file))
-        return gt_roidb
+        return gt_roidb,filtered_image_index
 
     def load_annotation(self,index):
         return self.annoReader.load_annotation(index)
@@ -283,7 +353,14 @@ class RepoImdb(imdb):
         if self.roidb is None:
             raise ValueError("roidb must be loaded before 'compute_size_along_roidb' can be run")
         self._roidbSize = []
-        self._roidbSize.append(len(self.roidb[0]['gt_classes']))
-        for image in self.roidb[1:]:
-            newSize = self._roidbSize[-1] + len(image['gt_classes'])
-            self._roidbSize.append(newSize)
+
+        if cfg.DATASETS.ANNOTATION_CLASS == "object_detection":
+           self._roidbSize.append(len(self.roidb[0]['gt_classes']))
+           for image in self.roidb[1:]:
+               newSize = self._roidbSize[-1] + len(image['gt_classes'])
+               self._roidbSize.append(newSize)
+        elif cfg.DATASETS.ANNOTATION_CLASS == "classification":
+           self._roidbSize = np.arange(len(self._image_index)) + 1
+        else:
+            print("ERROR: the cfg.DATASETS.ANNOTATION_CLASS is not recognized.")
+            sys.exit()

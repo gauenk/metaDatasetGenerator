@@ -1,7 +1,8 @@
-import sys,os,pickle,uuid,cv2
+import sys,os,pickle,uuid,cv2,glob
 import matplotlib.pyplot as plt
 import os.path as osp
 import numpy as np
+import numpy.random as npr
 from core.config import cfg,iconicImagesFileFormat
 from ntd.hog_svm import plot_confusion_matrix,appendHOGtoRoidb,split_data, scale_data,train_SVM,findMaxRegions, make_confusion_matrix
 from datasets.ds_utils import computeTotalAnnosFromAnnoCount
@@ -195,17 +196,17 @@ def vis_dets(im, class_names, dets, _idx_, fn=None, thresh=0.5):
     im = im[:, :, (2, 1, 0)]
     fig, ax = plt.subplots(figsize=(12, 12))
     ax.imshow(im, aspect='equal')
-    for i in range(len(dets)):
-        bbox = dets[i, :4]
-        
-        
-        ax.add_patch(
-            plt.Rectangle((bbox[0], bbox[1]),
-                          bbox[2] - bbox[0],
-                          bbox[3] - bbox[1], fill=False,
-                          edgecolor='red', linewidth=3.5)
-        )
-        
+    if dets is not None:
+       for i in range(len(dets)):
+           bbox = dets[i, :4]
+
+
+           ax.add_patch(
+               plt.Rectangle((bbox[0], bbox[1]),
+                             bbox[2] - bbox[0],
+                             bbox[3] - bbox[1], fill=False,
+                             edgecolor='red', linewidth=3.5)
+           )
     plt.axis('off')
     plt.tight_layout()
     plt.draw()
@@ -220,10 +221,18 @@ def toRadians(angle):
 
 def getRotationScale(M,rows,cols):
     a = np.array([cols,0,1])
+    b = np.array([0,0,1])
     ta = np.matmul(M,a)
-    if cfg._DEBUG.utils.misc: print("[getRotationScale] ta",ta)
-    rotate_y = 2 * (-ta[1]) + rows
-    scale = (rows) / ( rotate_y )
+    tb = np.matmul(M,b)
+    if cfg._DEBUG.utils.misc:
+        print("[getRotationScale] ta",ta)
+        print("[getRotationScale] tb",tb)
+    if ta[1] < tb[0]:
+        rotate_y = 2 * (-ta[1]) + rows
+        scale = (rows) / ( rotate_y )
+    else:
+        rotate_y = 2 * (-tb[0]) + cols
+        scale = (cols) / ( rotate_y )
     return scale
 
 def getRotationInfo(angle,cols,rows):
@@ -259,7 +268,8 @@ def getImageWithBorder(_img,border=255,rotation=None):
 
 def save_image_with_border(fn,_img,border=255,rotation=None):
     img = getImageWithBorder(_img,border=border,rotation=rotation)
-    cv2.imwrite(fn,img)
+    fp = osp.join(cfg.ROTATE_PATH,fn)
+    cv2.imwrite(fp,img)
 
 def save_image_of_overlap_bboxes(fn,img_bb1,img_bb2,rot1,rot2):
     img = np.zeros(img_bb1.shape)
@@ -274,8 +284,30 @@ def save_image_of_overlap_bboxes(fn,img_bb1,img_bb2,rot1,rot2):
     img[:,:,1] = img1[:,:,1] # green; the guess
     img[:,:,2] = img2[:,:,2] # red; the groundtruth
     cv2.putText(img,'{:0.2f}'.format(overlap),(0,60),cv2.FONT_HERSHEY_SIMPLEX, 2, (255,255,255,255))
-    cv2.imwrite(fn,img)
+    fp = osp.join(cfg.ROTATE_PATH,fn)
+    cv2.imwrite(fp,img)
 
+def save_list_of_bbox_imgs(fn,pimgs):
+    img = pimgs[0].astype(np.uint8)
+    for pimg in pimgs:
+        img = np.bitwise_or(pimg.astype(np.uint8),img)
+    fp = osp.join(cfg.ROTATE_PATH,fn)
+    cv2.imwrite(fn,img)    
+
+    ADD_NOISE = True
+    moves = []
+    if ADD_NOISE:
+        moves = zip([0,1,-5,3],[0,-1,3,-5])
+    base_fn = fn.split(".")[0]
+    cols = img.shape[0]
+    rows = img.shape[1]
+    for idx,m_xy in enumerate(moves):
+        xm,ym = m_xy[0],m_xy[1]
+        fn = "{}_{}.png".format(base_fn,idx)
+        M = np.float32([[1,0,xm],[0,1,ym]])
+        dst = cv2.warpAffine(img,M,(cols,rows))
+        cv2.imwrite(fn,dst)
+        
 def npBoolToUint8(a):
     return a.astype(np.uint8)*255
 
@@ -306,6 +338,60 @@ def print_net_activiation_data(net,layers_to_print):
         if name in layers_to_print:
             print("{}: {}".format(name,blob.data.shape))
     print("-"*50)
+
+
+def createNoisyBox(scale):
+    r = npr.rand(4)*scale
+    return r - np.mean(r)
+
+
+def loadActivityVectors():
+    av = {}
+    avDir = cfg.GET_SAVE_ACTIVITY_VECTOR_BLOBS_DIR()
+    for fn in glob.glob('{}/*.pkl'.format(avDir)):
+        start = fn.rfind('/') + 1
+        end = fn.rfind('.')
+        blob_name = fn[start:end]
+        with open(fn,'rb') as f:
+            av[blob_name] = pickle.load(f)
+    return av
+
+
+def evaluate_image_detections(roidb,cls_dets):
+    # we only decide if a bounding box is detected;
+    # e.g. (TP and FN) only
+    #      NOT (FP or FN)
+    # print("[./utils/misc.py: evaluate_image_detections]")
+    BBGT = []
+    for elem in roidb:
+        for idx,cls in enumerate(elem['gt_classes']):
+            if cls != 0: continue #cfg.PERSON_INDEX
+            BBGT.append(elem['boxes'][idx])
+    BBGT = np.array(BBGT)
+    # print(BBGT.shape)
+    found = np.zeros((BBGT.shape[0])).astype(np.uint8)
+    for bb in cls_dets:
+        ixmin = np.maximum(BBGT[:, 0], bb[0])
+        iymin = np.maximum(BBGT[:, 1], bb[1])
+        ixmax = np.minimum(BBGT[:, 2], bb[2])
+        iymax = np.minimum(BBGT[:, 3], bb[3])
+        iw = np.maximum(ixmax - ixmin + 1., 0.)
+        ih = np.maximum(iymax - iymin + 1., 0.)
+        inters = iw * ih
+
+        # union
+        uni = ((bb[2] - bb[0] + 1.) * (bb[3] - bb[1] + 1.) +
+               (BBGT[:, 2] - BBGT[:, 0] + 1.) *
+               (BBGT[:, 3] - BBGT[:, 1] + 1.) - inters)
+
+        overlaps = inters / uni
+        ovmax = np.max(overlaps)
+        jmax = np.argmax(overlaps)
+        found[jmax] = 1
+    return found
+
+
+
 
 
 

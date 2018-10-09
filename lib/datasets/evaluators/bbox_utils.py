@@ -3,9 +3,10 @@ import os.path as osp
 import xml.etree.ElementTree as ET
 import numpy as np
 from core.config import cfg
-from utils.misc import getRotationScale,toRadians,save_image_with_border,getRotationInfo,npBoolToUint8,save_image_of_overlap_bboxes
+from utils.misc import getRotationScale,toRadians,save_image_with_border,getRotationInfo,npBoolToUint8,save_image_of_overlap_bboxes,save_list_of_bbox_imgs
 
-#cfg._DEBUG.datasets.evaluators.bbox_utils = True
+cfg._DEBUG.datasets.evaluators.bbox_utils = False
+WESHOULDSAVE = False
 
 def cocoID_to_base(cocoID):
     if "COCO" in cocoID:
@@ -135,7 +136,8 @@ def compute_TP_FP(ovthresh,image_ids,BB,class_recs):
         ovmax = -np.inf
         BBGT = R['bbox'].astype(float)
         if cfg._DEBUG.datasets.evaluators.bbox_utils: print("[compute_TP_FP]",bb,BBGT)
-        if BBGT.size == 0: print("zero @ {}".format(d))
+
+        #if BBGT.size == 0: print("zero @ {}".format(d))
         
         if BBGT.size > 0:
             # compute overlaps
@@ -194,13 +196,21 @@ def compute_TP_FP_rotation(ovthresh,image_ids,BB,class_recs,rotations):
         ovmax = -np.inf
         BBGT = R['bbox'].astype(float)
         if cfg._DEBUG.datasets.evaluators.bbox_utils: print("rotation",rotation)
-        if BBGT.size == 0: print("zero @ {}".format(d))
+        # if BBGT.size == 0: print("zero @ {}".format(d))
         
         if BBGT.size > 0:
             # compute overlaps
+            global WESHOULDSAVE
+
+            # cfg._DEBUG.datasets.evaluators.bbox_utils = True
+            # if image_ids[d] in ["000017"]:
+            #     WESHOULDSAVE = True
+            # else:
+            #     WESHOULDSAVE = False
 
             if len(rotation) > 0:
                 pimgs = polygonImageList(BBGT,rotation)
+                if cfg._DEBUG.datasets.evaluators.bbox_utils: save_list_of_bbox_imgs("gt_bboxes_{}.png".format(image_ids[d]),pimgs)
                 if cfg._DEBUG.datasets.evaluators.bbox_utils: print("after polygonimagelist",pimgs.shape)
                 overlaps = computeIOU_from_PolygonList(pimgs,bb,rotation,d,image_ids[d])
             else:
@@ -252,7 +262,7 @@ def compute_REC_PREC_AP(tp,fp,npos,ovthresh,classname,use07=False,viz=False):
     rec = np.zeros((len(fp),len(ovthresh)))
     prec = np.zeros((len(fp),len(ovthresh)))
     ap = np.zeros(len(ovthresh))
-    show = [True,False,False]
+    show = [False,False,False]
     for idx in range(len(ovthresh)):
         # compute precision recall
         _fp = np.cumsum(fp[:,idx])
@@ -262,27 +272,30 @@ def compute_REC_PREC_AP(tp,fp,npos,ovthresh,classname,use07=False,viz=False):
         # ground truth
         prec[:,idx] = _tp / np.maximum(_tp + _fp, np.finfo(np.float64).eps)
         #ap = bbox_ap(rec, prec, use_07_metric)
-        ap[idx] = bbox_ap(rec[:,idx], prec[:,idx], classname, use_07_metric = use07, viz=show[idx])
+        ap[idx] = bbox_ap(rec[:,idx], prec[:,idx], classname, \
+                          use_07_metric = use07, viz=show[idx])
     return rec, prec, ap
 
-def record_TP_FP_IMAGE_AND_BBOX_ID(tp,fp,class_recs,image_ids,classname):
-    # TODO: write this function. :)
+def record_TP_FP_IMAGE_AND_BBOX_ID(tp,fp,class_recs,gt_image_ids,classname,suffix):
     print("-=-=-=- class: {} -=-=-=-".format(classname))
     print("WARNING: only prints TP and FN detections. That is, not False Positives.")
-    image_ids = set(image_ids)
-    nd = len(image_ids) # we only need to see each one once
-    for d,image_id in enumerate(image_ids):
+    image_ids = set(gt_image_ids)
+    nd = len(gt_image_ids) # we only need to see each one once
+    record = {}
+    for idx,image_id in enumerate(gt_image_ids):
         R = class_recs[image_id]
         if cfg._DEBUG.datasets.evaluators.bbox_utils: print(R['det'],image_id)
-        # if R['bbox'].size == 0: continue
-        # isCorrect = tp[d,0]
-        # if isCorrect:
-        #     print(d,tp[d,0],image_ids[d],R['bbox_id'][R['count']])
-        # else:
-        #     print(d,tp[d,0],image_ids[d])
-        # R['count'] += tp[d,0]
-    return True
+        BBGT  = R['bbox']
+        if BBGT.size == 0: continue
+        record[image_id] = R['det']
     
+    saveDir = osp.join(cfg.TP_FN_RECORDS_PATH,cfg.CALLING_DATASET_NAME)
+    if not osp.isdir(saveDir):
+        os.mkdir(saveDir)
+    savePath = osp.join(saveDir,"records_{}.pkl".format(suffix))
+    with open(savePath, 'w') as f:
+        pickle.dump(record, f)
+    return record
 
 def bbox_ap(rec, prec, clsnm,use_07_metric=False,viz=False):
     """ ap = bbox_ap(rec, prec, [use_07_metric])
@@ -351,10 +364,11 @@ def bbox_ap(rec, prec, clsnm,use_07_metric=False,viz=False):
 
 def polygonImageList(box_list,rotation):
     #img_size = polygonImage_getImageSize(box_list)
-    img_size = (rotation[2],rotation[1],3)
-    pimgs = np.zeros((len(box_list),) + img_size)
+    o_img_size = rotation[3]
+    r_img_size = (rotation[2],rotation[1],3)
+    pimgs = np.zeros((len(box_list),) + r_img_size)
     for idx,box in enumerate(box_list):
-        pimg = polygonImage(box.reshape(2,2),img_size,rotation,idx)
+        pimg = polygonImage(box.reshape(2,2),r_img_size,rotation,idx)
         pimgs[idx,:,:,:] = pimg
     return pimgs
 
@@ -367,11 +381,19 @@ def polygonImage(box,img_size,rotation,num):
     -> the image shape is contrained such that the original or translated bounding box will not be outside of the image. That is, the image size should be *at least* greater than the bottom right of the bounding box.
     -> for now, use x2 the bottom right of the bounding box as the image size.
     """
+    o_im_shape = rotation[3]
+    im_scale_x = float(o_im_shape[0]) / img_size[0]
+    im_scale_y = float(o_im_shape[1]) / img_size[1]
+    box[:,0] /= im_scale_x
+    box[:,1] /= im_scale_y
+    box = box.astype(np.int64)
+    
     points = ( tuple(box[0,:]),
                  (box[1,0], box[0,1]),
                  tuple(box[1,:]),
                  (box[0,0], box[1,1])
                )
+
     np_zeros = np.zeros(img_size).astype(np.uint8)
     zero_img = Image.fromarray(np_zeros)
     draw = ImageDraw.Draw(zero_img)
@@ -384,13 +406,29 @@ def polygonImage(box,img_size,rotation,num):
     post_warp = cv2.warpAffine(box_img,M,(cols,rows),scale).astype(np.uint8)
 
     if cfg._DEBUG.datasets.evaluators.bbox_utils:
-        zero_img.save("./only_polygon_{}.png".format(num))
+        #zero_img.save("./only_polygon_{}.png".format(num))
         print("angle",angle)
         print("M",M)
         print("scale",scale)
-        cv2.imwrite("./only_poly_rotated_{}.png".format(num),post_warp)
+        #cv2.imwrite("./only_poly_rotated_{}.png".format(num),post_warp)
 
+    im = cv2.resize(post_warp, None, None, fx=im_scale_x, fy=im_scale_y,
+                    interpolation=cv2.INTER_LINEAR)
+
+    if WESHOULDSAVE:
+        print("o_im_shape",o_im_shape)
+        print("img_size",img_size)
+        print("im.shape",im.shape)
+        print("post_warp.shape",post_warp.shape)
+        print(im_scale_x,im_scale_y)
+        save_image_with_border("./im_scale_test_{}.png".format(num),im)
+        save_image_with_border("./post_warp_{}.png".format(num),im)
+
+    # TODO: POSSIBLE ERROR HERE! SHOULD WE RETURN "IM" OR "POST_WARP"???
+    # I THINK IT IS OKAY WITH ONLY "POST_WARP" SINCE THE BBOX IS *BOOSTED* INTO THE POST_WARP SPACE.
+    # return im.astype(np.uint8)
     return post_warp.astype(np.uint8)
+
 
 def computeIOU_from_PolygonList(pimgs,bb,rotation,guessNumber,imgId):
     overlaps = [ None for _ in range(pimgs.shape[0]) ]
@@ -401,21 +439,19 @@ def computeIOU_from_PolygonList(pimgs,bb,rotation,guessNumber,imgId):
     guessBoxImg = polygonImage(bb.reshape(2,2),img_size,rotation_none,-1)
     if cfg._DEBUG.datasets.evaluators.bbox_utils:
         print("[computeIOU_from_PolygonList]",rotation)
-        save_image_with_border("./guess.png",guessBoxImg)
+        #save_image_with_border("./guess.png",guessBoxImg)
     for idx,pimg in enumerate(pimgs):
         inter = np.bitwise_and(guessBoxImg.astype(np.bool),pimg.astype(np.bool))
         union = np.bitwise_or(guessBoxImg.astype(np.bool),pimg.astype(np.bool))
         overlap = np.sum(inter) / float(np.sum(union))
         overlaps[idx] = overlap
         if cfg._DEBUG.datasets.evaluators.bbox_utils:
-            save_image_with_border("./guess_AND_{}.png".format(idx),npBoolToUint8(inter),
-                                   rotation=rotation)
+            # save_image_with_border("./guess_AND_{}.png".format(idx),npBoolToUint8(inter),rotation=rotation)
             #save_image_with_border("./gt_{}.png".format(idx),pimg,rotation=rotation)
-            cv2.imwrite("./gt_{}.png".format(idx),pimg)
-            save_image_of_overlap_bboxes("./show_overlap_img_{}_guess_{}_gt_{}.png".format(imgId,guessNumber,idx),guessBoxImg,pimg,
-                                         rotation_none,rotation)
-            print("stats\n\
-            inter: {}\n\
-            union: {}\n\
-            overlap: {}\n".format(np.sum(inter),np.sum(union),overlap))
+            #cv2.imwrite("./gt_{}.png".format(idx),pimg)
+            save_image_of_overlap_bboxes("./show_overlap_img_{}_rot_{}_guess_{}_gt_{}.png".format(imgId,cfg.ROTATE_IMAGE,guessNumber,idx),guessBoxImg,pimg,rotation_none,rotation)
+            # print("stats\n\
+            # inter: {}\n\
+            # union: {}\n\
+            # overlap: {}\n".format(np.sum(inter),np.sum(union),overlap))
     return overlaps

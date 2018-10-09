@@ -338,8 +338,42 @@ def vis_dets(im, class_names, dets, _idx_, fn=None, thresh=0.5):
     else:
         plt.savefig(fn.format(_idx_,str(uuid.uuid4())))
 
+def combine_roidb(self,roidbs):
+    # assumes ordering of roidbs
+    roidb = []
+    for r in roidbs:
+        # skips "None"; shouldn't impact the outcome
+        if r is None: continue
+        roidb.extend(r)
+        print_each_size(roidb)
+    return roidb
+
+def combineOnlyNewRoidbs(roidbs,pc):
+    # assumes ordering of roidbs
+    newRoidb = []
+    print(pc)
+    for idx,roidb in enumerate(roidbs):
+        if roidb is None: continue
+        newRoidb.extend(roidb[pc[idx]:])
+    return newRoidb
 
 
+def loadEvaluationRecords(classname):
+    saveDir = osp.join(cfg.TP_FN_RECORDS_PATH,cfg.CALLING_DATASET_NAME)
+    savePath = osp.join(saveDir,"records_{}.pkl".format('det_{:s}').format(classname))
+    print("loading evalutation records from: {}".format(savePath))
+    with open(savePath, "rb") as f:
+        records = pickle.load(f)
+    return records
+
+def split_and_load_ImdbImages(imdb,records):
+    for roidb,image_id in zip(imdb.roidb,imdb.image_set):
+        record = records[image_id]
+
+def convertFlattenedImageIndextoImageIndex(flattened_image_index):
+    bbox_index = flattened_image_index.split('_')[-1]
+    image_index = '_'.join(flattened_image_index.split('_')[:-1])
+    return image_index,int(bbox_index)
 
 
 

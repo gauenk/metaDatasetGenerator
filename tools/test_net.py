@@ -5,12 +5,12 @@
 """Test an object detection network on an image database."""
 
 import matplotlib
-matplotlib.use('Agg')
+# matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 
 import _init_paths
 from core.test import test_net
-from core.config import cfg, cfg_from_file, cfg_from_list
+from core.config import cfg, cfg_from_file, cfg_from_list, set_global_cfg
 from datasets.factory import get_repo_imdb
 import caffe
 import argparse
@@ -45,13 +45,20 @@ def parse_args():
                         help='set config keys', default=None,
                         nargs=argparse.REMAINDER)
     parser.add_argument('--vis', dest='vis', help='visualize detections',
-                        action='store_false')
+                        action='store_true')
     parser.add_argument('--num_dets', dest='max_per_image',
                         help='max number of detections per image',
                         default=100, type=int)
     parser.add_argument('--rotate', dest='rotate',
                         help='how much should we rotate each image?',
                         default=0, type=int)
+    # params for active learning model
+    parser.add_argument('--al_def', dest='al_def',
+                        help='active learning model prototxt',
+                        default=None, type=str)
+    parser.add_argument('--al_net', dest='al_net',
+                        help='active learning model weights',
+                        default=None, type=str)
 
     if len(sys.argv) == 1:
         parser.print_help()
@@ -70,6 +77,7 @@ if __name__ == '__main__':
         cfg_from_file(args.cfg_file)
     if args.set_cfgs is not None:
         cfg_from_list(args.set_cfgs)
+    set_global_cfg("TEST")
 
     cfg.GPU_ID = args.gpu_id
     cfg.ROTATE_IMAGE = args.rotate
@@ -89,10 +97,15 @@ if __name__ == '__main__':
     print(args.imdb_name)
     imdb = get_repo_imdb(args.imdb_name)
     imdb.competition_mode(args.comp_mode)
-    if not cfg.TEST.OBJ_DET.HAS_RPN:
+    if not cfg.TEST.OBJ_DET.HAS_RPN and cfg.TASK == 'object_detection':
         imdb.set_proposal_method(cfg.TEST.PROPOSAL_METHOD)
 
-    test_net(net, imdb, max_per_image=args.max_per_image, vis=args.vis)
+    al_net = None
+    if args.al_net is not None and args.al_def is not None:
+        al_net = caffe.Net(args.al_def,caffe.TEST, weights=args.al_net)
+        al_net.name = "al_"+os.path.splitext(os.path.basename(args.al_def))[0]
+
+    test_net(net, imdb, max_per_image=args.max_per_image, vis=args.vis, al_net=al_net)
     
 '''
 argparse.ArgumentParser

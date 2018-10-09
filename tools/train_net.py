@@ -2,9 +2,13 @@
 
 """Train an Img2Vec network on a "region of interest" database."""
 
+import matplotlib
+# matplotlib.use('Agg')
+import matplotlib.pyplot as plt
+
 import _init_paths
 from core.train import get_training_roidb, train_net
-from core.config import cfg, cfg_from_file, cfg_from_list, get_output_dir
+from core.config import cfg, cfg_from_file, cfg_from_list, get_output_dir, set_global_cfg
 from datasets.factory import get_repo_imdb
 from datasets.ds_utils import load_mixture_set,print_each_size
 import datasets.imdb
@@ -12,7 +16,7 @@ import caffe
 import argparse
 import pprint
 import numpy as np
-import sys
+import sys,os
 
 def parse_args():
     """
@@ -27,7 +31,7 @@ def parse_args():
                         default=None, type=str)
     parser.add_argument('--iters', dest='max_iters',
                         help='number of iterations to train',
-                        default=400000, type=int)
+                        default=1000000, type=int)
     parser.add_argument('--weights', dest='pretrained_model',
                         help='initialize with pretrained model weights',
                         default=None, type=str)
@@ -54,6 +58,12 @@ def parse_args():
                         nargs=argparse.REMAINDER)
     parser.add_argument('--solver_state', dest='solver_state',
                         help='initialize with a previous solver state',
+                        default=None, type=str)
+    parser.add_argument('--al_def', dest='al_def',
+                        help='active learning model prototxt',
+                        default=None, type=str)
+    parser.add_argument('--al_net', dest='al_net',
+                        help='active learning model weights',
                         default=None, type=str)
 
     # mixed dataset parameters
@@ -150,6 +160,7 @@ if __name__ == '__main__':
         cfg_from_file(args.cfg_file)
     if args.set_cfgs is not None:
         cfg_from_list(args.set_cfgs)
+    set_global_cfg("TRAIN")
 
     cfg.GPU_ID = args.gpu_id
     if args.solver_state == "None": args.solver_state = None
@@ -183,14 +194,18 @@ if __name__ == '__main__':
             print(sample['flipped'])
         
     """
-
+    al_net = None
+    if args.al_net is not None and args.al_def is not None:
+        al_net = caffe.Net(args.al_def,caffe.TEST, weights=args.al_net)
+        al_net.name = "al_"+os.path.splitext(os.path.basename(args.al_def))[0]
 
     print '{:d} roidb entries'.format(len(roidb))
     print 'Output will be saved to `{:s}`'.format(output_dir)
     train_net(args.solver, roidb, output_dir,
               solver_state=args.solver_state,
               pretrained_model=args.pretrained_model,
-              max_iters=args.max_iters)
+              max_iters=args.max_iters,
+              al_net=al_net)
     
 '''
 argparse.ArgumentParser

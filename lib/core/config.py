@@ -32,6 +32,8 @@ cfg = __C
 #
 __C.DATASETS = edict()
 cfgData = __C.DATASETS
+__C.CALLING_DATASET_NAME = ""
+__C.CALLING_IMAGESET_NAME = ""
 __C.DATASETS.EXP_DATASET = ""
 __C.DATASETS.PATH_ROOT = ""
 __C.DATASETS.PATH_TO_IMAGES = ""
@@ -47,11 +49,20 @@ __C.DATASETS.CONVERT_TO_PERSON = None
 __C.DATASETS.IMAGE_INDEX_TO_IMAGE_PATH = None
 __C.DATASETS.USE_IMAGE_SET = None
 __C.DATASETS.CONVERT_ID_TO_CLS_FILE = None
-__C.DATASETS.USE_IMAGE_SET = None
-__C.DATASETS.CONVERT_ID_TO_CLS_FILE = None
 __C.DATASETS.ONLY_PERSON = False
 __C.DATASETS.MODEL = None
+__C.DATASETS.ANNOTATION_CLASS = "object_detection"
 
+#
+# Global Options
+#
+
+__C.BATCH_SIZE = None
+__C.SCALES = None
+
+__C.AL_CLS = edict()
+__C.AL_CLS.BALANCE_CLASSES = True
+__C.AL_CLS.LAYERS = ['conv5_1','conv4_1','conv3_1']
 
 #
 # Training options
@@ -75,7 +86,7 @@ __C.TRAIN.MAX_SIZE = 1000
 #__C.TRAIN.MAX_SIZE = 64
 
 # Images to use per minibatch
-__C.TRAIN.IMS_PER_BATCH = 1
+__C.TRAIN.BATCH_SIZE = 1
 
 # Use horizontally-flipped images during training?
 __C.TRAIN.USE_FLIPPED = False
@@ -95,6 +106,9 @@ __C.TRAIN.USE_PREFETCH = False
 # tall and thin or both short and wide) in order to avoid wasting computation
 # on zero-padding.
 __C.TRAIN.ASPECT_GROUPING = True
+
+# Batch size
+__C.TRAIN.BATCH_SIZE = 1
 
 #
 # Training (object detection) options
@@ -166,13 +180,35 @@ __C.TRAIN.OBJ_DET.RPN_POSITIVE_WEIGHT = -1.0
 # VAE Options
 
 __C.TRAIN.VAE = edict()
-__C.TRAIN.VAE.BATCH_SIZE = __C.TRAIN.IMS_PER_BATCH
+__C.TRAIN.VAE.BATCH_SIZE = __C.TRAIN.BATCH_SIZE
+
+__C.TRAIN.CLASSIFICATION = edict()
+__C.TRAIN.CLASSIFICATION.TASK = 'tp_fn'
+__C.TRAIN.CLASSIFICATION.THRESHOLD = 0.5
+__C.TRAIN.CLASSIFICATION.PROPOSAL_METHOD = 'gt'
+
+
+# CLASSIFICATION Options
+
+__C.TRAIN.CLS = edict()
+__C.TRAIN.CLS.BATCH_SIZE = __C.TRAIN.BATCH_SIZE
+__C.TRAIN.CLS.BALANCE_CLASSES = True
+
+# AL Train Options
+
+__C.TRAIN.AL_CLS = edict()
+__C.TRAIN.AL_CLS.BALANCE_CLASSES = True
+__C.TRAIN.AL_CLS.LAYERS = ['conv5_1','conv4_1','conv3_1']
+
 
 #
 # Testing options
 #
 
 __C.TEST = edict()
+
+# number of image per batch
+__C.TEST.BATCH_SIZE = 1
 
 # Scales to use during testing (can list multiple scales)
 # Each scale is the pixel size of an image's shortest side
@@ -214,13 +250,27 @@ __C.TEST.OBJ_DET.RPN_POST_NMS_TOP_N = 300
 __C.TEST.OBJ_DET.RPN_MIN_SIZE = 16
 
 
+__C.TEST.CLASSIFICATION = edict()
+__C.TEST.CLASSIFICATION.TASK = 'tp_fn'
+__C.TEST.CLASSIFICATION.THRESHOLD = 0.5
+__C.TEST.CLASSIFICATION.PROPOSAL_METHOD = 'gt'
+
+#
+# AL Testing Options
+#
+
+__C.TEST.AL_CLS = edict()
+__C.TEST.AL_CLS.BALANCE_CLASSES = True
+__C.TEST.AL_CLS.LAYERS = ['conv5_1','conv4_1','conv3_1']
+
+
 #
 # MISC
 #
 
 # official names for publication
 __C.DATASET_NAMES_PAPER = ['COCO', 'ImageNet', 'VOC', 'Caltech', 'INRIA', 'SUN', 'KITTI', 'CAM2']
-__C.DATASET_NAMES_ORDERED = ['coco', 'imagenet', 'pascal_voc', 'caltech', 'inria', 'sun','kitti','cam2' ]
+__C.DATASET_NAMES_ORDERED = ['coco', 'imagenet', 'pascal_voc', 'caltech', 'inria', 'sun','kitti','cam2','mnist' ]
 
 # For print statements
 __C.DEBUG = False
@@ -287,6 +337,11 @@ __C.OBJ_DET.DEDUP_BOXES = 1./16.
 # Use GPU implementation of non-maximum suppression
 __C.OBJ_DET.USE_GPU_NMS = True
 
+
+# Threshold for the generative model
+__C.GENERATE = edict()
+__C.GENERATE.THRESHOLD = 127.5
+
 # How much information about the bounding boxes do we store in memory?
 __C.OBJ_DET.BBOX_VERBOSE = True
 
@@ -295,10 +350,13 @@ __C.OBJ_DET.BBOX_VERBOSE = True
 __C.MIXED_DATASET_SIZES = [50,1000,5000]
 
 # The size of the input for images cropped to their annotations
-__C.CROPPED_IMAGE_SIZE = 100
+__C.CROPPED_IMAGE_SIZE = 227
 
 # The size of the input for raw images
 __C.RAW_IMAGE_SIZE = 300
+
+# The size of the input for raw images
+__C.AL_IMAGE_SIZE = 400
 
 # the size of the 
 __C.CONFIG_DATASET_INDEX_DICTIONARY_PATH = "default_dataset_index.yml"
@@ -321,8 +379,35 @@ __C.COMPUTE_IMG_STATS = True
 # how much should we rotate each image?
 __C.ROTATE_IMAGE = 0
 
+# how much should we rotate each image?
+__C.COLOR_CHANNEL = 3 #color == 3 | black&white == 1
+
 # should we write the results?
 __C.WRITE_RESULTS = True
+
+# output for recoding the TP and FN of a model
+__C.TP_FN_RECORDS_PATH = "./output/{}/tp_fn_records/".format("faster_rcnn")
+
+# output for recoding the TP and FN of a model
+__C.ROTATE_PATH = "./output/rotate/"
+
+# a switching condition for different goals in training/testing
+__C.TASK = "object_detection"
+
+# string name of the output layer's probability vectore
+__C.CLS_PROBS = "cls_prob"
+
+
+def GET_SAVE_ACTIVITY_VECTOR_BLOBS_DIR():
+    dirn = "./output/activity_vectors/{}/{}-{}/".format(__C.EXP_DIR.replace("/",""),__C.CALLING_DATASET_NAME,__C.CALLING_IMAGESET_NAME)
+    if not osp.exists(dirn):
+        os.makedirs(dirn)
+    return dirn
+
+# used for saving activity vectors
+__C.GET_SAVE_ACTIVITY_VECTOR_BLOBS_DIR = GET_SAVE_ACTIVITY_VECTOR_BLOBS_DIR
+__C.SAVE_ACTIVITY_VECTOR_BLOBS = [] # the list of blobs to save
+
 
 def get_output_dir(imdb_name, net=None):
     """Return the directory where experimental artifacts are placed.
@@ -376,6 +461,18 @@ def _merge_a_into_b(a, b):
         else:
             b[k] = v
 
+def set_global_cfg(MODE):
+    # set global variables for testing
+    cfg.PIXEL_MEANS = np.array(cfg.PIXEL_MEANS)
+    if MODE == "TEST":
+        cfg.BATCH_SIZE = cfg.TEST.BATCH_SIZE
+        cfg.AL_CLS.LAYERS = cfg.TEST.AL_CLS.LAYERS
+        cfg.SCALES = cfg.TEST.SCALES
+    elif MODE == "TRAIN":
+        cfg.BATCH_SIZE = cfg.TRAIN.BATCH_SIZE
+        cfg.AL_CLS.LAYERS = cfg.TRAIN.AL_CLS.LAYERS
+        cfg.SCALES = cfg.TRAIN.SCALES
+
 def cfg_from_file(filename):
     """Load a config file and merge it into the default options."""
     import yaml
@@ -383,6 +480,7 @@ def cfg_from_file(filename):
         yaml_cfg = edict(yaml.load(f))
 
     _merge_a_into_b(yaml_cfg, __C)
+    load_tp_fn_record_path()
 
 def cfgData_from_file(filename):
     """Load a config file and merge it into the default options."""
@@ -391,6 +489,7 @@ def cfgData_from_file(filename):
         yaml_cfg = edict(yaml.load(f))
 
     _merge_a_into_b(yaml_cfg, __C.DATASETS)
+    load_tp_fn_record_path()
 
 def cfg_from_list(cfg_list):
     """Set config keys via list (e.g., from command line)."""
@@ -428,6 +527,14 @@ def createPathRepeat(setID,r):
 def createFilenameID(setID,r,size):
     return osp.join(cfg.PATH_MIXTURE_DATASETS,setID,r,size)
 
+def load_tp_fn_record_path():
+    __C.TP_FN_RECORDS_PATH = "./output/{:s}/tp_fn_records/"
+    if type(__C.DATASETS.MODEL) is str:
+        __C.TP_FN_RECORDS_PATH = __C.TP_FN_RECORDS_PATH.format(__C.DATASETS.MODEL)
+    else:
+        __C.TP_FN_RECORDS_PATH = __C.TP_FN_RECORDS_PATH.format("faster_rcnn")
+    return __C.TP_FN_RECORDS_PATH
+    
 def loadDatasetIndexDict():
     # legacy
     return __C.DATASET_NAMES_ORDERED

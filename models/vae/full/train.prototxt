@@ -3,11 +3,11 @@ layer {
   name: 'input-data'
   type: 'Python'
   top: 'data'
-  top: 'im_info'
   top: 'labels'
+  # top: 'im_info'
   python_param {
-    module: 'vae_data_layer.layer'
-    layer: 'VAE_DataLayer'
+    module: 'cls_data_layer.layer'
+    layer: 'ClsDataLayer'
     param_str: "'num_classes': 2"
   }
   include {
@@ -19,135 +19,499 @@ layer {
   type: "Flatten"
   bottom: "data"
   top: "flatdata"
-  include {
-    phase: TRAIN
-  }
   flatten_param {
     end_axis: 3
   }
+  include {
+    phase: TRAIN
+  }
 }
 layer {
-  name: "encode1_"
-  type: "InnerProduct"
+  name: "norm_flatdata"
+  bottom: "flatdata"
+  top: "norm_flatdata"
+  type: "Power"
+  power_param {
+    power: 1
+    scale: 0.003921569
+    shift: 0
+  }
+  include {
+    phase: TRAIN
+  }
+}
+layer {
+  name: "conv1_1"
+  type: "Convolution"
   bottom: "data"
-  top: "encode1"
+  top: "conv1_1"
   param {
-    lr_mult: 1
-    decay_mult: 1
-  }
-  param {
-    lr_mult: 1
+    lr_mult: 0
     decay_mult: 0
   }
-  inner_product_param {
-    num_output: 1000
-    weight_filler {
-      type: "gaussian"
-	    std: 0.1
-	    sparse: 15
-	  }
-    bias_filler {
-      type: "constant"
-	    value: 0
-	  }
-  }
-  include {
-    phase: TRAIN
-  }
-}
-layer {
-  name: "encode1neuron"
-  type: "ReLU"
-  bottom: "encode1"
-  top: "encode1neuron"
-  include {
-    phase: TRAIN
-  }
-}
-layer {
-  name: "encode2"
-  type: "InnerProduct"
-  bottom: "encode1neuron"
-  top: "encode2"
   param {
-    lr_mult: 1
-    decay_mult: 1
-  }
-  param {
-    lr_mult: 1
+    lr_mult: 0
     decay_mult: 0
   }
-  inner_product_param {
-    num_output: 500
-    weight_filler {
-      type: "gaussian"
-	    std: 0.1
-	    sparse: 15
-	  }
-    bias_filler {
-      type: "constant"
-	    value: 0
-	  }
+  convolution_param {
+    num_output: 64
+    pad: 1
+    kernel_size: 3
   }
   include {
     phase: TRAIN
   }
+
 }
 layer {
-  name: "encode2neuron"
+  name: "relu1_1"
   type: "ReLU"
-  bottom: "encode2"
-  top: "encode2neuron"
+  bottom: "conv1_1"
+  top: "conv1_1"
   include {
     phase: TRAIN
   }
+
 }
 layer {
-  name: "encode3"
-  type: "InnerProduct"
-  bottom: "encode2neuron"
-  top: "encode3"
+  name: "conv1_2"
+  type: "Convolution"
+  bottom: "conv1_1"
+  top: "conv1_2"
   param {
-    lr_mult: 1
-    decay_mult: 1
-  }
-  param {
-    lr_mult: 1
+    lr_mult: 0
     decay_mult: 0
   }
-  inner_product_param {
-    num_output: 250
-    weight_filler {
-      type: "gaussian"
-	    std: 0.1
-	    sparse: 15
-	  }
-    bias_filler {
-      type: "constant"
-	    value: 0
-	  }
+  param {
+    lr_mult: 0
+    decay_mult: 0
+  }
+  convolution_param {
+    num_output: 64
+    pad: 1
+    kernel_size: 3
   }
   include {
     phase: TRAIN
   }
+
 }
 layer {
-  name: "encode3neuron"
+  name: "relu1_2"
   type: "ReLU"
-  bottom: "encode3"
-  top: "encode3neuron"
+  bottom: "conv1_2"
+  top: "conv1_2"
   include {
     phase: TRAIN
   }
+
+}
+layer {
+  name: "pool1"
+  type: "Pooling"
+  bottom: "conv1_2"
+  top: "pool1"
+  pooling_param {
+    pool: MAX
+    kernel_size: 2
+    stride: 2
+  }
+  include {
+    phase: TRAIN
+  }
+
+}
+layer {
+  name: "conv2_1"
+  type: "Convolution"
+  bottom: "pool1"
+  top: "conv2_1"
+  param {
+    lr_mult: 0
+    decay_mult: 0
+  }
+  param {
+    lr_mult: 0
+    decay_mult: 0
+  }
+  convolution_param {
+    num_output: 128
+    pad: 1
+    kernel_size: 3
+  }
+  include {
+    phase: TRAIN
+  }
+
 }
 
+layer {
+  name: "relu2_1"
+  type: "ReLU"
+  bottom: "conv2_1"
+  top: "conv2_1"
+  include {
+    phase: TRAIN
+  }
 
+}
+layer {
+  name: "conv2_2"
+  type: "Convolution"
+  bottom: "conv2_1"
+  top: "conv2_2"
+  param {
+    lr_mult: 0
+    decay_mult: 0
+  }
+  param {
+    lr_mult: 0
+    decay_mult: 0
+  }
+  convolution_param {
+    num_output: 128
+    pad: 1
+    kernel_size: 3
+  }
+  include {
+    phase: TRAIN
+  }
+
+}
+layer {
+  name: "relu2_2"
+  type: "ReLU"
+  bottom: "conv2_2"
+  top: "conv2_2"
+  include {
+    phase: TRAIN
+  }
+
+}
+layer {
+  name: "pool2"
+  type: "Pooling"
+  bottom: "conv2_2"
+  top: "pool2"
+  pooling_param {
+    pool: MAX
+    kernel_size: 2
+    stride: 2
+  }
+  include {
+    phase: TRAIN
+  }
+
+}
+layer {
+  name: "conv3_1"
+  type: "Convolution"
+  bottom: "pool2"
+  top: "conv3_1"
+  param {
+    lr_mult: 0
+  }
+  param {
+    lr_mult: 0
+  }
+  convolution_param {
+    num_output: 256
+    pad: 1
+    kernel_size: 3
+  }
+  include {
+    phase: TRAIN
+  }
+}
+layer {
+  name: "relu3_1"
+  type: "ReLU"
+  bottom: "conv3_1"
+  top: "conv3_1"
+  include {
+    phase: TRAIN
+  }
+}
+layer {
+  name: "conv3_2"
+  type: "Convolution"
+  bottom: "conv3_1"
+  top: "conv3_2"
+  param {
+    lr_mult: 0
+  }
+  param {
+    lr_mult: 0
+  }
+  convolution_param {
+    num_output: 256
+    pad: 1
+    kernel_size: 3
+  }
+  include {
+    phase: TRAIN
+  }
+}
+layer {
+  name: "relu3_2"
+  type: "ReLU"
+  bottom: "conv3_2"
+  top: "conv3_2"
+  include {
+    phase: TRAIN
+  }
+}
+layer {
+  name: "conv3_3"
+  type: "Convolution"
+  bottom: "conv3_2"
+  top: "conv3_3"
+  param {
+    lr_mult: 0
+  }
+  param {
+    lr_mult: 0
+  }
+  convolution_param {
+    num_output: 256
+    pad: 1
+    kernel_size: 3
+  }
+  include {
+    phase: TRAIN
+  }
+}
+layer {
+  name: "relu3_3"
+  type: "ReLU"
+  bottom: "conv3_3"
+  top: "conv3_3"
+  include {
+    phase: TRAIN
+  }
+}
+layer {
+  name: "pool3"
+  type: "Pooling"
+  bottom: "conv3_3"
+  top: "pool3"
+  pooling_param {
+    pool: MAX
+    kernel_size: 2
+    stride: 2
+  }
+  include {
+    phase: TRAIN
+  }
+}
+layer {
+  name: "conv4_1"
+  type: "Convolution"
+  bottom: "pool3"
+  top: "conv4_1"
+  param {
+    lr_mult: 0
+  }
+  param {
+    lr_mult: 0
+  }
+  convolution_param {
+    num_output: 512
+    pad: 1
+    kernel_size: 3
+  }
+  include {
+    phase: TRAIN
+  }
+}
+layer {
+  name: "relu4_1"
+  type: "ReLU"
+  bottom: "conv4_1"
+  top: "conv4_1"
+  include {
+    phase: TRAIN
+  }
+}
+layer {
+  name: "conv4_2"
+  type: "Convolution"
+  bottom: "conv4_1"
+  top: "conv4_2"
+  param {
+    lr_mult: 0
+  }
+  param {
+    lr_mult: 0
+  }
+  convolution_param {
+    num_output: 512
+    pad: 1
+    kernel_size: 3
+  }
+  include {
+    phase: TRAIN
+  }
+}
+layer {
+  name: "relu4_2"
+  type: "ReLU"
+  bottom: "conv4_2"
+  top: "conv4_2"
+  include {
+    phase: TRAIN
+  }
+}
+layer {
+  name: "conv4_3"
+  type: "Convolution"
+  bottom: "conv4_2"
+  top: "conv4_3"
+  param {
+    lr_mult: 0
+  }
+  param {
+    lr_mult: 0
+  }
+  convolution_param {
+    num_output: 512
+    pad: 1
+    kernel_size: 3
+  }
+  include {
+    phase: TRAIN
+  }
+}
+layer {
+  name: "relu4_3"
+  type: "ReLU"
+  bottom: "conv4_3"
+  top: "conv4_3"
+  include {
+    phase: TRAIN
+  }
+}
+layer {
+  name: "pool4"
+  type: "Pooling"
+  bottom: "conv4_3"
+  top: "pool4"
+  pooling_param {
+    pool: MAX
+    kernel_size: 2
+    stride: 2
+  }
+  include {
+    phase: TRAIN
+  }
+}
+layer {
+  name: "conv5_1"
+  type: "Convolution"
+  bottom: "pool4"
+  top: "conv5_1"
+  param {
+    lr_mult: 0
+  }
+  param {
+    lr_mult: 0
+  }
+  convolution_param {
+    num_output: 512
+    pad: 1
+    kernel_size: 3
+  }
+  include {
+    phase: TRAIN
+  }
+}
+layer {
+  name: "relu5_1"
+  type: "ReLU"
+  bottom: "conv5_1"
+  top: "conv5_1"
+  include {
+    phase: TRAIN
+  }
+}
+layer {
+  name: "conv5_2"
+  type: "Convolution"
+  bottom: "conv5_1"
+  top: "conv5_2"
+  param {
+    lr_mult: 0
+  }
+  param {
+    lr_mult: 0
+  }
+  convolution_param {
+    num_output: 512
+    pad: 1
+    kernel_size: 3
+  }
+  include {
+    phase: TRAIN
+  }
+}
+layer {
+  name: "relu5_2"
+  type: "ReLU"
+  bottom: "conv5_2"
+  top: "conv5_2"
+  include {
+    phase: TRAIN
+  }
+}
+layer {
+  name: "conv5_3"
+  type: "Convolution"
+  bottom: "conv5_2"
+  top: "conv5_3"
+  param {
+    lr_mult: 0
+  }
+  param {
+    lr_mult: 0
+  }
+  convolution_param {
+    num_output: 512
+    pad: 1
+    kernel_size: 3
+  }
+  include {
+    phase: TRAIN
+  }
+}
+layer {
+  name: "relu5_3"
+  type: "ReLU"
+  bottom: "conv5_3"
+  top: "conv5_3"
+  include {
+    phase: TRAIN
+  }
+}
+layer {
+  name: "pool5"
+  type: "Pooling"
+  bottom: "conv5_3"
+  top: "pool5"
+  pooling_param {
+    pool: MAX
+    kernel_size: 2
+    stride: 2
+  }
+  include {
+    phase: TRAIN
+  }
+}
 # end encoder, begin VAE z definition
 
 layer {
   name: "mu_"
   type: "InnerProduct"
-  bottom: "encode3neuron"
+  bottom: "pool5"
   top: "mu"
   param {
     lr_mult: 1
@@ -177,7 +541,7 @@ layer {
 layer {
   name: "logsd_"
   type: "InnerProduct"
-  bottom: "encode3"
+  bottom: "pool5"
   top: "logsd"
   param {
     lr_mult: 1
@@ -289,8 +653,10 @@ layer{
   top: "mu"
   dummy_data_param{
     shape {
-      dim: 20 # test-time batch_size
-	    dim: 100 # num z's
+    	  dim: 1
+    	  dim: 1
+	  dim: 1 # test-time batch_size
+	  dim: 100 # num z's
 	  }
     data_filler{
       type: "constant"
@@ -307,12 +673,14 @@ layer{
   top: "sd"
   dummy_data_param{
     shape {
-      dim: 20 # test-time batch_size
-	    dim: 100 # num z's
+    	  dim: 1    
+    	  dim: 1    
+          dim: 1 # test-time batch_size
+	  dim: 100 # num z's
 	  }
     data_filler{
-      type: "constant"
-	    value: 1
+         type: "constant"
+	 value: 1
 	  }
   }
   include {
@@ -325,41 +693,40 @@ layer{
   top: "noise"
   dummy_data_param{
     shape {
-      dim: 20 # train batch_size
-	    dim: 100 # num z's
+        dim:1
+        dim:1
+    	dim: 1 # train batch_size
+	dim: 100 # num z's
 	  }
     data_filler{
       type: "gaussian"
 	    std: 1.
 	  }
-  }
-  include {
-    phase: TRAIN
   }
 }
-layer{
-  name: "noise"
-  type: "DummyData"
-  top: "noise"
-  dummy_data_param{
-    shape {
-      dim: 20 # test batch_size
-      dim: 100 # num z's
-	  }
-    data_filler{
-      type: "gaussian"
-	    std: 1.
-	  }
+layer {
+  name: "sd_reshape"
+  type: "Reshape"
+  bottom: "sd"
+  top: "sd_reshape"  
+  reshape_param {
+     shape { dim: 1 dim:  1  dim: 1  dim:  100 }
   }
-  include {
-    phase: TEST
+}
+layer {
+  name: "mu_reshape"
+  type: "Reshape"
+  bottom: "mu"
+  top: "mu_reshape"  
+  reshape_param {
+     shape { dim: 1 dim:  1  dim: 1  dim:  100 }
   }
 }
 layer{
   name: "sdnoise"
   type: "Eltwise"
   bottom: "noise"
-  bottom: "sd"
+  bottom: "sd_reshape"
   top: "sdnoise"
   eltwise_param{
     operation: PROD
@@ -368,7 +735,7 @@ layer{
 layer{
   name: "sample"
   type: "Eltwise"
-  bottom: "mu"
+  bottom: "mu_reshape"
   bottom: "sdnoise"
   top: "sample"
   eltwise_param{
@@ -379,8 +746,8 @@ layer{
 # end VAE z's definition, begin decoder
 
 layer {
-  name: "decode4_"
-  type: "InnerProduct"
+  name: "decode4"
+  type: "Convolution"
   bottom: "sample"
   top: "decode4"
   param {
@@ -391,16 +758,13 @@ layer {
     lr_mult: 1
     decay_mult: 0
   }
-  inner_product_param {
-    num_output: 250
+  convolution_param {
+    num_output: 64
+    pad: 1
+    kernel_size: 3
     weight_filler {
       type: "gaussian"
-	    std: 0.1
-	    sparse: 15
-	  }
-    bias_filler {
-      type: "constant"
-	    value: 0
+      	    std: 0.1
 	  }
   }
 }
@@ -412,7 +776,7 @@ layer {
 }
 layer {
   name: "decode3"
-  type: "InnerProduct"
+  type: "Convolution"
   bottom: "decode4neuron"
   top: "decode3"
   param {
@@ -423,16 +787,13 @@ layer {
     lr_mult: 1
     decay_mult: 0
   }
-  inner_product_param {
-    num_output: 500
+  convolution_param {
+    num_output: 128
+    pad: 1
+    kernel_size: 3
     weight_filler {
       type: "gaussian"
-	    std: 0.1
-	    sparse: 15
-	  }
-    bias_filler {
-      type: "constant"
-	    value: 0
+      	    std: 0.1
 	  }
   }
 }
@@ -444,7 +805,7 @@ layer {
 }
 layer {
   name: "decode2"
-  type: "InnerProduct"
+  type: "Convolution"
   bottom: "decode3neuron"
   top: "decode2"
   param {
@@ -455,16 +816,13 @@ layer {
     lr_mult: 1
     decay_mult: 0
   }
-  inner_product_param {
-    num_output: 1000
+  convolution_param {
+    num_output: 128
+    pad: 1
+    kernel_size: 3
     weight_filler {
       type: "gaussian"
-	    std: 0.1
-	    sparse: 15
-	  }
-    bias_filler {
-      type: "constant"
-	    value: 0
+      	    std: 0.1
 	  }
   }
 }
@@ -488,7 +846,7 @@ layer {
     decay_mult: 0
   }
   inner_product_param {
-    num_output: 30000
+    num_output: 7500
     weight_filler {
       type: "gaussian"
 	    std: 0.1
@@ -500,11 +858,25 @@ layer {
 	  }
   }
 }
-
+layer {
+  name: "generated_images_reshape"
+  type: "Reshape"
+  bottom: "decode1"
+  top: "generated_images_reshape"
+  reshape_param {
+     shape { dim: 1 dim:  7500 }
+  }
+}
+layer {
+  name: "generated_images"
+  type: "Sigmoid"
+  bottom: "generated_images_reshape"
+  top: "generated_images"
+}
 layer {
   name: "loss"
   type: "EuclideanLoss"
-  bottom: "decode1"
+  bottom: "generated_images"
   bottom: "flatdata"
   top: "cross_entropy_loss"
   loss_weight: .1
@@ -517,16 +889,10 @@ layer {
 }
 
 layer {
-  name: "decode1neuron"
-  type: "Sigmoid"
-  bottom: "decode1"
-  top: "decode1neuron"
-}
-layer {
   name: "loss"
   type: "Silence"
-  bottom: "decode1neuron"
-  bottom: "flatdata"
+  bottom: "generated_images"
+  bottom: "norm_flatdata"
   include {
     phase: TRAIN
   }
@@ -535,7 +901,7 @@ layer {
   name: "silence_info"
   type: "Silence"
   bottom: "labels"
-  bottom: "im_info"
+  # bottom: "im_info"
   include {
     phase: TRAIN
   }

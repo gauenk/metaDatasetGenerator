@@ -63,7 +63,7 @@ class imdb(object):
         for idx,rsize in enumerate(self.roidbSize):
             #print("idx,rsize,gsize",idx,rsize,gsize)
             if rsize >= gsize: return idx
-        return -1
+        return -1 
 
     def get_roidb_at_size(self,gsize):
         rindex = self._get_roidb_index_at_size(gsize)
@@ -167,6 +167,15 @@ class imdb(object):
                 for i in xrange(self.num_images)]
 
     def append_flipped_images(self):
+        if cfg.DATASETS.ANNOTATION_CLASS == "object_detection":
+            self.append_flipped_images_bbox()
+        elif cfg.DATASETS.ANNOTATION_CLASS == "classification":
+            self.append_flipped_images_cls()
+        else:
+            print("ERROR: the cfg.DATASETS.ANNOTATION_CLASS is not recognized.")
+            sys.exit()
+
+    def append_flipped_images_bbox(self):
         num_images = self.num_images
         widths = self._get_widths()
         for i in range(num_images):
@@ -189,6 +198,16 @@ class imdb(object):
                      'gt_overlaps' : self.roidb[i]['gt_overlaps'],
                      'gt_classes' : self.roidb[i]['gt_classes'],
                      'flipped' : True,
+                     'set': self.roidb[i]['set']}
+            self.roidb.append(entry)
+        self._update_image_index(self._image_index * 2)
+        
+    def append_flipped_images_cls(self):
+        num_images = self.num_images
+        widths = self._get_widths()
+        for i in range(num_images):
+            entry = {'gt_classes' : self.roidb[i]['gt_classes'],
+                     'flipped': True,
                      'set': self.roidb[i]['set']}
             self.roidb.append(entry)
         self._update_image_index(self._image_index * 2)

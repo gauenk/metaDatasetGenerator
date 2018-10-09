@@ -19,7 +19,8 @@ class txtReader(object):
 
     def __init__(self, annoPath, classes , datasetName, setID,
                  bboxOffset = 0,useDiff = True, cleanRegex = None,
-                 convertToPerson = None, convertIdToCls = None):
+                 convertToPerson = None, convertIdToCls = None, anno_type='box',
+                 is_image_index_flattened=False):
         """
         __init__ function for annoReader [annotationReader]
 
@@ -33,6 +34,8 @@ class txtReader(object):
         self._classToIndex = self._create_classToIndex(classes)
         self._convertIdToCls = convertIdToCls
         self._convertToPerson = convertToPerson
+        self._anno_type = anno_type
+        self._is_image_index_flattened = is_image_index_flattened
         if cleanRegex is not None: self._cleanRegex = cleanRegex # used for INRIA
         else:
             self._cleanRegex = r"(?P<cls>[0-9]+) (?P<xmin>[0-9]*\.[0-9]*) (?P<ymin>[0-9]*\.[0-9]*) (?P<xmax>[0-9]*\.[0-9]*) (?P<ymax>[0-9]*\.[0-9]*)"
@@ -45,9 +48,23 @@ class txtReader(object):
         load annotations depending on how the annotation should be loaded
 
         """
-        return self._load_txt_annotation(index)
+        if self._anno_type is 'box':
+            if self._is_image_index_flattened:
+                return self._load_single_txt_box_annotation(index)
+            else:
+                return self._load_txt_box_annotation(index)
+        elif self._anno_type is 'cls': return self._load_txt_cls_annotation(index)
 
-    def _load_txt_annotation(self, index):
+    def _load_txt_cls_annotation(self, index):
+        filename = os.path.join(self._annoPath, index + '.txt')
+        annos = []
+        with open(filename,"r") as f:
+            annos = f.readlines()
+            return {'gt_classes': np.array(annos,dtype=np.uint8),
+                    'flipped' : False,
+                    'set' : self._setID}
+
+    def _load_txt_box_annotation(self, index):
         """
         requires the following format @ 
         <PATH_TO_ANNOTATIONS>/*txt
@@ -89,6 +106,70 @@ class txtReader(object):
                 overlaps[ix, cls] = 1.0
                 seg_areas[ix] = (x2 - x1 + 1) * (y2 - y1 + 1)
                 ix += 1
+
+        overlaps = scipy.sparse.csr_matrix(overlaps)
+
+        if cfg.OBJ_DET.BBOX_VERBOSE:
+            bbox = {'boxes' : boxes,
+                    'gt_classes': gt_classes,
+                    'gt_overlaps' : overlaps,
+                    'flipped' : False,
+                    'seg_areas' : seg_areas,
+                    'set' : self._setID}
+        else:
+            bbox = {'boxes' : boxes,
+                    'gt_classes': gt_classes,
+                    'flipped': False,
+                    'set' : self._setID}
+        return bbox
+
+    def _load_single_txt_box_annotation(self, index):
+        """
+        requires the following format @ 
+        <PATH_TO_ANNOTATIONS>/*txt
+        """
+
+        bbox_index = int(index.split('_')[-1])
+        image_index = '_'.join(index.split('_')[:-1])
+        filename = os.path.join(self._annoPath, image_index + '.xml')
+        annos = []
+        with open(filename,"r") as f:
+            annos = f.readlines()
+
+        num_objs = 0 
+        if self._cleanRegex is not None:
+            for idx,line in enumerate(annos):
+                m = re.match(self._cleanRegex,line)
+                if m is not None:
+                    if self._find_cls(m.groupdict()) != -1:
+                        num_objs += 1
+        else:
+            num_objs = len(annos)
+                    
+        num_objs = 1 # by definition of the function
+        # reformat into the dictionary
+        boxes = np.zeros((num_objs, 4), dtype=np.int16)
+        gt_classes = np.zeros((num_objs), dtype=np.int32)
+        overlaps = np.zeros((num_objs, self.num_classes), dtype=np.float32)
+        # "Seg" area for pascal is just the box area
+        seg_areas = np.zeros((num_objs), dtype=np.float32)
+        ix = 0
+        for line in annos:
+            m = re.match(self._cleanRegex,line)
+            if m is not None:
+                mgd = m.groupdict()
+                x1,y1,x2,y2 = self._extract_bounding_box(mgd)
+                cls = self._find_cls(mgd)
+                if cls == -1:
+                    continue
+                if ix != bbox_index:
+                    ix += 1
+                    continue
+                boxes[0, :] = [x1, y1, x2, y2]
+                gt_classes[0] = cls
+                overlaps[0, cls] = 1.0
+                seg_areas[0] = (x2 - x1 + 1) * (y2 - y1 + 1)
+                break
 
         overlaps = scipy.sparse.csr_matrix(overlaps)
 

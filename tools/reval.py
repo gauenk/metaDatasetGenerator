@@ -11,7 +11,7 @@ import matplotlib.pyplot as plt
 
 import _init_paths
 from core.test import apply_nms
-from core.config import cfg
+from core.config import cfg, cfg_from_file, cfg_from_list
 from datasets.factory import get_repo_imdb
 import cPickle
 import os, sys, argparse
@@ -37,6 +37,8 @@ def parse_args():
                         action='store_true')
     parser.add_argument('--rot', dest='rot', help='re-eval with some rotation',
                         default=0, type=int)
+    parser.add_argument('--cfg', dest='cfg_file',
+                        help='optional config file', default=None, type=str)
 
     if len(sys.argv) == 1:
         parser.print_help()
@@ -45,24 +47,28 @@ def parse_args():
     args = parser.parse_args()
     return args
 
-def from_dets(imdb_name, output_dir, args):
+def from_elems(imdb_name, output_dir, args):
     imdb = get_repo_imdb(imdb_name)
     imdb.competition_mode(args.comp_mode)
 
     if args.against_gt:
-        dets = build_gt_roidb(imdb,args.rot)
+        elems = build_gt_roidb(imdb,args.rot)
     else:
-        with open(os.path.join(output_dir, 'detections.pkl'), 'rb') as f:
-            dets = cPickle.load(f)
+        if cfg.TASK == 'object_detection':
+            with open(os.path.join(output_dir, 'detections.pkl'), 'rb') as f:
+                elems = cPickle.load(f)
+        elif cfg.TASK == 'classification':
+            with open(os.path.join(output_dir, 'probs.pkl'), 'rb') as f:
+                elems = cPickle.load(f)
 
-    if args.apply_nms:
+    if args.apply_nms and cfg.TASK == 'object_detection':
         print 'Applying NMS to all detections'
-        nms_dets = apply_nms(dets, cfg.TEST.NMS)
+        nms_elems = apply_nms(elems, cfg.TEST.NMS)
     else:
-        nms_dets = dets
+        nms_elems = elems
 
-    print 'Evaluating detections'
-    imdb.evaluate_detections(nms_dets, output_dir)
+    print 'Evaluating elements'
+    imdb.evaluate_detections(nms_elems, output_dir)
 
 def build_gt_roidb(imdb,rot):
     roidb = imdb.roidb
@@ -91,18 +97,20 @@ def build_gt_roidb(imdb,rot):
         for cls in range(num_classes):
             all_boxes[cls][idx] = np.array(all_boxes[cls][idx])
             
-    dets = {}
-    dets["all_boxes"] = all_boxes
-    dets["im_rotates_all"] = im_rotates_all
-    return dets
+    elems = {}
+    elems["all_boxes"] = all_boxes
+    elems["im_rotates_all"] = im_rotates_all
+    return elems
 
 if __name__ == '__main__':
     args = parse_args()
+    if args.cfg_file is not None:
+        cfg_from_file(args.cfg_file)
     cfg.ROTATE_IMAGE = args.rot
 
     output_dir = os.path.abspath(args.output_dir[0])
     imdb_name = args.imdb_name
-    from_dets(imdb_name, output_dir, args)
+    from_elems(imdb_name, output_dir, args)
     
     '''
 argparse.ArgumentParser

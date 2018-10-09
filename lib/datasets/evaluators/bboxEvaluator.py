@@ -76,9 +76,10 @@ class bboxEvaluator(object):
             if self._onlyCls is not None and cls != self._onlyCls:
                 continue
             detfile = self._get_results_file_template().format(cls)
+            suffix = self._get_experiment_suffix_template().format(cls)
             rec, prec, ap, ovthresh = self.bbox_eval(
-                detfile, annopath, self._imageSetPath, cls, self._cachedir, ovthresh=0.5,
-                use_07_metric=use_07_metric, rotations = rotations)
+                detfile, annopath, self._imageSetPath, cls, self._cachedir, suffix, \
+                ovthresh=0.5, use_07_metric=use_07_metric, rotations = rotations)
             aps += [ap]
         aps = np.array(aps)
         infix = "faster-rcnn"
@@ -86,7 +87,7 @@ class bboxEvaluator(object):
             infix = cfgData.MODEL
         if cfg.ROTATE_IMAGE != -1:
             infix += "_{}".format(cfg.ROTATE_IMAGE)
-        results_filename = "./results_{}_{}.txt".format(infix,self._datasetName + self._salt)
+        results_filename = "./results_{}_{}_{}.txt".format(infix,self._datasetName, self._salt)
         results_fd = open(results_filename,"w")
         for kdx in range(len(ovthresh)):
             #print('{0:.3f}@{1:.2f}'.format(ap[kdx],ovthresh[kdx]))
@@ -132,15 +133,19 @@ class bboxEvaluator(object):
 
     def _get_results_file_template(self):
         # example: VOCdevkit/results/VOC2007/Main/<comp_id>_det_test_aeroplane.txt
-        filename = self._comp_id + self._salt + '_det_' + self._imageSet + '_{:s}.txt'
+        filename = self._comp_id + "_" + self._get_experiment_suffix_template() + ".txt"
         path = osp.join(self._pathResults,filename)
         return path
+
+    def _get_experiment_suffix_template(self):
+        return 'det_{:s}'
 
     def bbox_eval(self,detpath,
                   annopath,
                   imagesetfile,
                   classname,
                   cachedir,
+                  suffix,
                   ovthresh=0.5,
                   use_07_metric=False,
                   rotations = None):
@@ -167,29 +172,38 @@ class bboxEvaluator(object):
         # assumes imagesetfile is a text file with each line an image name
         # cachedir caches the annotations in a pickle file
 
-
         # first load gt
         imagenames, recs = load_groundTruth(cachedir,imagesetfile,annopath,
                                             self._load_annotation,self._classes)
 
+        gt_image_ids = imagenames
         # extract gt objects for this class
         class_recs, npos = extractClassGroundTruth(imagenames,recs,classname)
         
         # read dets from model
         image_ids, BB = loadModelDets(detpath,classname)
 
+        # number of detections (nd) from the model
         nd = len(image_ids)
+        print("# of detections",nd)
+
         ovthresh = [0.5,0.75,0.95]
-        if len(rotations.values()[0]) == 0: # if any of the rotations are not there, none are
+        if False:#rotations.values()[0][0][0] == 0: # if any of the rotations are not there, none are
             print("\n\n\n\ rotation is NONE\n\n\n")
             tp, fp = compute_TP_FP(ovthresh,image_ids,BB,class_recs)
         else:
-            #tp, fp = compute_TP_FP(ovthresh,image_ids,BB,class_recs)
             tp, fp = compute_TP_FP_rotation(ovthresh,image_ids,BB,class_recs,rotations)
             
         rec, prec, ap = compute_REC_PREC_AP(tp,fp,npos,ovthresh,classname,False)
         if cfg._DEBUG.datasets.evaluators.bboxEvaluator: print(rec,prec)
-        record_TP_FP_IMAGE_AND_BBOX_ID(tp,fp,class_recs,image_ids,classname)
+        record_TP_FP_IMAGE_AND_BBOX_ID(tp,fp,class_recs,gt_image_ids,classname,suffix)
 
+        
         # print(fp,tp,rec,prec,ap,npos)
         return rec, prec, ap, ovthresh
+        
+        
+        
+
+
+
