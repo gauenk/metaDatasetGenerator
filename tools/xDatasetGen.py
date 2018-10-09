@@ -23,6 +23,9 @@ def parse_args():
     parser.add_argument('--type', dest='tableType',
                         help='which format of table to print',
                         default='txt', type=str)
+    parser.add_argument('--color', dest='color',
+                        help='print with coloring?',
+                        action='store_true')
 
     if len(sys.argv) == 1:
         parser.print_help()
@@ -76,7 +79,7 @@ def elementValues(diff):
         sign = "+"
     return color,sign,colorValue
 
-def createLatexTable(xdata):
+def createLatexTable(xdata,params):
     outputFile = osp.join("./output/faster_rcnn/","xDatasetGen.txt")
     apDiff,aps = xDataToApDiff(xdata)
     diffMat = np.zeros((len(apDiff.keys()),len(apDiff['VOC'].keys())))
@@ -89,7 +92,7 @@ def createLatexTable(xdata):
             outputStr += "\\multicolumn{{1}}{{c}}{{\\makebox[3em]{{{:s}}}}}".format(name)
             outputStr += " & "
 
-    outputStr += " & \multicolumn{1}{c|}{\makebox[3em]{AB}}"
+    outputStr += " & \multicolumn{1}{c|}{\makebox[3em]{$l_1$-norm}}"
     outputStr += "\\\\\n\\hline\n\\hline\n"
     outputStr += "\\arrayrulecolor{light-gray}\n"
     trSetCount = 0
@@ -102,15 +105,19 @@ def createLatexTable(xdata):
             tableValue = round(np.abs(diff) * 100,0)
             diffMat[trSetCount-1,idx] = diff
             color,sign,colorValue = elementValues(diff)
-            outputStr += "\\cellcolor{{{0:s}!{1:d}}}{2:s}{3:2.0f}\%".format(color,
-                                                                       colorValue,
-                                                                       sign,tableValue)
+            if params['color']:
+                outputStr += "\\cellcolor{{{0:s}!{1:d}}}{2:s}{3:2.0f}\%".format(color,
+                                                                                colorValue,
+                                                                                sign,tableValue)
+            else:
+                outputStr += "{0:s}{1:2.0f}\%".format(sign,tableValue)
+
             if idx == (len(paperFriendlySets) - 1):
                 outputStr += " & {{\\bf {0:2.0f}\% }}".format(
                     sum(np.abs(apDiff[name].values()))*100)
 
             if idx == (len(paperFriendlySets) - 1) and trSetCount != len(aps):
-                outputStr += "\\\\\n\\cline{4-11}\n"
+                outputStr += "\\\\\n\\cline{3-11}\n"
             elif idx == (len(paperFriendlySets) - 1) and trSetCount == len(aps):
                 outputStr += "\\\\\n\\arrayrulecolor{black}\n"                
                 outputStr += "\\hline\n"
@@ -125,9 +132,13 @@ def createLatexTable(xdata):
     for idx,col in enumerate(colSums):
         tableValue = round(np.abs(col) * 100,0)
         color,sign,colorValue = elementValues(col)
-        outputStr += "\\cellcolor{{{0:s}!{1:d}}}{2:s}{3:2.0f}\%".format(color,
-                                                                        colorValue,
-                                                                        sign,tableValue)
+        if params['color']:
+            outputStr += "\\cellcolor{{{0:s}!{1:d}}}{2:s}{3:2.0f}\%".format(color,
+                                                                            colorValue,
+                                                                            sign,tableValue)
+        else:
+            outputStr += "{0:s}{1:2.0f}\%".format(sign,tableValue)
+
         if idx < (len(colSums)-1):
             outputStr += "&"
     outputStr += "& \\\\\n\\hline\n"
@@ -149,13 +160,15 @@ if __name__ == '__main__':
     args = parse_args()
     print('Called with args:')
     print(args)
+    params = {}
+    params['color'] = args.color
 
     fn = osp.join("./output/faster_rcnn/","xDatasetGen.txt")
     xdata = readXDatasetResults(fn)
     pp.pprint(xdata)
 
     if args.tableType == "latex":
-        createLatexTable(xdata)
+        createLatexTable(xdata,params)
     elif args.tableType == "txt":
         createTxtTable(xdata)
         

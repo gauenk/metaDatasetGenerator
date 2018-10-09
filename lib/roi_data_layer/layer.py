@@ -43,11 +43,11 @@ class RoIDataLayer(caffe.Layer):
 
     def _get_next_minibatch_inds(self):
         """Return the roidb indices for the next minibatch."""
-        if self._cur + cfg.TRAIN.IMS_PER_BATCH >= len(self._roidb):
+        if self._cur + cfg.TRAIN.BATCH_SIZE >= len(self._roidb):
             self._shuffle_roidb_inds()
 
-        db_inds = self._perm[self._cur:self._cur + cfg.TRAIN.IMS_PER_BATCH]
-        self._cur += cfg.TRAIN.IMS_PER_BATCH
+        db_inds = self._perm[self._cur:self._cur + cfg.TRAIN.BATCH_SIZE]
+        self._cur += cfg.TRAIN.BATCH_SIZE
         return db_inds
 
     def _get_next_minibatch(self):
@@ -84,6 +84,7 @@ class RoIDataLayer(caffe.Layer):
     def setup(self, bottom, top):
         """Setup the RoIDataLayer."""
 
+        self.name = "RoIDataLayer"
         # parse the layer parameter string, which must be valid YAML
         layer_params = yaml.load(self.param_str)
 
@@ -94,7 +95,7 @@ class RoIDataLayer(caffe.Layer):
         # data blob: holds a batch of N images, each with 3 channels
         idx = 0
 
-        top[idx].reshape(cfg.TRAIN.IMS_PER_BATCH, 3,
+        top[idx].reshape(cfg.TRAIN.BATCH_SIZE, 3,
             max(cfg.TRAIN.SCALES), cfg.TRAIN.MAX_SIZE)
         self._name_to_top_map['data'] = idx
         idx += 1
@@ -147,7 +148,7 @@ class RoIDataLayer(caffe.Layer):
         # timer.tic()
         blobs = self._get_next_minibatch()
         # print(timer.toc())
-        print(blobs['data'].shape)
+        # print(blobs['data'].shape)
 
         for blob_name, blob in blobs.iteritems():
             top_ind = self._name_to_top_map[blob_name]
@@ -186,11 +187,11 @@ class BlobFetcher(Process):
     def _get_next_minibatch_inds(self):
         """Return the roidb indices for the next minibatch."""
         # TODO(rbg): remove duplicated code
-        if self._cur + cfg.TRAIN.IMS_PER_BATCH >= len(self._roidb):
+        if self._cur + cfg.TRAIN.BATCH_SIZE >= len(self._roidb):
             self._shuffle_roidb_inds()
 
-        db_inds = self._perm[self._cur:self._cur + cfg.TRAIN.IMS_PER_BATCH]
-        self._cur += cfg.TRAIN.IMS_PER_BATCH
+        db_inds = self._perm[self._cur:self._cur + cfg.TRAIN.BATCH_SIZE]
+        self._cur += cfg.TRAIN.BATCH_SIZE
         return db_inds
 
     def run(self):

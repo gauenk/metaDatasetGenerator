@@ -33,7 +33,7 @@ case $DATASET in
 	;;
     pascal_voc)
 	TRAIN_IMDB="pascal_voc-trainval"
-	TEST_IMDB="pascal_voc-test"
+	TEST_IMDB="pascal_voc-minival"
 	PT_DIR="pascal_voc"
 	ITERS=120000
 	;;
@@ -54,7 +54,8 @@ case $DATASET in
 	# You can probably use fewer iterations and reduce the
 	# time to the LR drop (set in the solver to 350,000 iterations).
 	TRAIN_IMDB="coco-train"
-	TEST_IMDB="coco-testdev2015"
+	#TEST_IMDB="coco-testdev2015"
+	TEST_IMDB="coco-minival2014"
 	PT_DIR="coco"
 	ITERS=490000
 	;;
@@ -118,7 +119,7 @@ else
     if [ "${DATASET}" == "pascal_voc_2012" ]; then
 	DATASET="pascal_voc"
     fi
-    DEF=models/${DATASET}/${NET}/faster_rcnn_end2end/test.prototxt
+    DEF=models/${DATASET}/${NET}/faster_rcnn_end2end/test_only_people.prototxt
 fi
 
 ./tools/test_net.py --gpu ${GPU_ID} \

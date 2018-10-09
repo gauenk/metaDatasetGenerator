@@ -12,7 +12,7 @@ import _init_paths
 from utils.misc import PreviousCounts
 from core.train import get_training_roidb, train_net
 from core.config import cfg, cfg_from_file, cfg_from_list, get_output_dir, createFilenameID, createPathRepeat, createPathSetID
-from datasets.ds_utils import print_each_size,printPyroidbSetCounts,roidbSampleBox,roidbSampleImageAndBox
+from datasets.ds_utils import print_each_size,printPyroidbSetCounts,roidbSampleBox,roidbSampleImageAndBox,combine_roidb,combineOnlyNewRoidbs
 from datasets.factory import get_repo_imdb
 from ntd.hog_svm import appendHOGtoRoidb
 import datasets.imdb
@@ -27,11 +27,15 @@ import os.path as osp
 # pytorch imports
 from datasets.pytorch_roidb_loader import RoidbDataset
 
-
 #imdb_names = {"coco":1,"pacsal_voc":2,"imagenet":3,"caltech":4,"cam2":5,"inria":6,"sun":7,"kitti":8}
-train_imdb_names = ["coco-train2014-default","pascal_voc-train-default","imagenet-train2014-default","cam2-train-default","caltech-train-default","kitti-train-default","sun-all-default","inria-all-default"]
-test_imdb_names = ["coco-testdev2015-default","pascal_voc-test-default","imagenet-val1-default","cam2-test-default","caltech-test-default","kitti-val-default","sun-all-default","inria-all-default"]
-indexToImdbName = ['coco','pascal_voc','imagenet','cam2','caltech','kitti','sun','inria']
+
+# baby sized sets for debug
+train_imdb_names = ["coco-minival2014-default","pascal_voc-medium-default","imagenet-very_short_train-default","cam2-train-default","caltech-train_50_filter-default","kitti-train-default","sun-all-default","inria-all-default"]
+
+# actual sets
+#train_imdb_names = ["coco-train2014-default","imagenet-train2014-default","pascal_voc-trainval-default","caltech-train-default","inria-all-default","sun-all-default","kitti-train-default","cam2-all-default"]
+test_imdb_names = ["coco-val2014-default","imagenet-val1-default","pascal_voc-test-default","caltech-test-default","inria-all-default","sun-all-default","kitti-val-default","cam2-all-default"]
+indexToImdbName = cfg.DATASET_NAMES_ORDERED
 datasetSizes = cfg.MIXED_DATASET_SIZES
 loadedImdbsTr = {}
 loadedImdbsTe = {}
@@ -120,32 +124,66 @@ def getMixtureRoidb(imdbs,size,pc):
     mixedRoidb = [None for _ in range(8)]
     annoCounts = [None for _ in range(8)]
     for imdb in imdbs:
-        sizedRoidb,annoCount = imdb.get_roidb_at_size(size)
+        # HACKY af
+        # todo: provide a more structural solution
+        print(imdb.name)
+        if imdb.name in ['sun','inria','cam2'] and size == 1000:
+            print("HERE getting 2k instead of 1k")
+            sizedRoidb,annoCount = imdb.get_roidb_at_size(2000)
+        else:
+            sizedRoidb,annoCount = imdb.get_roidb_at_size(size)
+        print("type(sizedRoidb): {}".format(type(sizedRoidb)))
         mixedRoidb[imdb.config['setID']] = sizedRoidb
         annoCounts[imdb.config['setID']] = annoCount
         print_each_size(sizedRoidb)
     return mixedRoidb,annoCounts
     
+def roidbListToDict(roidbs):
+    return dict(zip(cfg.DATASET_NAMES_ORDERED,roidb))
+
+def roidbListOnlyNewToDict(roidbs,pc):
+    # assumes ordering of roidbs
+    newRoidb = {}
+    for idx,roidb in enumerate(roidbs):
+        if roidb is None: continue
+        #print("idx @ {} : original len(roidb): {} onlyNew len(): {} pc[idx]: {}".format(idx,len(roidb),len(roidb[pc[idx]:]),pc[idx]))
+        print(type(roidb))
+        print(type(roidb[pc[idx]:]))
+        newRoidb[cfg.DATASET_NAMES_ORDERED[idx]] = roidb[pc[idx]:]
+    return newRoidb
+
+def clearBboxHOGFtsFromRoidb(roidb):
+    for sample in roidb:
+        sample['hog'] = None
+
+def addHOGtoNewRoidbSamples(roidbs,pc,size):
+    onlyNewSamples = combineOnlyNewRoidbs(roidbs,pcTr)
+    if size > 1000: clearBboxHOGFtsFromRoidb(onlyNewSamples)
+    appendHOGtoRoidb(onlyNewSamples,size)
+    return onlyNewSamples
+
 def createMixtureDataset(setID,size,pcTr,pcTe):
     
     imdbsTr,imdbsTe = getImdbs(setID)
     mixedRoidbTr,annoCountsTr = getMixtureRoidb(imdbsTr,size,pcTr)
     mixedRoidbTe,annoCountsTe = getMixtureRoidb(imdbsTe,size,pcTe)
-    assert len(mixedRoidbTr) == setID.count('1')
+    assert len([0 for roidb in mixedRoidbTr if roidb is not None]) == setID.count('1')
     # no assert for "mixedRoidbTe" since varies from length
-
-    comboTr = combined_roidb(mixedRoidbTr)
-    comboTe = combined_roidb(mixedRoidbTe)
-    onlyNewTr = combineOnlyNew(mixedRoidbTr,pcTr)
-    onlyNewTe = combineOnlyNew(mixedRoidbTe,pcTe)
-
-    appendHOGtoRoidb(onlyNewTr)
-    appendHOGtoRoidb(onlyNewTe)
+    
+    # add hog to the samples
+    # Some HACKS to shrink the size of these
+    if size != 15000:
+        addHOGtoNewRoidbSamples(mixedRoidbTr,pcTr,size)
+        addHOGtoNewRoidbSamples(mixedRoidbTe,pcTe,size)
+        
+    # put the list into a dict
+    mixedRoidbDictTr = roidbListOnlyNewToDict(mixedRoidbTr,pcTr)
+    mixedRoidbDictTe = roidbListOnlyNewToDict(mixedRoidbTe,pcTe)
 
     pcTr.update(mixedRoidbTr)
     pcTe.update(mixedRoidbTe)
 
-    return {"train":[onlyNewTr,annoCountsTr],"test":[onlyNewTe,annoCountsTe]}
+    return {"train":[mixedRoidbDictTr,annoCountsTr],"test":[mixedRoidbDictTe,annoCountsTe]}
 
 
 def filterImdbsBySetID(setID):
@@ -178,24 +216,18 @@ def loadDatasetsToMemory():
         imdb, roidb = get_roidb(te_imdb_name)
         loadedImdbsTe[imdb.name] = imdb
 
-def combined_roidb(roidbs):
-    # assumes ordering of roidbs
-    roidb = []
-    for r in roidbs:
-        # skips "None"; shouldn't impact the outcome
-        if r is None: continue
-        roidb.extend(r)
-        print_each_size(roidb)
-    return roidb
+def print_imdb_report():
+    for key,imdb in loadedImdbsTr.items():
+        print("{}:".format(imdb.name))
+        sys.stdout.write('#images: {:>10}\n'.format(len(imdb.roidb)))
+        sys.stdout.write('#annos: {:>11}\n'.format(imdb.roidbSize[-1]))
+        print("-"*20)
 
-def combineOnlyNew(roidbs,pc):
-    # assumes ordering of roidbs
-    newRoidb = []
-    print(pc)
-    for idx,roidb in enumerate(roidbs):
-        if roidb is None: continue
-        newRoidb.extend(roidb[pc[idx]:])
-    return newRoidb
+    for key,imdb in loadedImdbsTe.items():
+        print("{}:".format(imdb.name))
+        sys.stdout.write('#images: {:>10}\n'.format(len(imdb.roidb)))
+        sys.stdout.write('#annos: {:>11}\n'.format(imdb.roidbSize[-1]))
+        print("-"*20)
 
 if __name__ == '__main__':
     args = parse_args()
@@ -221,11 +253,16 @@ if __name__ == '__main__':
         sys.exit()
 
     loadDatasetsToMemory()
+    print_imdb_report()
     pcTr = PreviousCounts(8,0)
     pcTe = PreviousCounts(8,0)
 
+
     for setNum in range(range_start,range_end+1):
         # for each of the "ranges" we want
+        # we want to create the training-testing samples
+        # onlyDlDatasets = [ '10000000','01000000','00100000','00010000' ]
+        # onlyDlDatasets = [ '10000000','01000000','00100000','00010000' ]
         for setID in createListFromId(setNum):
             # create setID folder
             path_setID = createPathSetID(setID)
@@ -247,7 +284,7 @@ if __name__ == '__main__':
                     mixedData = createMixtureDataset(setID,size,pcTr,pcTe)
                     pklName = idlist_filename + ".pkl"
                     print(pklName)
-                    print(mixedData['train'][1],mixedData['test'][1])
+                    #print(mixedData['train'][1],mixedData['test'][1])
                     if osp.exists(pklName) is False:
                         with open(pklName,"wb") as f:
                             pickle.dump(mixedData,f)

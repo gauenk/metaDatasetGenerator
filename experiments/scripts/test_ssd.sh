@@ -33,7 +33,8 @@ case $DATASET in
 	;;
     pascal_voc)
 	TRAIN_IMDB="pascal_voc-trainval"
-	TEST_IMDB="pascal_voc-test"
+	#TEST_IMDB="pascal_voc-test"
+	TEST_IMDB="pascal_voc-vshort"
 	PT_DIR="pascal_voc"
 	ITERS=120000
 	;;

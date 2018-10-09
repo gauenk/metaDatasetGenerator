@@ -17,16 +17,19 @@ __sets.append("pascal_voc_2012")
 __sets.append("pascal_voc_2007")
 __sets.append("pascal_voc")
 __sets.append("imagenet")
+__sets.append("imagenet_cls")
 __sets.append("cam2")
 __sets.append("caltech")
 __sets.append("kitti")
 __sets.append("inria")
 __sets.append("coco")
 __sets.append("sun")
+__sets.append("mnist")
 
 def get_repo_imdb(name):
     """Get an imdb (image database) by name."""
     print(name)
+    cfg.CALLING_DATASET_NAME = name
     di = name.split("-")
     if len(di) != 3:
         raise KeyError('Dataset name [{}] is not correct length'.format(name))

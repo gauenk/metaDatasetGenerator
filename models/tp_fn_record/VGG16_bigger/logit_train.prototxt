@@ -1,0 +1,61 @@
+name: "logit_regression"
+layer {
+  name: 'input-data'
+  type: 'Python'
+  top: 'data'
+  top: 'labels'
+  # top: 'im_info'
+  python_param {
+    module: 'cls_data_layer.layer'
+    layer: 'ClsDataLayer'
+    param_str: "'num_classes': 1"
+  }
+}
+layer {
+  name: "_fc7"
+  type: "InnerProduct"
+  bottom: "data"
+  top: "fc7"
+  param {
+    lr_mult: 10
+  }
+  param {
+    lr_mult: 2
+  }
+  inner_product_param {
+    num_output: 1
+    weight_filler {
+      type: "gaussian"
+      std: 0.01
+    }
+  }
+}
+layer {
+  name: "cls_score"
+  type: "InnerProduct"
+  bottom: "fc7"
+  top: "cls_score"
+  param {
+    lr_mult: 1000
+  }
+  param {
+    lr_mult: 2
+  }
+  inner_product_param {
+    num_output: 1
+    weight_filler {
+      type: "gaussian"
+      std: 0.01
+    }
+  }
+}
+layer {
+  name: "sm_cls"
+  type: "SoftmaxWithLoss"
+  bottom: "cls_score"
+  bottom: "labels"
+  propagate_down: 1
+  propagate_down: 0
+  top: "loss_cls"
+  loss_weight: 100
+}

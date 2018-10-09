@@ -11,7 +11,7 @@ import numpy as np
 import numpy.random as npr
 import cv2,sys
 from core.config import cfg
-from utils.blob import prep_im_for_blob, im_list_to_blob
+from utils.blob import prep_im_for_vae_blob, prep_im_for_blob, im_list_to_blob, _get_cropped_image_blob
 
 def get_minibatch(roidb, num_classes):
     """Given a roidb, construct a minibatch sampled from it."""
@@ -20,17 +20,20 @@ def get_minibatch(roidb, num_classes):
     random_scale_inds = npr.randint(0, high=len(cfg.TRAIN.SCALES),
                                     size=num_images)
 
-    assert(cfg.TRAIN.BATCH_SIZE % num_images == 0), \
+    assert(cfg.TRAIN.VAE.BATCH_SIZE % num_images == 0), \
         'num_images ({}) must divide BATCH_SIZE ({})'. \
-        format(num_images, cfg.TRAIN.BATCH_SIZE)
+        format(num_images, cfg.TRAIN.VAE.BATCH_SIZE)
 
     # Get the input image blob, formatted for caffe
     im_blob, im_scales = _get_image_blob(roidb, random_scale_inds)
+    im_blob /= 255
 
     blobs = {'data': im_blob}
+    #TODO: im_scales not properly passed
     blobs['im_info'] = np.array(
-            [[im_blob.shape[2], im_blob.shape[3], im_scales[0]]],
+            [[im_blob.shape[2], im_blob.shape[3], im_scales[0][0]]],
             dtype=np.float32)
+
 
     labels_blob = np.zeros((0), dtype=np.float32)
     for im_i in xrange(num_images):
@@ -50,10 +53,11 @@ def _get_image_blob(roidb, scale_inds):
     im_scales = []
     for i in xrange(num_images):
         im = cv2.imread(roidb[i]['image'])
+        #print("[vae_data_layer/minibatch.py/_get_image_blob]: im.shape",im.shape)
         if roidb[i]['flipped']:
             im = im[:, ::-1, :]
         target_size = cfg.TRAIN.SCALES[scale_inds[i]]
-        im, im_scale = prep_im_for_blob(im, cfg.PIXEL_MEANS, target_size,
+        im, im_scale = prep_im_for_vae_blob(im, cfg.PIXEL_MEANS, target_size,
                                         cfg.TRAIN.MAX_SIZE)
         im_scales.append(im_scale)
         processed_ims.append(im)
@@ -67,30 +71,6 @@ def _project_im_rois(im_rois, im_scale_factor):
     """Project image RoIs into the rescaled training image."""
     rois = im_rois * im_scale_factor
     return rois
-
-def _get_bbox_regression_labels(bbox_target_data, num_classes):
-    """Bounding-box regression targets are stored in a compact form in the
-    roidb.
-
-    This function expands those targets into the 4-of-4*K representation used
-    by the network (i.e. only one class has non-zero targets). The loss weights
-    are similarly expanded.
-
-    Returns:
-        bbox_target_data (ndarray): N x 4K blob of regression targets
-        bbox_inside_weights (ndarray): N x 4K blob of loss weights
-    """
-    clss = bbox_target_data[:, 0]
-    bbox_targets = np.zeros((clss.size, 4 * num_classes), dtype=np.float32)
-    bbox_inside_weights = np.zeros(bbox_targets.shape, dtype=np.float32)
-    inds = np.where(clss > 0)[0]
-    for ind in inds:
-        cls = clss[ind]
-        start = 4 * cls
-        end = start + 4
-        bbox_targets[ind, start:end] = bbox_target_data[ind, 1:]
-        bbox_inside_weights[ind, start:end] = cfg.TRAIN.BBOX_INSIDE_WEIGHTS
-    return bbox_targets, bbox_inside_weights
 
 def _vis_minibatch(im_blob, rois_blob, labels_blob, overlaps):
     """Visualize a mini-batch for debugging."""

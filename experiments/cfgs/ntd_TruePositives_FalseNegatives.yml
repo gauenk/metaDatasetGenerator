@@ -1,0 +1,8 @@
+coco:
+imagenet:
+voc: "./output/ssd/tp_fn_records/pascal_voc-vshort-default/records_6e1b3668-55ed-4c6a-a59d-8fb556d60a41_det_vshort_person.pkl"
+caltech:
+sun:
+kitti:
+inria:
+cam2: 

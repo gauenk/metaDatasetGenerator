@@ -10,7 +10,7 @@ import numpy as np
 import scipy.sparse
 from core.config import cfg,cfgData
 from easydict import EasyDict as edict
-from utils import *
+from bbox_utils import *
 
 class bboxEvaluator(object):
     """Image database."""
@@ -30,13 +30,15 @@ class bboxEvaluator(object):
         self._imageSet = imageSetPath.split("/")[-1].split(".")[0] # "...asdf/imageSet.txt"
         self._onlyCls = onlyCls
 
-    def evaluate_detections(self, all_boxes, output_dir):
+    def evaluate_detections(self, detection_object, output_dir):
         # num_outpus = 
         # if self._classes != num_outputs:
         #     raise ValueError("ERROR: the classes and output size don't match!")
+        all_boxes = detection_object['all_boxes']
+        im_rotates_all = detection_object['im_rotates_all']
         self._pathResults = output_dir
         self._write_results_file(all_boxes)
-        self._do_python_eval(output_dir)
+        self._do_python_eval(output_dir,rotations=im_rotates_all)
 
     def _write_results_file(self, all_boxes):
         for cls_ind, cls in enumerate(self._classes):
@@ -49,6 +51,7 @@ class bboxEvaluator(object):
             filename = self._get_results_file_template().format(cls)
             with open(filename, 'wt') as f:
                 for im_ind, index in enumerate(self.image_index):
+                    if cfg._DEBUG.datasets.evaluators.bboxEvaluator: print(im_ind,index)
                     dets = all_boxes[cls_ind][im_ind]
                     if len(dets) == 0:
                         skip_count+=1
@@ -56,10 +59,10 @@ class bboxEvaluator(object):
                     for k in xrange(dets.shape[0]):
                         f.write('{:s} {:.3f} {:.1f} {:.1f} {:.1f} {:.1f}\n'.
                                 format(index, dets[k, -1],
-                                       dets[k, 0] + 1, dets[k, 1] + 1,
-                                       dets[k, 2] + 1, dets[k, 3] + 1))
+                                       dets[k, 0] , dets[k, 1] ,
+                                       dets[k, 2] , dets[k, 3] ))
 
-    def _do_python_eval(self, output_dir = 'output'):
+    def _do_python_eval(self, output_dir = 'output',rotations = None):
         annopath = self._annoPath + "/{:s}"
         aps = []
         # The PASCAL VOC metric changed in 2010
@@ -73,16 +76,19 @@ class bboxEvaluator(object):
             if self._onlyCls is not None and cls != self._onlyCls:
                 continue
             detfile = self._get_results_file_template().format(cls)
+            suffix = self._get_experiment_suffix_template().format(cls)
             rec, prec, ap, ovthresh = self.bbox_eval(
-                detfile, annopath, self._imageSetPath, cls, self._cachedir, ovthresh=0.5,
-                use_07_metric=use_07_metric)
+                detfile, annopath, self._imageSetPath, cls, self._cachedir, suffix, \
+                ovthresh=0.5, use_07_metric=use_07_metric, rotations = rotations)
             aps += [ap]
         aps = np.array(aps)
         infix = "faster-rcnn"
         if cfgData.MODEL:
             infix = cfgData.MODEL
-
-        results_fd = open("./results_{}_{}.txt".format(infix,self._datasetName + self._salt),"w")
+        if cfg.ROTATE_IMAGE != -1:
+            infix += "_{}".format(cfg.ROTATE_IMAGE)
+        results_filename = "./results_{}_{}_{}.txt".format(infix,self._datasetName, self._salt)
+        results_fd = open(results_filename,"w")
         for kdx in range(len(ovthresh)):
             #print('{0:.3f}@{1:.2f}'.format(ap[kdx],ovthresh[kdx]))
             print('Mean AP = {:.4f} @ {:.2f}'.format(np.mean(aps[:,kdx]),ovthresh[kdx]))
@@ -120,20 +126,29 @@ class bboxEvaluator(object):
         print('Results computed with the **unofficial** Python eval code.')
         print('--------------------------------------------------------------')
         print('')
+        results_fd.close()
+
+        # remove the results since I don't know how to "not write" with the results_fd variable.
+        if not cfg.WRITE_RESULTS: os.remove(results_filename)
 
     def _get_results_file_template(self):
         # example: VOCdevkit/results/VOC2007/Main/<comp_id>_det_test_aeroplane.txt
-        filename = self._comp_id + self._salt + '_det_' + self._imageSet + '_{:s}.txt'
+        filename = self._comp_id + "_" + self._get_experiment_suffix_template() + ".txt"
         path = osp.join(self._pathResults,filename)
         return path
+
+    def _get_experiment_suffix_template(self):
+        return 'det_{:s}'
 
     def bbox_eval(self,detpath,
                   annopath,
                   imagesetfile,
                   classname,
                   cachedir,
+                  suffix,
                   ovthresh=0.5,
-                  use_07_metric=False):
+                  use_07_metric=False,
+                  rotations = None):
         """rec, prec, ap = bbox_eval(detpath,
                                     annopath,
                                     imagesetfile,
@@ -157,19 +172,38 @@ class bboxEvaluator(object):
         # assumes imagesetfile is a text file with each line an image name
         # cachedir caches the annotations in a pickle file
 
-
         # first load gt
         imagenames, recs = load_groundTruth(cachedir,imagesetfile,annopath,
                                             self._load_annotation,self._classes)
+
+        gt_image_ids = imagenames
         # extract gt objects for this class
         class_recs, npos = extractClassGroundTruth(imagenames,recs,classname)
+        
         # read dets from model
         image_ids, BB = loadModelDets(detpath,classname)
 
+        # number of detections (nd) from the model
         nd = len(image_ids)
-        ovthresh = [0.5,0.75,0.95]
-        tp, fp = compute_TP_FP(ovthresh,image_ids,BB,class_recs)
-        rec, prec, ap = compute_REC_PREC_AP(tp,fp,npos,ovthresh,classname,False)
+        print("# of detections",nd)
 
+        ovthresh = [0.5,0.75,0.95]
+        if False:#rotations.values()[0][0][0] == 0: # if any of the rotations are not there, none are
+            print("\n\n\n\ rotation is NONE\n\n\n")
+            tp, fp = compute_TP_FP(ovthresh,image_ids,BB,class_recs)
+        else:
+            tp, fp = compute_TP_FP_rotation(ovthresh,image_ids,BB,class_recs,rotations)
+            
+        rec, prec, ap = compute_REC_PREC_AP(tp,fp,npos,ovthresh,classname,False)
+        if cfg._DEBUG.datasets.evaluators.bboxEvaluator: print(rec,prec)
+        record_TP_FP_IMAGE_AND_BBOX_ID(tp,fp,class_recs,gt_image_ids,classname,suffix)
+
+        
         # print(fp,tp,rec,prec,ap,npos)
         return rec, prec, ap, ovthresh
+        
+        
+        
+
+
+

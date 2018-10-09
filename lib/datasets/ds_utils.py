@@ -89,10 +89,12 @@ def load_mixture_set_single(setID,repetition,size):
     
 def load_mixture_set(setID,repetition,final_size):
 
-    roidbTr = []
-    roidbTe = []
-    annoCountsTr = []
-    annoCountsTe = []
+    roidbTr = {}
+    roidbTe = {}
+    l_roidbTr = {}
+    l_roidbTe = {}
+    annoCountsTr = {}
+    annoCountsTe = {}
 
     datasetSizes = cfg.MIXED_DATASET_SIZES
     if final_size not in datasetSizes:
@@ -103,6 +105,7 @@ def load_mixture_set(setID,repetition,final_size):
     sizeIndex = datasetSizes.index(final_size)
     
     for size in datasetSizes[:sizeIndex+1]:
+        print(size)
         # create a file for each dataset size
         pklName = createFilenameID(setID,str(repetition),str(size)) + ".pkl"
         # write pickle file of the roidb
@@ -114,14 +117,48 @@ def load_mixture_set(setID,repetition,final_size):
             train = loaded['train']
             test = loaded['test']
             print(pklName)
-            if size == final_size: # only save the last count
-                annoCountsTr = train[1]
-                annoCountsTe = test[1]
-            roidbTr.extend(train[0])
-            roidbTe.extend(test[0])
+            # todo: what depends on the old version?
+            # old version: returns only one list of sizes from "final_size"
+            annoCountsTr[size] = train[1]
+            annoCountsTe[size] = test[1]
+            # if size == final_size: # only save the last count
+            #     annoCountsTr = train[1]
+            #     annoCountsTe = test[1]
+            for dsID,roidb in train[0].items():
+                print(dsID,type(roidb),len(roidb))
+                l_roidb = list(roidb)
+                if dsID not in roidbTr.keys():
+                    # sometimes read in as tuple
+                    # cause unknown
+                    roidbTr[dsID] = list(l_roidb)
+                    if size < 5000: print("less than 5k @ {}".format(size))
+                    if size < 5000: l_roidbTr[dsID] = list(l_roidb)
+                else:
+                    print("(a)@ {} roidbTr v.s. l_roidbTr: {} v.s. {}".format(dsID,len(roidbTr[dsID]),len(l_roidbTr[dsID])))
+                    roidbTr[dsID].extend(l_roidb)
+                    print("(b)@ {} roidbTr v.s. l_roidbTr: {} v.s. {}".format(dsID,len(roidbTr[dsID]),len(l_roidbTr[dsID])))
+                    if size < 5000: print("less than 5k @ {}".format(size))
+                    if size < 5000: l_roidbTr[dsID].extend(l_roidb)
+                    print("(c)@ {} roidbTr v.s. l_roidbTr: {} v.s. {}".format(dsID,len(roidbTr[dsID]),len(l_roidbTr[dsID])))
+
+            for dsID,roidb in test[0].items():
+                print(dsID,type(roidb),len(roidb))
+                l_roidb = list(roidb)
+                if dsID not in roidbTe.keys():
+                    roidbTe[dsID] = list(l_roidb)
+                    if size < 5000: l_roidbTe[dsID] = list(l_roidb)
+                else:
+                    roidbTe[dsID].extend(l_roidb)
+                    if size < 5000: l_roidbTe[dsID].extend(l_roidb)
         else:
             raise ValueError("{} does not exists".format(pklName))
-    return {"train":[roidbTr,annoCountsTr],"test":[roidbTe,annoCountsTe]}
+    # KNOWN ISSUE: the annoCounts* ordering is incorrect.
+    # see ymlConfig/default_dataset_index.yml v.s. config DATASET_ORDER 
+    for ds in roidbTr.keys():
+        print("@ {} roidbTr v.s. l_roidbTr: {} v.s. {}".format(ds,len(roidbTr[ds]),len(l_roidbTr[ds])))
+    for ds in roidbTe.keys():
+        print("@ {} roidbTe v.s. l_roidbTe: {} v.s. {}".format(ds,len(roidbTe[ds]),len(l_roidbTe[ds])))
+    return {"train":[roidbTr,annoCountsTr,l_roidbTr],"test":[roidbTe,annoCountsTe,l_roidbTe]}
 
 def save_mixture_set_single(roidb,annoCount,setID,repetition,size):
     pklName = createFilenameID(setID,str(repetition),str(size)) + ".pkl"
@@ -204,6 +241,13 @@ def roidbSampleImage(sample,annoIndex):
         img = img[:, ::-1, :]
     return img,sample['set']
 
+def roidbSampleImageHOG(sample,annoIndex):
+    # load the image
+    if sample['flipped']:
+        print("Error: can't use flipped images")
+        sys.exit()
+    return sample["hog_image"],sample['set']
+
 def roidbSampleImageAndBox(sample,annoIndex):
     # load the image
     img = cv2.imread(sample['image'])
@@ -259,7 +303,7 @@ def pyroidbTransform_normalizeBox(inputs,**kwargs):
         inputs[::2] /= sample['width']
         inputs[1::2] /= sample['height']
         if np.any(inputs > 1):
-            print(inputs,sample)
+            print("inputs greater than 1")
         assert np.all(inputs <= 1)
         assert np.all(inputs >= 0)
         updateNormalizeSample(sample,annoIndex)
@@ -294,8 +338,42 @@ def vis_dets(im, class_names, dets, _idx_, fn=None, thresh=0.5):
     else:
         plt.savefig(fn.format(_idx_,str(uuid.uuid4())))
 
+def combine_roidb(self,roidbs):
+    # assumes ordering of roidbs
+    roidb = []
+    for r in roidbs:
+        # skips "None"; shouldn't impact the outcome
+        if r is None: continue
+        roidb.extend(r)
+        print_each_size(roidb)
+    return roidb
+
+def combineOnlyNewRoidbs(roidbs,pc):
+    # assumes ordering of roidbs
+    newRoidb = []
+    print(pc)
+    for idx,roidb in enumerate(roidbs):
+        if roidb is None: continue
+        newRoidb.extend(roidb[pc[idx]:])
+    return newRoidb
 
 
+def loadEvaluationRecords(classname):
+    saveDir = osp.join(cfg.TP_FN_RECORDS_PATH,cfg.CALLING_DATASET_NAME)
+    savePath = osp.join(saveDir,"records_{}.pkl".format('det_{:s}').format(classname))
+    print("loading evalutation records from: {}".format(savePath))
+    with open(savePath, "rb") as f:
+        records = pickle.load(f)
+    return records
+
+def split_and_load_ImdbImages(imdb,records):
+    for roidb,image_id in zip(imdb.roidb,imdb.image_set):
+        record = records[image_id]
+
+def convertFlattenedImageIndextoImageIndex(flattened_image_index):
+    bbox_index = flattened_image_index.split('_')[-1]
+    image_index = '_'.join(flattened_image_index.split('_')[:-1])
+    return image_index,int(bbox_index)
 
 
 

@@ -1,15 +1,10 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-"""
-Created on Tue Mar 13 21:32:08 2018
-
-@author: zkapach
-"""
 import matplotlib
 import matplotlib.image as mpimg
 import matplotlib.pyplot as plt
 import numpy as np
-import cv2
+import cv2,sys
 import itertools
 import os
 import glob
@@ -34,7 +29,7 @@ def bboxHOGfromRoidbSample(sample,orient=9, pix_per_cell=8,
                        cell_per_block=2, hog_channel=0):
     features = []
     if 'image' not in sample.keys():
-        print(sample)
+        # print(sample)
         print(sample.keys())
         print("WARINING [bboxHOGfromRoidbSample]: the\
         image field is not available for the above sample")
@@ -55,50 +50,66 @@ def bboxHOGfromRoidbSample(sample,orient=9, pix_per_cell=8,
 def imageHOGfromRoidbSample(sample,orient=9, pix_per_cell=8,
                        cell_per_block=2, hog_channel=0):
     if 'image' not in sample.keys():
-        print(sample)
+        #print(sample)
         print(sample.keys())
         print("WARINING [imageHOGfromRoidbSample]: the\
         image field is not available for the above sample")
         return None
     img = cv2.imread(sample['image'])
     try:
-        feature = scaleRawImage(img)
+        # scaleRawImage(img); maybe scale raw images differently in the future
+        feature = HOGFromImage(img)
     except Exception as e:
         feature = None
         print(e)
         print('[imageHOGfromRoidbSample] hog failed @ path {}'.format(sample['image']))
     return feature
 
-def HOGFromImage(image,orient=9, pix_per_cell=8,
+def HOGFromImage(image,rescale=True,orient=9, pix_per_cell=8,
                  spatial_size=(128,256), hist_bins=32,
                  cell_per_block=2):
     # hist_bins is *not* used
 
     if len(image.shape) == 3 and image.shape[2] == 3:
         image = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
-    image = cv2.resize(image, spatial_size)
+    if rescale: image = cv2.resize(image, spatial_size)
+
     hogFeatures =  get_hog_features(image[:,:], orient, 
                                     pix_per_cell, cell_per_block,
                                     vis=False, feature_vec=True)
     return hogFeatures
 
-def appendHOGtoRoidb(roidb):
+def appendHOGtoRoidb(roidb,size):
     print("="*100)
     print("appending the HOG field to Roidb")
-    addRoidbField(roidb,"hog",bboxHOGfromRoidbSample)
+    # HACK: skip to save space + time
+    if size <= 1000: 
+        addRoidbField(roidb,"hog",bboxHOGfromRoidbSample)
     addRoidbField(roidb,"hog_image",imageHOGfromRoidbSample)
     print("finished appending HOG")
+
+def appendHOGtoRoidbDict(roidbDict,size):
+    for roidb in roidbDict.values():
+        appendHOGtoRoidb(roidb,size)
+
+def getSampleWeight(y_test):
+    weights = [0.0 for _ in cfg.DATASET_NAMES_ORDERED]
+    for idx,ds in enumerate(cfg.DATASET_NAMES_ORDERED):
+        weights[idx] = np.sum( y_test == idx )
+    return weights
 
 def make_confusion_matrix(model, X_test, y_test, clsToSet, normalize=True):
 
     y_pred = model.predict(X_test)    
     # Compute confusion matrix
     cnf_matrix = confusion_matrix(y_test, y_pred)
+    print(cnf_matrix)
     if normalize:
         cnf_matrix = cnf_matrix.astype('float') / cnf_matrix.sum(axis=1)[:, np.newaxis]
     np.set_printoptions(precision=2)
-    cnf_matrix = switch_rows_cols(cnf_matrix,clsToSet,cfg.DATASET_NAMES_ORDERED)
-    # Plot normalized confusion matrix  ----- NEED TO FIX CLASS NAMES DEPENDS ON PYROIDB
+    # we fixed the original ordering
+    #cnf_matrix = switch_rows_cols(cnf_matrix,clsToSet,cfg.DATASET_NAMES_ORDERED)
+    # todo Plot normalized confusion matrix  ----- NEED TO FIX CLASS NAMES DEPENDS ON PYROIDB
     return cnf_matrix
 
 
@@ -119,25 +130,29 @@ def plot_confusion_matrix(cm, classes, path_to_save,
                 }
 
     fig, ax = plt.subplots()
-
-    print(cm)
-
+    
+    # todo: uncomement below
     cm = cm * 100
     cm = np.around(cm,0)
-    ax.imshow(cm, interpolation='nearest', cmap=cmap, vmin = vmin, vmax = vmax)
+
+    # todo: remove me below
+    _zeros = np.zeros(cm.shape)
+    ax.imshow(_zeros, interpolation='nearest', cmap=cmap, vmin = vmin, vmax = vmax)
+
+    # todo: uncomement below
+    #ax.imshow(cm, interpolation='nearest', cmap=cmap, vmin = vmin, vmax = vmax)
     classes = order
     tick_marks = np.arange(len(classes))
     plt.xticks(tick_marks, classes, rotation=45,size="15",ha="right")
     plt.yticks(tick_marks, classes,size="15")
 
     fmt = '.0f'# if normalize else 'd'
-    thresh = cm.max() / 2.
+    thresh = cm.max() / 2. * 1000000 # todo remove "10000000..."
     for i, j in itertools.product(range(cm.shape[0]), range(cm.shape[1])):
-        ax.text(j, i+.2, format(cm[i, j], fmt),
-                horizontalalignment="center",
-                color="white" if cm[i, j] > thresh else "black",
-                fontsize="17")
-
+        t = ax.text(j, i+.2, format(cm[i, j], fmt),
+                    horizontalalignment="center",
+                    color="white" if cm[i, j] > thresh else "black",
+                    fontsize="17")
     plt.subplots_adjust(hspace=0, wspace=0)
     if title != None:
         plt.title(title,fontdict=fontdict)
@@ -207,6 +222,58 @@ def img_features(feature_image, feat_type, hist_bins, orient,
         file_features.append(hog_features)
     return file_features
 
+def extract_roidbDict_features(roidbDict, feat_type, clsToSet, calc_feat = False,
+                               spatial_size=(32, 32),hist_bins=32, orient=9, 
+                               pix_per_cell=8, cell_per_block=2, hog_channel=0):
+    # Create a list to append feature vectors to
+
+    # Create a list to append feature vectors to
+    features = []
+    y = []
+    l_feat = [[] for _ in range(len(cfg.DATASET_NAMES_ORDERED))]
+    l_idx = [[] for _ in range(len(cfg.DATASET_NAMES_ORDERED))]
+
+    for key,roidb in roidbDict.items():
+        index = cfg.DATASET_NAMES_ORDERED.index(key)
+        for i in range(len(roidb)):
+            l_feat[index].append(roidb[i])
+
+        
+    errors = 0
+    print('the length of the pyroidb is ', len(pyroidb))
+    # Iterate through the list of images
+    for i in range(len(pyroidb)):
+        try:
+            file_features = []
+            inputs,target = pyroidb[i] # Read in each image one by one
+            if calc_feat == True:
+                img = img_features(inputs, feat_type, hist_bins, orient, pix_per_cell, cell_per_block)
+                if i == 0:
+                    print(img)
+                l_feat[target].extend(img)
+            else:
+                l_feat[target].append(inputs)
+            l_idx[target].append(i)
+            y.append(target)
+        except Exception as e:
+            print(e,i)
+            errors = errors + 1
+
+    # now let's make each "sublist" a numpy array
+    for idx in range(len(clsToSet)):
+        l_feat[idx] = np.array(l_feat[idx])
+        l_idx[idx] = np.array(l_idx[idx])
+
+    if cfg.DEBUG:
+        print("{} errors sorting pyroidb".format(errors))
+
+    if cfg.DEBUG:
+       for idx,name in enumerate(clsToSet):
+           print("{}: {},{}".format(idx,name,len(l_idx[idx])))
+
+    return l_feat, l_idx, y # Return list of feature vectors
+
+
 def extract_pyroidb_features(pyroidb, feat_type, clsToSet, calc_feat = False, spatial_size=(32, 32),
                         hist_bins=32, orient=9, 
                         pix_per_cell=8, cell_per_block=2, hog_channel=0):
@@ -255,7 +322,7 @@ def splitFeatures(trainSize,testSize,inputFtrs):
     testFtrs = inputFtrs[trainSize:trainSize + testSize]
     return trainFtrs,testFtrs
 
-def split_data(train_size, test_size, l_feat,l_idx, y, clsToSet):
+def split_data(train_size, test_size, ds_feat,l_idx, y, dsHasTest):
     x_train = []
     x_test = []
     y_train = []
@@ -264,38 +331,34 @@ def split_data(train_size, test_size, l_feat,l_idx, y, clsToSet):
     y = np.array(y)
 
     """
-    @zohar
     Each class has a specific index determined by a file in "ymlConfigs"
     This means that a list of lists is totally cool for iterating over
     That is the key to compressing this code
     """
+    clsToSet = cfg.DATASET_NAMES_ORDERED
     for idx in range(len(clsToSet)):
 
-        feats = l_feat[idx]
-        x_train.append(feats[:train_size])
-        x_test.append(feats[train_size:train_size+test_size])
-
-        toAdd = test_size - len(feats[train_size:train_size+test_size])
-        if toAdd > 0:
-            x_test.append([ None for _ in range(toAdd) ])
+        feats = ds_feat[idx]
+        ds_train_size = train_size
+        ds_test_size = test_size
+        # if there is not "test" set, split equally
+        if not dsHasTest[idx]:
+            ds_train_size = min(len(feats)/2,train_size)
+            ds_test_size = ds_train_size
+            
+        print(feats[:ds_train_size].shape)
+        x_train.append(feats[:ds_train_size])
+        x_test.append(feats[ds_train_size:ds_train_size+ds_test_size])
 
         indicies = l_idx[idx]
-        trIdx = indicies[:train_size]
-        teIdx = indicies[train_size:train_size+test_size]
-        print("teIdx: {}".format(len(teIdx)))
+        trIdx = indicies[:ds_train_size]
+        teIdx = indicies[ds_train_size:ds_train_size+ds_test_size]
+        print("<{}> dsHasTest: {} teIdx: {}".format(clsToSet[idx],dsHasTest[idx],len(teIdx)))
 
         y_train.extend(y[trIdx])
 
         te_idx.extend(teIdx)
         y_test.extend(y[teIdx])
-
-        if toAdd != (test_size - len(teIdx)):
-            print("To add is not equal")
-
-        toAdd = test_size - len(teIdx)
-        if toAdd > 0:
-            te_idx.extend([ None for _ in range(toAdd) ])
-            y_test.extend([ idx for _ in range(toAdd) ])
 
     if cfg.DEBUG:
         for idx,name in enumerate(clsToSet):
@@ -312,6 +375,114 @@ def split_data(train_size, test_size, l_feat,l_idx, y, clsToSet):
 
     return X_train, X_test, Y_train, Y_test, X_idx
 
+def dealwithKittiQuickly(feats_tr,y_tr,feats_te,y_te,train_size,test_size,tr_idx,te_idx):
+    totalSize = len(feats_tr) + len(feats_te)
+    xTr = []
+    xTe = []
+    yTr = []
+    yTe = []
+    idxTe = []
+    if True:
+        # our actual case
+        xTr = feats_tr[:train_size]
+        trIdx = tr_idx[:train_size]
+        yTr.extend(y_tr[trIdx])
+
+        # we "break" if we have to do both....
+        # addFromTest = train_size - len(xTr)
+        # if addFromTest > 0:
+        #     xTr.append(feats_te[:addFromTest])
+
+        xTe = list(feats_te[:test_size])
+        teIdx = te_idx[:test_size]
+        yTe.extend(y_te[teIdx])
+        idxTe.extend([{"idx":idx,"split":"test"} for idx in teIdx])
+        addFromTrain = test_size - len(xTe)
+        if addFromTrain > 0:
+            xTe.extend(feats_tr[len(xTr):len(xTr)+addFromTrain])
+            teIdx = tr_idx[len(xTr):len(xTr)+addFromTrain]
+            yTe.extend(y_tr[teIdx])
+            idxTe.extend([{"idx":idx,"split":"train"} for idx in teIdx])
+        
+    return np.array(xTr),np.array(xTe),yTr,yTe,idxTe
+    
+def split_tr_te_data(ds_feat_tr,l_idx_tr,y_tr,
+                     ds_feat_te,l_idx_te,y_te,
+                     train_size, test_size, dsHasTest):
+
+    x_train = []
+    x_test = []
+
+    y_train = []
+    y_test = []
+
+    te_idx = []
+
+    print("y_tr looks like...")
+    
+    y_tr = np.array(y_tr)
+    y_te = np.array(y_te)
+
+    for idx,ds in enumerate(cfg.DATASET_NAMES_ORDERED):
+
+        feats_tr = ds_feat_tr[idx]
+        feats_te = ds_feat_te[idx]
+        if ds == "kitti":
+
+            print("Kiiti")
+            x_tr_k,x_te_k,y_tr_k,y_te_k,te_idx_k = dealwithKittiQuickly(feats_tr,y_tr,
+                                                                        feats_te,y_te,
+                                                                        train_size,
+                                                                        test_size,
+                                                                        l_idx_tr[idx],
+                                                                        l_idx_te[idx])
+            x_train.append(x_tr_k)
+            x_test.append(x_te_k)
+            y_train.extend(y_tr_k)
+            y_test.extend(y_te_k)
+            te_idx.extend(te_idx_k)
+
+        elif not dsHasTest[idx]:
+            ds_train_size = min(len(feats_tr)/2,train_size)
+            ds_test_size = ds_train_size
+            x_train.append(feats_tr[:ds_train_size])
+            x_test.append(feats_tr[ds_train_size:ds_train_size+ds_test_size])
+
+            trIdx = l_idx_tr[idx][:ds_train_size]
+            teIdx = l_idx_tr[idx][ds_train_size:ds_train_size+ds_test_size]
+
+            print("{} has Train {} Test {}".format(ds,len(trIdx),
+                                                   len(teIdx)))
+            y_train.extend(y_tr[trIdx])
+            y_test.extend(y_tr[teIdx])
+            te_idx.extend([{"idx":idx,"split":"train"} for idx in teIdx])
+        else:
+            ds_train_size = train_size
+            ds_test_size = test_size
+
+            x_train.append(feats_tr[:ds_train_size])
+            x_test.append(feats_te[:ds_test_size])
+
+            trIdx = l_idx_tr[idx][:ds_train_size]
+            teIdx = l_idx_te[idx][:ds_test_size]
+
+            y_train.extend(y_tr[trIdx])
+            y_test.extend(y_te[teIdx])
+
+            if len(y_te[teIdx]) != len(feats_te[:ds_test_size]):
+                print(ds,len(y_te[teIdx]),len(feats_te[:ds_test_size]))
+                sys.exit()
+            te_idx.extend([{"idx":idx,"split":"test"} for idx in teIdx])
+
+    X_train = np.vstack(x_train).astype(np.float64)
+    X_test = np.vstack(x_test).astype(np.float64)
+
+    Y_train = np.array(y_train).astype(np.float64)
+    Y_test = np.array(y_test).astype(np.float64)
+
+    return X_train, X_test, Y_train, Y_test, te_idx
+
+
 def scale_data(X_train, X_test):
     X_train_scaler = StandardScaler().fit(X_train)
     X_test_scaler = StandardScaler().fit(X_test)
@@ -321,10 +492,9 @@ def scale_data(X_train, X_test):
 
     return X_train_scaled, X_test_scaled
 
-
 def train_SVM(X_train, y_train):
     print('Feature vector length:', len(X_train[0]))
-    svc = LinearSVC(loss='hinge', multi_class = 'ovr') # Use a linear SVC 
+    svc = LinearSVC(loss='hinge', multi_class = 'ovr',class_weight='balanced') # Use a linear SVC 
     t=time.time() # Check the training time for the SVC
     print('start train')
     model_fit = svc.fit(X_train, y_train)
