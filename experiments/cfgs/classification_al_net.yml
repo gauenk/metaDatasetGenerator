@@ -1,0 +1,16 @@
+EXP_DIR: classification
+TASK: "classification"
+WRITE_RESULTS: True
+TRAIN:
+   BATCH_SIZE: 10
+   CLS:
+      BATCH_SIZE: 10
+   MAX_SIZE: 400
+   SCALES: !!python/list [400,]
+TEST:
+   BATCH_SIZE: 1
+   SCALES: !!python/list [400,]
+   MAX_SIZE: 400
+   CLASSIFICATION:
+      TASK: "tp_fn"
+      PROPOSAL_METHOD: gt

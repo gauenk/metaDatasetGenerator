@@ -1,0 +1,23 @@
+EXP_DIR: vae
+TASK: "regeneration"
+PIXEL_MEANS: !!python/list [[[0,0,0]]]
+CROPPED_IMAGE_SIZE: 50
+TRAIN:
+  OBJ_DET:
+    HAS_RPN: True
+    BBOX_REG: False
+    PROPOSAL_METHOD: gt
+    RPN_POSITIVE_OVERLAP: 0.7
+    RPN_BATCHSIZE: 256
+    BBOX_NORMALIZE_TARGETS: False
+    BG_THRESH_LO: 0.0
+  BATCH_SIZE: 1
+  USE_PREFETCH: False
+  USE_FLIPPED: True
+  SCALES: !!python/tuple [50]
+  MAX_SIZE: 50
+  VAE:
+    BATCH_SIZE: 1
+TEST:
+  OBJ_DET:
+    HAS_RPN: True

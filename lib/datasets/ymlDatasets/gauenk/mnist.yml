@@ -1,0 +1,15 @@
+EXP_DATASET: mnist
+PATH_ROOT: /home/gauenk/Documents/data/mnist/
+PATH_TO_IMAGES: /home/gauenk/Documents/data/mnist/images/
+PATH_TO_ANNOTATIONS: /home/gauenk/Documents/data/mnist/annotations/
+PATH_TO_IMAGESETS: /home/gauenk/Documents/data/mnist/ImageSets/Main/
+PATH_TO_RESULTS: /home/gauenk/Documents/data/mnist/results
+CLASSES: /home/gauenk/Documents/data/mnist/classes.txt
+COMPID: mnist
+IMAGE_TYPE: .jpg
+ANNOTATION_CLASS: classification
+ANNOTATION_TYPE: cls_txt
+PARSE_ANNOTATION_REGEX:
+CONVERT_TO_PERSON:
+IMAGE_INDEX_TO_IMAGE_PATH: default
+ONLY_PERSON: True
