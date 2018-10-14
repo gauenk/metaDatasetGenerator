@@ -1,0 +1,14 @@
+train_net: "models/mnist/lenet5/train.prototxt"
+base_lr: 0.01
+momentum: 0.9
+weight_decay: 0.0005
+lr_policy: "inv"
+gamma: 0.0001
+power: 0.75
+display: 100
+max_iter: 10000
+# snapshot intermediate results
+snapshot: 0
+snapshot_prefix: "mnist_al_net_lenet5"
+iter_size: 1
+solver_mode: GPU

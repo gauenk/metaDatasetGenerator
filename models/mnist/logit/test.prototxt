@@ -1,0 +1,39 @@
+name: "VGG_ILSVRC_16_layers"
+
+input: "data"
+input_shape {
+  dim: 1
+  dim: 3
+  dim: 28
+  dim: 28
+}
+layer {
+  name: "cls_score"
+  type: "InnerProduct"
+  bottom: "data"
+  top: "cls_score"
+  param {
+    lr_mult: 1
+  }
+  param {
+    lr_mult: 2
+  }
+  inner_product_param {
+    num_output: 10
+    weight_filler {
+      type: "gaussian"
+      std: 0.01
+    }
+    bias_filler {
+      type: "constant"
+      value: 0
+    }
+  }
+  propagate_down: 1
+}
+layer {
+  name: "cls_prob"
+  type: "Softmax"
+  bottom: "cls_score"
+  top: "cls_prob"
+}

@@ -1,0 +1,17 @@
+train_net: "models/mnist/logit/train.prototxt"
+base_lr: 0.001
+lr_policy: "step"
+gamma: 0.1
+stepsize: 5000
+display: 20
+average_loss: 1
+# iter_size: 1
+momentum: 0.9
+weight_decay: 0.05
+# We disable standard caffe solver snapshotting and implement our own snapshot
+# function
+snapshot: 0
+# We still use the snapshot prefix, though
+snapshot_prefix: "mnist_al_net_CroppedOrRaw"
+iter_size: 1
+
