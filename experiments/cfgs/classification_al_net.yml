@@ -1,5 +1,6 @@
 EXP_DIR: classification
 TASK: "classification"
+SUBTASK: "tp_fn"
 WRITE_RESULTS: True
 TRAIN:
    BATCH_SIZE: 10

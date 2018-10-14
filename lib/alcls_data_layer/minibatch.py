@@ -13,7 +13,7 @@ import cv2,sys
 from core.config import cfg
 from fast_rcnn.bbox_transform import clip_boxes, bbox_transform_inv
 from fast_rcnn.nms_wrapper import nms
-from utils.blob import prep_im_for_blob, im_list_to_blob, _get_cropped_image_blob, save_blob_list_to_file, _get_blobs_from_roidb,getRawImageBlob,getCroppedImageBlob
+from utils.blob import prep_im_for_blob, im_list_to_blob, _get_cropped_image_blob, save_blob_list_to_file, _get_blobs_from_roidb,getRawImageBlob,getCroppedImageBlob,createInfoBlob
 from utils.misc import evaluate_image_detections
 from datasets.ds_utils import cropImageToAnnoRegion
 import matplotlib.pyplot as plt
@@ -48,15 +48,6 @@ def get_minibatch(roidb, records, al_net, num_classes):
     blobs['labels'] = np.array(records)
 
     return blobs
-
-def createInfoBlob(im_data,im_scales):
-    # ensure normalization of image data
-    if np.max(im_data) > 1: # assume this means we haven't normalized
-        im_data /= 255 
-    im_info = {}
-    im_info['data'] = im_data
-    im_info['scales'] = im_scales
-    return im_info
     
 def prepareAlImageBlobFromRawImageBlob(raw_im_info,cropped_im_info,al_net):
 

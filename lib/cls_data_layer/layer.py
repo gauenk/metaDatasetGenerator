@@ -65,7 +65,9 @@ class ClsDataLayer(caffe.Layer):
             # ^ yes. 09/10/18
             # we assume records are *not flattened*
             minibatch_db = [self._roidb[i] for i in db_inds]
-            records_db = [self._records[i] for i in db_inds]
+            records_db = []
+            if self._records is not None:
+                records_db = [self._records[i] for i in db_inds]
             # records_db = self._extractRecordDb(minibatch_db)
             return get_minibatch(minibatch_db, records_db, self._num_classes)
 
@@ -81,7 +83,7 @@ class ClsDataLayer(caffe.Layer):
         assert 'image_id' in roidb[0].keys()
         self._roidb = roidb
         self._records = records
-        if cfg.TRAIN.CLS.BALANCE_CLASSES:
+        if cfg.TRAIN.CLS.BALANCE_CLASSES and records is not None:
             # assume order is preserved in "extractRecordDb"
             self._records = np.array(self._extractRecordDb(self._roidb))
             neg = np.sum(self._records == 0)
