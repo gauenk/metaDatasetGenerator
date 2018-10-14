@@ -154,9 +154,9 @@ class SolverWrapper(object):
             timer.toc()
 
             if self.solver.iter % (10 * self.solver_param.display) == 0:
-                if 'Sigmoid' in self.solver.net.layers[-1].name:
+                if 'Sigmoid' in self.solver.net.layers[-1].type:
                     self.view_sigmoid_output()
-                elif 'Softmax' in self.solver.net.layers[-1].name:
+                elif 'Softmax' in self.solver.net.layers[-1].type:
                     self.view_softmax_output()
                 print('speed: {:.3f}s / iter'.format(timer.average_time))
 
