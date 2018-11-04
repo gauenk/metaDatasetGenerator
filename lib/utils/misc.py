@@ -433,17 +433,20 @@ def createAlReportHeader(fidAlReport,imdb):
 
 def transformField(field,value):
     if field == 'conv1_1':
-        return computeEntopy(value)
+        return computeEntropy(value)
     elif field == 'cls_prob':
-        return computeEntopy(value)
+        return computeEntropy(value)
     return value
         
-def computeEntopy(value):
+def computeEntropy(value):
     cvalue = value.copy()
     cvalue += np.abs(np.min(cvalue))
     cvalue /= cvalue.sum()
     return -(cvalue * np.ma.log(cvalue)/np.log(np.e)).sum()
 
+def printRoidbImageIds(roidb):
+    for sample in roidb:
+        print(sample['image'])
 
 
 

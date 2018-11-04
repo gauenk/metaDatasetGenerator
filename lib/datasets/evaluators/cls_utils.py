@@ -1,8 +1,10 @@
 import numpy as np
-import pickle,sys
+import pickle,sys,os
 from datasets import ds_utils
-from core.config import cfg,cfgData
+from core.config import cfg,cfgData,load_tp_fn_record_path
 import os.path as osp
+
+cfg._DEBUG.datasets.evaluators.cls_utils = False
 
 def cocoID_to_base(cocoID):
     if "COCO" in cocoID:
@@ -61,16 +63,18 @@ def load_groundTruth(classname,cachedir,imagesetfile,annopath,\
     if cfg.SUBTASK == 'tp_fn':
         records = ds_utils.loadEvaluationRecords(classname)
         imagenames,probs = zip(*records.items())
+        probsOrAnnos = probs
     elif cfg.SUBTASK in ["default","al_subset"]:
         imagenames,annos = load_cls_groundTruth(classname,cachedir,imagesetfile,annopath,\
                                                 _load_annotation,_classes)
-    return imagenames, annos
+        probsOrAnnos = annos
+    return imagenames, probsOrAnnos
 
 def extractClassGroundTruth(imagenames,annos,classname):
-    if cfg.SUBTASK == 'tp_fn':
+    if cfg.SUBTASK == 'tp_fn' and cfg.DATASETS.HAS_BBOXES:
         image_ids,class_probs,npos,nneg = extractImageIdsAndProbs(imagenames,annos,True)
         class_probs_dict = dict(zip(image_ids,class_probs))
-    elif cfg.SUBTASK in ["default","al_subset"]:
+    elif cfg.SUBTASK in ["default","al_subset"] or not cfg.DATASETS.HAS_BBOXES:
         image_ids,class_probs,npos,nneg = extractImageIdsAndProbs(imagenames,annos,False)
         class_probs_dict = dict(zip(image_ids,class_probs))
     else:
@@ -107,12 +111,14 @@ def loadModelCls(detpath,classname):
     return image_ids, items
 
 def extractImageIdsAndProbs(imagenames,annos,flatten):
+    #print("extractImageIdsAndProbs")
     if type(annos) is dict:
         return extractImageIdsAndProbs_annoDict(imagenames,annos,flatten)
-    elif type(annos) is list:
+    elif type(annos) is list or type(annos) is tuple:
         return extractImageIdsAndProbs_annoList(imagenames,annos,flatten)
     
 def extractImageIdsAndProbs_annoDict(imagenames,annos,flatten):
+    #print("extractImageIdsAndProbs_annoDict")
     npos = 0
     nneg = 0
     gt_classes = []
@@ -123,21 +129,23 @@ def extractImageIdsAndProbs_annoDict(imagenames,annos,flatten):
     return imagenames,np.array(gt_classes),npos,nneg
     
 def extractImageIdsAndProbs_annoList(imagenames,annos,flatten):
+    #print("extractImageIdsAndProbs_annoList")
     npos = 0
     nneg = 0
     gt_classes = []
     image_ids = []
     for image_id,anno in zip(imagenames,annos):
+        n_image_items = 0
         for item in anno:
             if flatten:
                 image_id_new = image_id + "_{}".format(str(n_image_items))
+                n_image_items += 1
             else:
-                image_id_new = image_id
+                image_id_new = str(image_id)
             image_ids.append(image_id_new)
             gt_classes.append(item)
             npos += (item == 1)
             nneg += (item == 0)
-            n_image_items += 1
     return image_ids,np.array(gt_classes),npos,nneg
 
 
@@ -153,6 +161,7 @@ def compute_metrics(ovthresh,image_ids,model_probs,gt_classes,num_classes):
 def compute_metrics_v2(ovthresh,image_ids,model_output_cls,gt_classes,num_classes):
     nd = len(image_ids)
     correct = np.zeros((nd,len(ovthresh))) # "false negative"
+    records = {}
     for d in range(nd):
         CLS_GT = gt_classes[image_ids[d]] # should be size 1
         for idx in range(len(ovthresh)):
@@ -164,13 +173,26 @@ def compute_metrics_v2(ovthresh,image_ids,model_output_cls,gt_classes,num_classe
             # record if correct
             guess = model_output_cls[d]
             if guess == CLS_GT: correct[d,idx] = 1
+        records[image_ids[d]] = [1*np.any(correct[d,:]==1)]
+    print(np.sum([sample for sample in records.values()]))
+    saveRecord(records)
     acc = np.mean(correct,axis=0)
     print(acc)
-    print("Accuracy: {}".format(acc[0]))
+    print("Accuracy: {:.6f}".format(acc[0]))
     print("DONE")
     sys.exit()
     return correct,None,None,None
 
+def saveRecord(objToSave,suffix='cls'):
+    saveDir = osp.join(cfg.TP_FN_RECORDS_PATH,cfg.CALLING_DATASET_NAME)
+    if cfg.TP_FN_RECORDS_WITH_IMAGESET:
+        datasetDest = "{}-{}-default".format(cfg.CALLING_DATASET_NAME,cfg.CALLING_IMAGESET_NAME)
+        saveDir = osp.join(cfg.TP_FN_RECORDS_PATH,datasetDest)
+    if not osp.isdir(saveDir):
+        os.makedirs(saveDir)
+    savePath = osp.join(saveDir,"records_{}_{}.pkl".format(suffix,cfg.TEST_NET.NET_PATH))
+    with open(savePath,'wb') as f:
+        pickle.dump(objToSave,f)
 
 def compute_metrics_v1(ovthresh,image_ids,model_probs,gt_classes):
     nd = len(image_ids)
@@ -178,9 +200,9 @@ def compute_metrics_v1(ovthresh,image_ids,model_probs,gt_classes):
     tn = np.zeros((nd,len(ovthresh))) # "true negative"
     fp = np.zeros((nd,len(ovthresh))) # "false positive"
     fn = np.zeros((nd,len(ovthresh))) # "false negative"
-    print(len(gt_classes.keys()))
-    print(gt_classes)
-    print(image_ids)
+    # print(len(gt_classes.keys()))
+    # print(gt_classes)
+    # print(image_ids)
 
     for d in range(nd):
         CLS_GT = gt_classes[image_ids[d]] # should be size 1
@@ -188,7 +210,7 @@ def compute_metrics_v1(ovthresh,image_ids,model_probs,gt_classes):
             prob = model_probs[d]
         else:
             prob = model_probs[d, :].astype(float) # should be size 1
-        if cfg._DEBUG.datasets.evaluators.bbox_utils: print("[compute_TP_FP]",bb,BBGT)
+        if cfg._DEBUG.datasets.evaluators.cls_utils: print("[compute_TP_FP]",bb,BBGT)
         
         for idx in range(len(ovthresh)):
             thresh = ovthresh[idx]
@@ -202,7 +224,18 @@ def compute_metrics_v1(ovthresh,image_ids,model_probs,gt_classes):
             if guess != CLS_GT and guess == 1: fp[d,idx] = 1
             if guess != CLS_GT and guess == 0: fn[d,idx] = 1
 
-
+    tpr = tp.sum(axis=0) / (tp.sum(axis=0) + fn.sum(axis=0))
+    tnr = tn.sum(axis=0) / (tn.sum(axis=0) + fp.sum(axis=0))
+    ppv = tp.sum(axis=0) / (tp.sum(axis=0) + fp.sum(axis=0))
+    npv = tn.sum(axis=0) / (tn.sum(axis=0) + fn.sum(axis=0))
+    acc = ( tp.sum(axis=0) + tn.sum(axis=0) ) /\
+          ( tp.sum(axis=0) + tn.sum(axis=0) + fp.sum(axis=0) + fn.sum(axis=0) )
+    print("TPR: {:.6f}".format(tpr[0]))
+    print("TNR: {:.6f}".format(tnr[0]))
+    print("PPV: {:.6f}".format(ppv[0]))
+    print("NPV: {:.6f}".format(npv[0]))
+    print("ACC: {:.6f}".format(acc[0]))
+    sys.exit()
     return tp, tn, fp, fn
 
 

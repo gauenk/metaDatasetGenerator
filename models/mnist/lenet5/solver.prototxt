@@ -5,10 +5,22 @@ weight_decay: 0.0005
 lr_policy: "inv"
 gamma: 0.0001
 power: 0.75
-display: 100
+display: 1
 max_iter: 10000
 # snapshot intermediate results
 snapshot: 0
-snapshot_prefix: "mnist_al_net_lenet5"
+#snapshot_prefix: "mnist_lenet5_short_train_3k_input28x28_yesImageNoise_yesPrune200"
+snapshot_prefix: "mnist_al_lenet5"
 iter_size: 1
 solver_mode: GPU
+# with solverstate: acc: ~89
+#0.00931012 @ 1000
+#0.00930378 @ 1010
+#0.00927851 @ 1050
+#0.00924777 @ 1099
+
+# withOUT solverstae: acc: ~??
+#0.00931012  @ 1000
+#0.00930378  @ 1010
+#0.00927851  @ 1050
+#0.00924777  @ 1099

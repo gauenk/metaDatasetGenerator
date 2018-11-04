@@ -1,0 +1,11 @@
+SOLVER_STATE: False
+AL_INFO_FN: "/home/gauenk/Documents/data/mnist/ImageSets/AL_500_combo/alSet_info.txt"
+AL_MODEL_TYPE: "lenet5"
+NUMBER_OF_PASSES_OF_AL_SUBSET: 1
+BATCH_SIZE: 10
+RESTORE_STATE: False
+ORIGINAL_MODEL_NAME: "mnist_lenet5_short_train_3k_input28x28_yesImageNoise_yesPrune200"
+ORIGINAL_MODEL_TYPE: "lenet5"
+ORIGINAL_MODEL_ACCURACY: .9515
+ORIGINAL_MODEL_ITERS: 2000
+CONFIG_FILE_TO_USE: "/home/gauenk/Documents/experiments/metaDatasetGenerator/experiments/cfgs/cls_mnist_al_yesImageNoise_yesPrune200.yml"

@@ -1,0 +1,12 @@
+average_loss: 1
+snapshot_prefix: "/home/gauenk/Documents/experiments/metaDatasetGenerator/output/classification/cifar_10/aim_lenet5_av400_al28"
+stepsize: 100000
+base_lr: 0.0001
+snapshot: 0
+momentum: 0.9
+train_net: "models/tp_fn_record/aim_net/cifar_10/lenet5/train.prototxt"
+lr_policy: "step"
+weight_decay: 0.005
+display: 20
+gamma: 0.1
+iter_size: 1

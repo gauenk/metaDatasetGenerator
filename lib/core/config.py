@@ -52,7 +52,8 @@ __C.DATASETS.CONVERT_ID_TO_CLS_FILE = None
 __C.DATASETS.ONLY_PERSON = False
 __C.DATASETS.MODEL = None
 __C.DATASETS.ANNOTATION_CLASS = "object_detection"
-
+__C.DATASETS.IS_IMAGE_INDEX_FLATTENED = False
+__C.DATASETS.HAS_BBOXES = False
 #
 # Global Options
 #
@@ -63,6 +64,11 @@ __C.SCALES = None
 __C.AL_CLS = edict()
 __C.AL_CLS.BALANCE_CLASSES = True
 __C.AL_CLS.LAYERS = ['conv5_1','conv4_1','conv3_1']
+__C.AL_CLS.ENTROPY_SUMMARY = False
+
+__C.TEST_NET = edict()
+__C.TEST_NET.NET_PATH = ""
+__C.TEST_NET.DEF_PATH = ""
 
 #
 # Training options
@@ -198,7 +204,9 @@ __C.TRAIN.CLS.BALANCE_CLASSES = True
 
 __C.TRAIN.AL_CLS = edict()
 __C.TRAIN.AL_CLS.BALANCE_CLASSES = True
-__C.TRAIN.AL_CLS.LAYERS = ['conv5_1','conv4_1','conv3_1']
+#__C.TRAIN.AL_CLS.LAYERS = ['conv5_1','conv4_3','conv4_1','conv3_3']
+#__C.TRAIN.AL_CLS.LAYERS = ['conv5_1','conv4_3']
+__C.TRAIN.AL_CLS.LAYERS = ['conv1','conv2','ip1','cls_score']
 
 
 #
@@ -261,7 +269,7 @@ __C.TEST.CLASSIFICATION.PROPOSAL_METHOD = 'gt'
 
 __C.TEST.AL_CLS = edict()
 __C.TEST.AL_CLS.BALANCE_CLASSES = True
-__C.TEST.AL_CLS.LAYERS = ['conv5_1','conv4_1','conv3_1']
+__C.TEST.AL_CLS.LAYERS =  ['conv1','conv2','ip1','cls_score']
 
 
 #
@@ -269,8 +277,8 @@ __C.TEST.AL_CLS.LAYERS = ['conv5_1','conv4_1','conv3_1']
 #
 
 # official names for publication
-__C.DATASET_NAMES_PAPER = ['COCO', 'ImageNet', 'VOC', 'Caltech', 'INRIA', 'SUN', 'KITTI', 'CAM2']
-__C.DATASET_NAMES_ORDERED = ['coco', 'imagenet', 'pascal_voc', 'caltech', 'inria', 'sun','kitti','cam2','mnist' ]
+__C.DATASET_NAMES_PAPER = ['COCO', 'ImageNet', 'VOC', 'Caltech', 'INRIA', 'SUN', 'KITTI', 'CAM2','MNIST']
+__C.DATASET_NAMES_ORDERED = ['coco', 'imagenet', 'pascal_voc', 'caltech', 'inria', 'sun','kitti','cam2','mnist','cifar_10']
 
 # For print statements
 __C.DEBUG = False
@@ -356,7 +364,11 @@ __C.CROPPED_IMAGE_SIZE = 227
 __C.RAW_IMAGE_SIZE = 300
 
 # The size of the input for raw images
-__C.AL_IMAGE_SIZE = 400
+__C.AL_IMAGE_SIZE = 28
+
+# The size of the input for activations
+__C.AV_IMAGE_SIZE = 400
+__C.AV_COLOR_CHANNEL = 4
 
 # the size of the 
 __C.CONFIG_DATASET_INDEX_DICTIONARY_PATH = "default_dataset_index.yml"
@@ -387,6 +399,7 @@ __C.WRITE_RESULTS = True
 
 # output for recoding the TP and FN of a model
 __C.TP_FN_RECORDS_PATH = "./output/{}/tp_fn_records/".format("faster_rcnn")
+__C.TP_FN_RECORDS_WITH_IMAGESET = True
 
 # output for recoding the TP and FN of a model
 __C.ROTATE_PATH = "./output/rotate/"
@@ -398,6 +411,8 @@ __C.SUBTASK = "default"
 # string name of the output layer's probability vectore
 __C.CLS_PROBS = "cls_prob"
 
+# how to loadImage during testing
+__C.LOAD_METHOD = None
 
 def GET_SAVE_ACTIVITY_VECTOR_BLOBS_DIR():
     dirn = "./output/activity_vectors/{}/{}-{}/".format(__C.EXP_DIR.replace("/",""),__C.CALLING_DATASET_NAME,__C.CALLING_IMAGESET_NAME)
@@ -407,7 +422,8 @@ def GET_SAVE_ACTIVITY_VECTOR_BLOBS_DIR():
 
 # used for saving activity vectors
 __C.GET_SAVE_ACTIVITY_VECTOR_BLOBS_DIR = GET_SAVE_ACTIVITY_VECTOR_BLOBS_DIR
-__C.SAVE_ACTIVITY_VECTOR_BLOBS = [] # the list of blobs to save
+# __C.SAVE_ACTIVITY_VECTOR_BLOBS = [] # the list of blobs to save
+__C.SAVE_ACTIVITY_VECTOR_BLOBS = ['conv1','conv2','ip1','cls_score']
 
 # Active Learning Settings
 __C.ACTIVE_LEARNING = edict()
@@ -416,6 +432,14 @@ __C.ACTIVE_LEARNING.VAL_SIZE = 30000
 __C.ACTIVE_LEARNING.SUBSET_SIZE = 500
 __C.ACTIVE_LEARNING.N_COVERS = 300
 __C.ACTIVE_LEARNING.REPORT = False
+
+# Prune Network: the number is the modulous for the frequency of pruning
+cfg.PRUNE_NET = 0 
+
+# add noise to image inputs
+__C.TRAIN.IMAGE_NOISE = False
+__C.TEST.IMAGE_NOISE = False
+__C.IMAGE_NOISE = False
 
 def get_output_dir(imdb_name, net=None):
     """Return the directory where experimental artifacts are placed.
@@ -476,10 +500,12 @@ def set_global_cfg(MODE):
         cfg.BATCH_SIZE = cfg.TEST.BATCH_SIZE
         cfg.AL_CLS.LAYERS = cfg.TEST.AL_CLS.LAYERS
         cfg.SCALES = cfg.TEST.SCALES
+        cfg.IMAGE_NOISE = cfg.TEST.IMAGE_NOISE
     elif MODE == "TRAIN":
         cfg.BATCH_SIZE = cfg.TRAIN.BATCH_SIZE
         cfg.AL_CLS.LAYERS = cfg.TRAIN.AL_CLS.LAYERS
         cfg.SCALES = cfg.TRAIN.SCALES
+        cfg.IMAGE_NOISE = cfg.TRAIN.IMAGE_NOISE
 
 def cfg_from_file(filename):
     """Load a config file and merge it into the default options."""
@@ -564,3 +590,8 @@ def loadDatasetIndexDict():
 
 __C.clsToSet = __C.DATASET_NAMES_ORDERED
 
+def getTestNetConfig(caffemodel,prototxt):
+    # find model number of iterations 
+    cfg.TEST_NET.NET_PATH = osp.splitext(caffemodel.split('/')[-1])[0]
+    cfg.TEST_NET.DEF_PATH = osp.splitext(prototxt.split('/')[-1])[0]
+    

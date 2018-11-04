@@ -59,7 +59,15 @@ class AimDataLayer(caffe.Layer):
         records_db = []
         for roi in minibatch_db:
             image_index,bbox_index = convertFlattenedImageIndextoImageIndex(roi['image_id'])
-            records_db.append(self._records[image_index][bbox_index])
+            # print(image_index,bbox_index)
+            # print(self._records[image_index])
+            # print(self._records[image_index][bbox_index])
+            try:
+                records_db.append(self._records[image_index][bbox_index])
+            except Exception as e:
+                if image_index not in self._records.keys():
+                    print("possible error is the image_index is not in the self._records. Did you \"load\" the proper dataset?")
+                raise Exception
         return records_db
 
     def set_roidb(self, roidb, records, al_net):
@@ -69,27 +77,48 @@ class AimDataLayer(caffe.Layer):
         self._al_net = al_net
         self._records = records
         if cfg.TRAIN.CLS.BALANCE_CLASSES:
+            print("BALANCING CLASSES")
             # assume order is preserved in "extractRecordDb"
             self._records = np.array(self._extractRecordDb(self._roidb))
             neg = np.sum(self._records == 0)
             pos = np.sum(self._records == 1)
+            print("CLASS BALANCE: (before)")
+            print("neg: {}".format(neg))
+            print("pos: {}".format(pos))
 
-            if pos >= .9*neg and pos <= 1.1*neg: # a 10% class imbalance is okay
-                self._perm = npr.permutation(np.arange(len(self._roidb)))
-            elif pos >= .9*neg: # (given we failed the 1st cond.) the positives are too big
-                # we grow the negatives to 110%|#positives|
-                goal = 1.1*pos
-                neg_inds = np.where(self._records == 0)[0]
-                neg_inds_rand = npr.permutation(neg_inds)[:goal] # limit to only needed
-                neg_roidb_examples = [ self._roidb[idx] for idx in neg_inds ]
-                neg_record_examples = [ self._records[idx] for idx in neg_inds ]
-                print(self._roidb[-2],self._roidb[-1])
-                self._roidb.extend(neg_roidb_examples)
-                print(self._roidb[-300],self._roidb[-2],self._roidb[-1])
-                self._records = np.r_[self._records,neg_record_examples]
-            elif pos <= 1.1*neg: # (given we failed the 1st cond.) the positives are too small
-                goal = neg - pos
-                pass # not here yet
+            #if pos >= .9*neg and pos <= 1.1*neg: # a 10% class imbalance is okay
+            tolerance = 0.20
+            while(pos < (1.-tolerance)*neg or pos > (1.+tolerance)*neg): # a 10% class imbalance is okay
+                # print("CLASS BALANCE: (during)")
+                # print("neg: {}".format(neg))
+                # print("pos: {}".format(pos))
+                if pos >= .9*neg: # (given we failed the 1st cond.) the positives are too big
+                    # we grow the negatives to 110%|#positives|
+                    goal = 1.1*pos
+                    neg_inds = np.where(self._records == 0)[0]
+                    neg_inds_rand = npr.permutation(neg_inds)[:goal] # limit to only needed
+                    neg_roidb_examples = [ self._roidb[idx] for idx in neg_inds ]
+                    neg_record_examples = [ self._records[idx] for idx in neg_inds ]
+                    #print(self._roidb[-2],self._roidb[-1])
+                    self._roidb.extend(neg_roidb_examples)
+                    #print(self._roidb[-300],self._roidb[-2],self._roidb[-1])
+                    self._records = np.r_[self._records,neg_record_examples]
+                elif pos <= 1.1*neg: # (given we failed the 1st cond.) the positives are too small
+                    goal = neg - pos
+                    sys.exit()
+                    pass # not here yet
+                neg = np.sum(self._records == 0)
+                pos = np.sum(self._records == 1)
+
+            neg = np.sum(self._records == 0)
+            pos = np.sum(self._records == 1)
+
+            print("CLASS BALANCE: (after)")
+            print("neg: {}".format(neg))
+            print("pos: {}".format(pos))
+
+        else:
+            print("DID NOT BALANCE CLASSES")
         self._shuffle_roidb_inds()
 
         if cfg.TRAIN.USE_PREFETCH:
@@ -120,17 +149,17 @@ class AimDataLayer(caffe.Layer):
         # data blob: holds a batch of N images, each with 3 channels
         idx = 0
 
-        top[idx].reshape(cfg.TRAIN.BATCH_SIZE, 3,
+        top[idx].reshape(cfg.BATCH_SIZE, cfg.COLOR_CHANNEL,
                          cfg.AL_IMAGE_SIZE,cfg.AL_IMAGE_SIZE)
         self._name_to_top_map['data'] = idx
         idx += 1
 
-        top[idx].reshape(cfg.TRAIN.BATCH_SIZE, 3,
-                         cfg.AL_IMAGE_SIZE,cfg.AL_IMAGE_SIZE)
+        top[idx].reshape(cfg.BATCH_SIZE, cfg.AV_COLOR_CHANNEL,
+                         cfg.AV_IMAGE_SIZE,cfg.AV_IMAGE_SIZE)
         self._name_to_top_map['avImage'] = idx
         idx += 1
 
-        top[idx].reshape(cfg.TRAIN.BATCH_SIZE)
+        top[idx].reshape(cfg.BATCH_SIZE)
         self._name_to_top_map['labels'] = idx
         idx += 1
 

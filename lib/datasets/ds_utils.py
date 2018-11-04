@@ -11,9 +11,44 @@ from core.config import cfg, createFilenameID
 # misc imports
 import pprint
 pp = pprint.PrettyPrinter(indent=4)
-import pickle,cv2,uuid
+import pickle,cv2,uuid,os,sys
 import os.path as osp
 import numpy as np
+from numpy import transpose as npt
+
+def adversarialPerturbation(img,net,inputBlob,inputBlobImgFieldName,inputBlobLabelFieldName,outputFieldName,targetOutput,alpha=0.1):
+
+    inputBlob[inputBlobImgFieldName] = img
+    inputBlob[inputBlobLabelFieldName] = targetOutput
+    
+    ## L-BFGS Method
+
+    # get current output info
+    clsOriginal,gradCurrent = networkForwardBackward(net,inputBlob,outputFieldName)
+    
+    # Loop variables
+    clsCurrent = clsOriginal
+    historyQuit = False # a quit var flagged by too many of the same, but not moving toward target
+
+    # Primary loop
+    imgCurrent = img.copy()
+    clsCurrent = clsOriginal
+    direction = np.rand(gradCurrent.shape)
+    # Bk = 0
+    while( (targetOutput != clsCurrent) or historyQuit ):
+        # propose new image
+        sk = alpha * direction
+        imgCurrentProp = imgCurrent + sk
+        # get new gradient and output class
+        inputBlob[inputBlobImgFieldName] = imgCurrentProp
+        clsCurrentProp,gradCurrentProp = networkForwardBackward(net,inputBlob,outputFieldName)
+        diff = gradCurrentProp - gradCurrent
+        # Bk += ( diff * npt(diff) ) / ( npt(diff) * sk ) - ( Bk * sk * npt(sk) * Bk ) / ( npt(sk) * Bk * npt(sk) )
+
+def networkForwardBackward(net,inputBlob):
+    output = net.forward(**inputBlob)
+    net.backward()
+    return output,net.layers[-1].diff[0].data
 
 def unique_boxes(boxes, scale=1.0):
     """Return indices of unique boxes."""
@@ -362,9 +397,19 @@ def loadEvaluationRecords(classname):
     #saveDir = osp.join(cfg.TP_FN_RECORDS_PATH,cfg.CALLING_DATASET_NAME)
     saveDirPostfix = "{}-{}-default".format(cfg.CALLING_DATASET_NAME,cfg.CALLING_IMAGESET_NAME)
     saveDir = osp.join(cfg.TP_FN_RECORDS_PATH,saveDirPostfix)
-    savePath = osp.join(saveDir,"records_{}.pkl".format('det_{:s}').format(classname))
+    #savePath = osp.join(saveDir,"records_{}.pkl".format('det_{:s}').format(classname))
+    savePath = osp.join(saveDir,"records_{}.pkl".format('cls').format(classname))
+    if not osp.exists(savePath):
+        print("PATH {} DOESN'T EXIST. NOTHING TO LOAD. QUITTING.".format(saveDir))
+        sys.exit(1)
     print("loading evaluation records from: {}".format(savePath))
     with open(savePath, "rb") as f:
+        records = pickle.load(f)
+    return records
+
+def loadEvaluationRecordsFromPath(recordPath):
+    print("loading evaluation records from: {}".format(recordPath))
+    with open(recordPath, "rb") as f:
         records = pickle.load(f)
     return records
 
@@ -373,6 +418,8 @@ def split_and_load_ImdbImages(imdb,records):
         record = records[image_id]
 
 def convertFlattenedImageIndextoImageIndex(flattened_image_index):
+    if '_' not in flattened_image_index: return flattened_image_index,0
+    if not cfg.DATASETS.IS_IMAGE_INDEX_FLATTENED: return flattened_image_index,0
     bbox_index = flattened_image_index.split('_')[-1]
     image_index = '_'.join(flattened_image_index.split('_')[:-1])
     return image_index,int(bbox_index)

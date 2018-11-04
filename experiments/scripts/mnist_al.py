@@ -5,9 +5,9 @@ import numpy as np
 from easydict import EasyDict as edict
 
 trainCommandTemplate = "./tools/train_net.py --iters {} --imdb mnist-{}-default --cfg ./experiments/cfgs/cls_mnist_al.yml --solver ./models/mnist/{}/solver.prototxt --solver_state ./mnist_al_net_{}_iter_{}.solverstate --new_path_to_imageset {} --snapshot_infix {}"
-testCommandTemplate = "./tools/test_net.py --imdb mnist-test-default --cfg ./experiments/cfgs/cls_mnist.yml --def ./models/mnist/{}/test.prototxt --net ./output/classification/mnist/mnist_al_net_{}_{}_iter_{}.caffemodel"
+testCommandTemplate = "./tools/test_net.py --imdb mnist-test-default --cfg ./experiments/cfgs/cls_mnist_al.yml --def ./models/mnist/{}/test.prototxt --net ./output/classification_al_subset/mnist/mnist_al_net_{}_{}_iter_{}.caffemodel"
 trainOriginalCommandTemplate = "./tools/train_net.py --iters {} --imdb mnist-train-default --cfg ./experiments/cfgs/cls_mnist_al.yml --solver ./models/mnist/{}/solver.prototxt"
-testOriginalModelCommandTemplate = "./tools/test_net.py --imdb mnist-test-default --cfg ./experiments/cfgs/cls_mnist.yml --def ./models/mnist/{}/test.prototxt --net {}"
+testOriginalModelCommandTemplate = "./tools/test_net.py --imdb mnist-test-default --cfg ./experiments/cfgs/cls_mnist_al.yml --def ./models/mnist/{}/test.prototxt --net {}"
 
 def dbprint(item):
     print("DEBUG_PRINT")
@@ -144,10 +144,11 @@ def handleTrainedModel(caffemodelPath):
 if __name__ == "__main__":
 
     # arguments
-    oIters = 6000
-    alInfoFn = "/home/gauenk/Documents/data/mnist/ImageSets/AL_single/alSet_info.txt"
+    oIters = 1000
+    alInfoFn = "/home/gauenk/Documents/data/mnist/ImageSets/AL/alSet_info.txt"
     modelType = "lenet5"
     nPassesofAlSubsets = 1
+    batchSize = 10 # MUST ALIGN WITH CFG FOR TRAINING THE AL_SUBSETS
     saveMod = 300
     restoreState = False
 
@@ -158,11 +159,12 @@ if __name__ == "__main__":
     # train original model
     # caffemodel = trainOriginalModel(oIters,modelType)
     # solverstate = handleTrainedModel(caffemodel)
-    caffemodel = "./output/classification/mnist/mnist_al_net_lenet5_iter_6000.caffemodel"
-    solverstate = "./mnist_al_net_lenet5_iter_6000.solverstate"
+    caffemodel = "./output/classification/mnist/mnist_al_net_lenet5_iter_1000.caffemodel"
+    solverstate = "./mnist_al_net_lenet5_iter_1000.solverstate"
 
     # test original model
-    originalAcc = testOriginalModel(caffemodel,modelType)
+    # originalAcc = testOriginalModel(caffemodel,modelType)
+    originalAcc = 0.92483333
     print(originalAcc)
 
     #-------------------
@@ -173,7 +175,7 @@ if __name__ == "__main__":
     alInfo = getAlInfo(alInfoFn)
     alSetOrigin = alInfo['alSetOrigin']
     alSetDir = alInfo['alSetDir']
-    nIters = alInfo['subsetSize'] * nPassesofAlSubsets + oIters
+    nIters = alInfo['subsetSize'] // batchSize * nPassesofAlSubsets + oIters
 
     # get of ALL image indicies available for active learning
     alIds = dict.fromkeys(getIdList(alSetOrigin),None)
@@ -186,8 +188,10 @@ if __name__ == "__main__":
     # load state information
     start_cover,start_subset = 0,0
     if restoreState:
+        print("Restoring State with {}".format(saveALResultsFn))
         alIds,originalAcc,stateInfo = restoreStatePickle(saveALResultsFn)
         start_cover,start_subset = stateInfo['cover'],stateInfo['subsetIndex']
+        print("STATE RESTORED: Starting (Cover,Subset) = ({},{})".format(start_cover,start_subset))
     
     # run the AL experiments
     for cover in range(start_cover,alInfo['numberOfCovers']):
@@ -197,6 +201,7 @@ if __name__ == "__main__":
                                                alInfo['valSize']) 
             trainAlModel(alSet,nIters,oIters,alSetDir,modelType) # train the new model
             acc = testAlModel(alSet,nIters,modelType) # test the new model
+            print("testing acc: {}".format(acc))
             assignAccuracy(alIds,alSet,acc) # aggregate the accuracy
             # save the current state information
             if subsetIndex % saveMod == 0:

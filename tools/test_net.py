@@ -10,7 +10,7 @@ import matplotlib.pyplot as plt
 
 import _init_paths
 from core.test import test_net
-from core.config import cfg, cfg_from_file, cfg_from_list, set_global_cfg
+from core.config import cfg, cfg_from_file, cfg_from_list, set_global_cfg, getTestNetConfig
 from datasets.factory import get_repo_imdb
 import caffe
 import argparse
@@ -91,8 +91,18 @@ if __name__ == '__main__':
 
     caffe.set_mode_gpu()
     caffe.set_device(args.gpu_id)
+    getTestNetConfig(args.caffemodel,args.prototxt)
     net = caffe.Net(args.prototxt, args.caffemodel, caffe.TEST)
     net.name = os.path.splitext(os.path.basename(args.caffemodel))[0]
+
+    # print("-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-")
+    # for name,layer in net.layer_dict.items():
+    #     if len(layer.blobs) == 0: continue
+    #     print(layer.blobs[0].data.shape)
+    #     #print(name,layer.blobs[0].data)
+    # print("-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-")
+    # sys.exit()
+
 
     print(args.imdb_name)
     imdb = get_repo_imdb(args.imdb_name)

@@ -139,21 +139,20 @@ class ClsDataLayer(caffe.Layer):
                          cfg.CROPPED_IMAGE_SIZE,cfg.CROPPED_IMAGE_SIZE)
         self._name_to_top_map['data'] = idx
         idx += 1
+        print("reshaped data")
 
         top[idx].reshape(cfg.TRAIN.BATCH_SIZE)
         self._name_to_top_map['labels'] = idx
         idx += 1
+        print("reshaped labels")
 
         # if cfg.TRAIN.OBJ_DET.HAS_RPN:
         #     top[idx].reshape(1)
         #     self._name_to_top_map['im_info'] = idx
         #     idx += 1
 
-
         print 'ClsDataLayer: name_to_top:', self._name_to_top_map
         assert len(top) == len(self._name_to_top_map)
-
-
 
 
     def forward(self, bottom, top):

@@ -3,7 +3,7 @@
 """Train an Img2Vec network on a "region of interest" database."""
 
 import matplotlib
-# matplotlib.use('Agg')
+matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 
 import _init_paths
@@ -59,6 +59,9 @@ def parse_args():
     parser.add_argument('--solver_state', dest='solver_state',
                         help='initialize with a previous solver state',
                         default=None, type=str)
+    parser.add_argument('--cacheStrModifier', dest='cacheStrModifier',
+                        help='append a string to the saved data caches',
+                        default=None, type=str)
     # params for model to which active learning is applied
     parser.add_argument('--al_def', dest='al_def',
                         help='model prototxt to which active learning is applied',
@@ -93,7 +96,7 @@ def parse_args():
     return args
 
 def get_roidb(imdb_name,args):
-    imdb = get_repo_imdb(imdb_name,args.new_path_to_imageset)
+    imdb = get_repo_imdb(imdb_name,args.new_path_to_imageset,args.cacheStrModifier)
     print 'Loaded dataset `{:s}` for training'.format(imdb.name)
     imdb.set_proposal_method(cfg.TRAIN.OBJ_DET.PROPOSAL_METHOD)
     print 'Set proposal method: {:s}'.format(cfg.TRAIN.OBJ_DET.PROPOSAL_METHOD)
@@ -208,9 +211,15 @@ if __name__ == '__main__':
         al_net = caffe.Net(args.al_def,caffe.TEST, weights=args.al_net)
         al_net.name = "al_"+os.path.splitext(os.path.basename(args.al_def))[0]
 
+    useDatasetName = True
+    datasetName = ""
+    if useDatasetName:
+        datasetName = imdb.name
+
     print '{:d} roidb entries'.format(len(roidb))
     print 'Output will be saved to `{:s}`'.format(output_dir)
     train_net(args.solver, roidb, output_dir,
+              datasetName=datasetName,
               solver_state=args.solver_state,
               pretrained_model=args.pretrained_model,
               max_iters=args.max_iters,

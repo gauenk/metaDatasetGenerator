@@ -10,6 +10,7 @@
 from core.config import cfg
 from datasets.ds_utils import cropImageToAnnoRegion
 import numpy as np
+import numpy.random as npr
 import cv2
 import matplotlib.pyplot as plt
 
@@ -266,10 +267,15 @@ def save_blob_list_to_file(blob_list,append_str_l,vis=False):
 def createInfoBlob(im_data,im_scales):
     # ensure normalization of image data
     if np.max(im_data) > 1: # assume this means we haven't normalized
-        im_data /= 255 
+        im_data /= 255.
     im_info = {}
     im_info['data'] = im_data
     im_info['scales'] = im_scales
     return im_info
+
+def addImageNoise(im_info):
+    img = im_info['data']
+    img += npr.randn(img.size).reshape(img.shape)/255.
+    im_info['data'] = img
 
 

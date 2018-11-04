@@ -1,0 +1,25 @@
+EXP_DIR: classification
+TASK: "classification"
+SUBTASK: "tp_fn"
+WRITE_RESULTS: True
+AL_IMAGE_SIZE: 28
+AV_IMAGE_SIZE: 400
+#RECORD_TYPE: "cls"
+LOAD_METHOD: "aim_data_layer"
+DATASETS:
+   MODEL: lenet5
+TRAIN:
+   SNAPSHOT_ITERS: 2000
+   BATCH_SIZE: 10
+   CLS:
+      BATCH_SIZE: 10
+   MAX_SIZE: 28
+   SCALES: !!python/list [28,]
+   IMAGE_NOISE: True
+TEST:
+   BATCH_SIZE: 1
+   SCALES: !!python/list [28,]
+   MAX_SIZE: 28
+   CLASSIFICATION:
+      TASK: "tp_fn"
+      PROPOSAL_METHOD: gt

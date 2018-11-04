@@ -1,14 +1,19 @@
-EXP_DIR: classification
+EXP_DIR: classification_al_subset
 TASK: "classification"
 SUBTASK: "al_subset"
-WRITE_RESULTS: True
+WRITE_RESULTS: False
 CLS_PROBS: "cls_prob"
+PRUNE_NET: 200
 CROPPED_IMAGE_SIZE: 28
+DATASETS:
+   MODEL: lenet5
 TRAIN:
-   BATCH_SIZE: 30
+   SNAPSHOT_ITERS: 200
+   BATCH_SIZE: 10
    CLS:
-      BATCH_SIZE: 30
+      BATCH_SIZE: 10
    MAX_SIZE: 28
+   IMAGE_NOISE: True
    SCALES: !!python/list [28,]
 TEST:
    BATCH_SIZE: 1

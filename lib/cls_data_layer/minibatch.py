@@ -11,7 +11,7 @@ import numpy as np
 import numpy.random as npr
 import cv2,sys
 from core.config import cfg
-from utils.blob import prep_im_for_blob, im_list_to_blob, getRawImageBlob, getCroppedImageBlob, createInfoBlob
+from utils.blob import prep_im_for_blob, im_list_to_blob, getRawImageBlob, getCroppedImageBlob, createInfoBlob, addImageNoise, save_blob_list_to_file
 from datasets.ds_utils import cropImageToAnnoRegion
 import matplotlib.pyplot as plt
 
@@ -31,13 +31,17 @@ def get_minibatch(roidb, records, num_classes):
     else:
         im_data, im_scales = getRawImageBlob(roidb, records, random_scale_inds)
     im_info = createInfoBlob(im_data,im_scales)
-
+    if cfg.TRAIN.IMAGE_NOISE: addImageNoise(im_info)
 
     blobs = {'data': im_info['data']}
+
     if cfg.SUBTASK == "tp_fn":
         blobs['labels'] = np.array(records)
     else:
         blobs['labels'] = np.array([ elem['gt_classes'] for elem in roidb ])
+
+    # print(blobs['labels'])
+    save_blob_list_to_file(im_info['data'],'',vis=False)
 
     # blobs['im_info'] = np.array(
     #     [[im_blob.shape[2], im_blob.shape[3], im_scales[0]]],

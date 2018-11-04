@@ -11,7 +11,7 @@ from core.config import cfg, get_output_dir
 from fast_rcnn.bbox_transform import clip_boxes, bbox_transform_inv
 import argparse
 from utils.timer import Timer
-from utils.misc import getRotationScale,toRadians,getRotationInfo,print_net_activiation_data,save_image_with_border,createAlReportHeader,transformField,openAlResultsCsv,startAlReport,computeEntopy
+from utils.misc import getRotationScale,toRadians,getRotationInfo,print_net_activiation_data,save_image_with_border,createAlReportHeader,transformField,openAlResultsCsv,startAlReport,computeEntropy
 import numpy as np
 import cv2
 import caffe
@@ -20,6 +20,7 @@ import cPickle
 from utils.blob import im_list_to_blob,blob_list_im,save_blob_list_to_file
 from datasets.ds_utils import cropImageToAnnoRegion
 from alcls_data_layer.minibatch import get_minibatch as alcls_get_minibatch
+from aim_data_layer.minibatch import get_minibatch as aim_get_minibatch
 import os
 import matplotlib.pyplot as plt
 
@@ -228,6 +229,9 @@ def im_detect(net, im, boxes=None, image_id="",isImBlob=False):
     elif cfg.SSD is False and cfg.TASK == 'object_detection':
         forward_kwargs['rois'] = blobs['rois'].astype(np.float32, copy=False)
 
+    if cfg.LOAD_METHOD == 'aim_data_layer':
+        forward_kwargs['avImage'] = blobs['avImage'].astype(np.float32, copy=False)
+
     if cfg._DEBUG.core.test:
         im_shape = forward_kwargs["data"].shape
         rimg = blob_list_im(forward_kwargs["data"])
@@ -349,7 +353,17 @@ def apply_nms(all_boxes, thresh):
 
 def loadImage(imdb,image_path,image_index,bbox,al_net,idx):
     isImBlob = False
-    if imdb.is_image_index_flattened and al_net is None:
+    if cfg.LOAD_METHOD == 'aim_data_layer':
+        sampleRoidb = [imdb.roidb[idx]]
+        sampleRoidb[0]['image'] = image_path
+        sampleRecords = []
+        numClasses = len(cfg.DATASETS.CLASSES)
+        input_data = aim_get_minibatch(sampleRoidb,sampleRecords,al_net,numClasses)
+        img = {}
+        img['data'] = input_data['data']
+        img['avImage'] = input_data['avImage']
+        isImBlob = True
+    elif imdb.is_image_index_flattened and al_net is None:
         raw_img = cv2.imread(image_path)
         img = cropImageToAnnoRegion(raw_img,bbox)
     elif imdb.is_image_index_flattened and al_net is not None:
@@ -388,6 +402,18 @@ def test_net(net, imdb, max_per_image=100, thresh=1/80., vis=False, al_net=None)
         all_probs = [[-1 for _ in xrange(num_images)]
                      for _ in xrange(imdb.num_classes)]
         all_items = all_probs
+
+
+    # threshold = 0.05
+    # for name,layer in net.layer_dict.items():
+    #     if len(layer.blobs) == 0: continue
+    #     for idx in range(len(layer.blobs)):
+    #         data = layer.blobs[idx].data
+    #         mask = layer.blobs[idx].mask
+    #         print("before {}".format(mask.sum()))
+    #         print(np.where(np.abs(data) < threshold,0,1).sum())
+    #         #mask[...] = np.where(np.abs(data) < threshold,0,1)
+    #         # print("after {}".format(mask.sum()))
 
     output_dir = get_output_dir(imdb, net)
 
@@ -449,7 +475,7 @@ def test_net(net, imdb, max_per_image=100, thresh=1/80., vis=False, al_net=None)
         dirn = cfg.GET_SAVE_ACTIVITY_VECTOR_BLOBS_DIR()
         print("activity vectors saved @")
         for blob_name,av in ds_av.items():
-            fn = os.path.join(dirn,"{}.pkl".format(blob_name))
+            fn = os.path.join(dirn,"{}_{}.pkl".format(blob_name,cfg.TEST_NET.NET_PATH))
             print(fn)
             with open(fn, 'wb') as f:
                 cPickle.dump(av, f, cPickle.HIGHEST_PROTOCOL)
@@ -501,6 +527,12 @@ def aggregateAV(ds_av,activity_vectors,image_id):
         ds_av[blob_name][image_id] = blob_av
 
 def aggregateClassification(imdb,scores,all_items,i):
+
+    # handle special case
+    if scores.size == 1:
+        all_items[0][i] = float(scores)
+        return
+
     scores = np.squeeze(scores)
     if imdb.num_classes == 1:
         all_items[0][i] = float(scores[0])

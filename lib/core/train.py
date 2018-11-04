@@ -16,8 +16,10 @@ import aim_data_layer.roidb as aim_roidb
 import vae_data_layer.roidb as vae_rdl_roidb
 from utils.timer import Timer
 from datasets import ds_utils
+from core.prune import prune_net_iterative_step
 import numpy as np
 import os
+import os.path as osp
 
 from caffe.proto import caffe_pb2
 import google.protobuf as pb2
@@ -63,6 +65,12 @@ class SolverWrapper(object):
         with open(solver_prototxt, 'rt') as f:
             pb2.text_format.Merge(f.read(), self.solver_param)
 
+        # HANDLE THE MASK ISSUES (yikes)
+        net = self.solver.net
+        setNetworkMasksToOne(net)
+        if al_net: setNetworkMasksToOne(al_net)
+
+        # set data for dataLoader class
         if cfg.TASK == "object_detection":
             self.solver.net.layers[0].set_roidb(roidb)
         elif cfg.TASK == "classification" or cfg.TASK == "regeneration":
@@ -115,20 +123,20 @@ class SolverWrapper(object):
                     (net.params['bbox_pred'][1].data *
                      self.bbox_stds + self.bbox_means)
 
-        infix = ('_' + cfg.TRAIN.SNAPSHOT_INFIX
-                 if cfg.TRAIN.SNAPSHOT_INFIX != '' else '')
-        filename = (self.solver_param.snapshot_prefix + infix +
+        # infix = ('_' + cfg.TRAIN.SNAPSHOT_INFIX
+        #          if cfg.TRAIN.SNAPSHOT_INFIX != '' else '')
+        filename = (self.solver_param.snapshot_prefix + 
                     '_iter_{:d}'.format(self.solver.iter) + '.caffemodel')
-        filename = os.path.join(self.output_dir, filename)
+        # filename = os.path.join(self.output_dir, filename)
 
         # save network
         net.save(str(filename))
         print('Wrote snapshot to: {:s}'.format(filename))
 
         # save solverstate 
-        filename = (self.solver_param.snapshot_prefix + infix +
-                    '_iter_{:d}'.format(self.solver.iter) + '.solverstate')
-        filename = os.path.join(self.output_dir, filename)
+        # filename = (self.solver_param.snapshot_prefix + infix +
+        #             '_iter_{:d}'.format(self.solver.iter) + '.solverstate')
+        # filename = os.path.join(self.output_dir, filename)
 
         self.solver.save(str(filename))
 
@@ -163,6 +171,9 @@ class SolverWrapper(object):
             if self.solver.iter % cfg.TRAIN.SNAPSHOT_ITERS == 0:
                 last_snapshot_iter = self.solver.iter
                 model_paths.append(self.snapshot())
+                
+            if cfg.PRUNE_NET and self.solver.iter % cfg.PRUNE_NET == 0:
+                prune_net_iterative_step(self.solver.net)
 
         if last_snapshot_iter != self.solver.iter:
             model_paths.append(self.snapshot())
@@ -237,6 +248,7 @@ class SolverWrapper(object):
         layer.Forward(bottom, top)
         np.set_printoptions(precision=3,suppress=True)
         print("Sigmoid output v.s. Labels: ")
+        print(top[0].data)
         print(np.c_[top[0].data, labels])
 
     def view_softmax_output(self):
@@ -305,13 +317,67 @@ def filter_roidb(roidb):
                                                        num, num_after))
     return filtered_roidb
 
-def train_net(solver_prototxt, roidb, output_dir,
+def setNetworkMasksToOne(net):
+    for name,layer in net.layer_dict.items():
+        if len(layer.blobs) == 0: continue
+        for idx in range(len(layer.blobs)):
+            mask = layer.blobs[idx].mask
+            layer.blobs[idx].mask[...] = np.ones(mask.shape)
+
+def insertInfixBeforeDecimal(oMsg,infix):
+    splitList = oMsg.split(".")
+    assert len(splitList) in [2,3], "splitList is length not 2 or 3: {}".format(len(splitList))
+    splitList[-2] += infix
+    return '.'.join(splitList)
+    
+def writeSolverToFile(fn,ymlContent):
+    ymlKeys = ymlContent.keys()
+    useQuotesList = ["lr_policy","train_net","snapshot_prefix"]
+    with open(fn, 'w') as f:
+        for key in ymlKeys:
+            val = ymlContent[key]
+            useQuotes = key in useQuotesList
+            if useQuotes:
+                f.write("{}: \"{}\"\n".format(key,val))
+            else:
+                f.write("{}: {}\n".format(key,val))                
+
+def addFullPathToSnapshotPrefix(solverPrototxt,outputDir,datasetName):
+    infix = "_generatedByTrainpy"
+    newSolverPrototxtFilename = insertInfixBeforeDecimal(solverPrototxt,infix)
+    import yaml
+    from easydict import EasyDict as edict
+    with open(solverPrototxt, 'r') as f:
+        yaml_cfg = edict(yaml.load(f))
+    # add full path
+    snapshotPrefix = yaml_cfg['snapshot_prefix']
+    if "/home/" not in yaml_cfg['snapshot_prefix']:
+        print("Mangling snapshot_prefix in {}".format(solverPrototxt))
+        finalSubstr = yaml_cfg['snapshot_prefix']
+        snapshotPrefix = osp.join(outputDir,yaml_cfg['snapshot_prefix'])
+        # add infix to ymlData
+        infix = ('_' + cfg.TRAIN.SNAPSHOT_INFIX
+                 if cfg.TRAIN.SNAPSHOT_INFIX != '' else '')
+        yaml_cfg['snapshot_prefix'] = snapshotPrefix + infix
+        print("new snapshot_prefix: {}".format(snapshotPrefix))
+    print("wrote solver_prototxt to read: {}".format(newSolverPrototxtFilename))
+    # write the new solver_prototxt
+    writeSolverToFile(newSolverPrototxtFilename,yaml_cfg)
+    print("added full path to snapshot_prefix")
+    print("snapshot_prefix: {}".format(snapshotPrefix))
+    return newSolverPrototxtFilename
+        
+def train_net(solver_prototxt, roidb, output_dir,datasetName="",
               pretrained_model=None, solver_state=None, max_iters=400000,
               al_net=None):
     """Train *any* object detection network."""
 
     #roidb = filter_roidb(roidb)
-    sw = SolverWrapper(solver_prototxt, roidb, output_dir,
+    # print(solver_prototxt)
+    newSolverPrototxt = addFullPathToSnapshotPrefix(solver_prototxt,\
+                                                    output_dir,
+                                                    datasetName)
+    sw = SolverWrapper(newSolverPrototxt, roidb, output_dir,
                        pretrained_model=pretrained_model,
                        solver_state=solver_state,
                        al_net=al_net)

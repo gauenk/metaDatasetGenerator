@@ -24,10 +24,11 @@ from datasets.annoReader.pathDerivedReader import pdReader
 class RepoImdb(imdb):
     """Image database."""
 
-    def __init__(self, datasetName, imageSet, configName, path_to_imageSets=None):
+    def __init__(self, datasetName, imageSet, configName, path_to_imageSets=None,cacheStrModifier=None):
         imdb.__init__(self, datasetName)
         cfg.CALLING_DATASET_NAME = datasetName
         cfg.CALLING_IMAGESET_NAME = imageSet
+        self._cacheStrModifier = cacheStrModifier
         self._path_to_imageSets = path_to_imageSets
         self._local_path = os.path.dirname(__file__)
         self._datasetName = datasetName
@@ -41,6 +42,7 @@ class RepoImdb(imdb):
         self._roidb_handler = self.gt_roidb
         self._roidbSize = []
         self.is_image_index_flattened = False
+        cfg.DATASETS.IS_IMAGE_INDEX_FLATTENED = False
         self._parseDatasetFile()
 
     def _parseDatasetFile(self):
@@ -57,10 +59,14 @@ class RepoImdb(imdb):
         self._num_classes = len(self._classes)
         self._path_root = cfgData['PATH_ROOT']
         self._compID = cfgData['COMPID']
-        self._cachedir = os.path.join(self._path_root,\
-                            'annotations_cache',\
-                                self._image_set)
-
+        if self._cacheStrModifier:
+            self._cachedir = os.path.join(self._path_root,\
+                                      'annotations_cache',\
+                                      self._image_set+"_"+self._cacheStrModifier)
+        else:
+            self._cachedir = os.path.join(self._path_root,\
+                                          'annotations_cache',
+                                          self._image_set)
         if self._path_to_imageSets is None:
             self._path_to_imageSets = cfgData['PATH_TO_IMAGESETS']
         if not self._checkImageSet():
@@ -108,6 +114,7 @@ class RepoImdb(imdb):
             setID = cfg.DATASET_NAMES_ORDERED.index(self._datasetName)
         except:
             setID = cfg.DATASET_NAMES_ORDERED.index(self._datasetName.split("_")[0])
+        cfg.DATASETS.HAS_BBOXES = yaml_cfg['CONFIG_HAS_BBOXES']
         self.config = {'cleanup'     : yaml_cfg['CONFIG_CLEANUP'],
                        'use_salt'    : yaml_cfg['CONFIG_USE_SALT'],
                        'use_diff'    : yaml_cfg['CONFIG_USE_DIFFICULT'],
@@ -214,6 +221,7 @@ class RepoImdb(imdb):
         
     def _update_is_image_index_flattened(self,state):
         self.is_image_index_flattened = state
+        cfg.DATASETS.IS_IMAGE_INDEX_FLATTENED = state
         if self.annoReader: self.annoReader._is_image_index_flattened = state
         if self.evaluator: self.evaluator._is_image_index_flattened = state
         if self.imgReader: self.imgReader._is_image_index_flattened = state
@@ -298,8 +306,13 @@ class RepoImdb(imdb):
             print("Image Index has not yet been flattened")
             sys.exit()
 
-        cache_file = osp.join(self.cache_path,\
-                              '{}_{}_{}_gt_roidb.pkl'.format(self.name,self._image_set,self._configName))
+        if self._cacheStrModifier:
+            cache_file = osp.join(self.cache_path,\
+                                  '{}_{}_{}_{}_gt_roidb.pkl'.format(self.name,self._image_set,
+                                                                    self._configName,self._cacheStrModifier))
+        else:
+            cache_file = osp.join(self.cache_path,\
+                                  '{}_{}_{}_gt_roidb.pkl'.format(self.name,self._image_set,self._configName))
         print(cache_file)
         if osp.exists(cache_file):
             with open(cache_file, 'rb') as fid:

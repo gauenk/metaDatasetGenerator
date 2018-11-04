@@ -25,8 +25,9 @@ __sets.append("inria")
 __sets.append("coco")
 __sets.append("sun")
 __sets.append("mnist")
+__sets.append("cifar_10")
 
-def get_repo_imdb(name,path_to_imageSets=None):
+def get_repo_imdb(name,path_to_imageSets=None,cacheStrModifier=None):
     """Get an imdb (image database) by name."""
     print(name)
     cfg.CALLING_DATASET_NAME = name
@@ -36,7 +37,7 @@ def get_repo_imdb(name,path_to_imageSets=None):
     for __set in __sets:
         if di[0] == __set:
             print(di)
-            return RepoImdb(di[0],di[1],di[2],path_to_imageSets=path_to_imageSets)
+            return RepoImdb(di[0],di[1],di[2],path_to_imageSets=path_to_imageSets,cacheStrModifier=cacheStrModifier)
             # if __set == "coco":
             #     return coco(di[0],di[1],di[2])
             # else:

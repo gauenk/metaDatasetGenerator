@@ -1,0 +1,24 @@
+mnist_lenet5_short_train_3k_input28x28_yesImageNoise_noPrune
+mnist-test-default (the actual mnist test data)
+[0.8059, 0.7919, 0.8801, 0.8094, 0.8544, 0.8237, 0.864, 0.7277, 0.8053, 0.7152]
+[200,400,600,...,1800,2000]
+use iter #7*200 = 1400
+
+mnist_lenet5_short_train_3k_input28x28_yesImageNoise_yesPrune10
+mnist-test-default (the actual mnist test data)
+[0.7702, 0.8543, 0.8935, 0.901, 0.8998, 0.8897, 0.9215, 0.9149, 0.9321, 0.9337]
+[200,400,600,...,1800,2000]
+use iter #10*200 = 2k
+
+mnist_lenet5_short_train_3k_input28x28_yesImageNoise_yesPrune100
+mnist-test-default (the actual mnist test data)
+[0.8465, 0.9144, 0.9324, 0.9364, 0.9222, 0.9295, 0.9476, 0.9477, 0.9508, 0.9526]
+[200,400,600,...,1800,2000]
+use iter #10*200 = 2k
+
+mnist_lenet5_short_train_3k_input28x28_yesImageNoise_yesPrune200
+mnist-test-default (the actual mnist test data)
+[0.8057, 0.908, 0.9297, 0.9275, 0.9278, 0.9286, 0.9451, 0.9502, 0.9513, 0.9515]
+[200,400,600,...,1800,2000]
+use iter #10*200 = 2k
+
