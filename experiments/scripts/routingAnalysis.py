@@ -4,6 +4,8 @@ from pprint import pprint as pp
 import os.path as osp
 import numpy as np
 from easydict import EasyDict as edict
+import matplotlib
+matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 from datasets.ds_utils import loadEvaluationRecordsFromPath
 from datasets.factory import get_repo_imdb
@@ -13,10 +15,10 @@ from sklearn import svm
 from sklearn import cluster as sk_cluster
 
 # LAYERS = ["conv1","ip1","cls_score"]
-# LAYERS = ["conv1","conv2","ip1","cls_score"]
+LAYERS = ["conv1","conv2","ip1","cls_score"]
 #LAYERS = ["ip1","cls_score"]
 # LAYERS = ["conv1","cls_score"]
-LAYERS = ["conv1"]
+# LAYERS = ["conv1"]
 
 
 def get_roidb(imdb_name):
@@ -92,20 +94,24 @@ def aggregateKmeansCluster(kmeans,data):
     print(distance_data[:10])
     print(distance_data[-10:])
 
-def routeFromActivations(activations,layerName):
+def routeFromActivationsSet(activations,layerName,cacheStr=''):
 
     cluster = None
-    useDBSCAN = True
-    useKMeans = False
+    useDBSCAN = False
+    useKMeans = True
     clusterStr = ''
     useCluster = useDBSCAN | useKMeans
-    # nSample = 10
+    nClusters_kmeans = 100
+    # nSample = 500
     # dataIndex = np.random.permutation(activations.shape[0])[:nSample]
     # clusterData = activations.reshape((activations.shape[0],-1))[dataIndex,:]
+    # #print("clusterData.shape: {}".format
     clusterData = activations.reshape((activations.shape[0],-1))
 
     if useCluster and clusterStr != '':
         netName = cfg.netName
+        if cacheStr != '': clusterStr = "{}_{}".format(clusterStr,cacheStr)
+        else: clusterStr = clusterStr
         cluster = loadClusterCache(clusterStr,netName,layerName)
 
     if useDBSCAN and cluster is None:
@@ -132,13 +138,18 @@ def routeFromActivations(activations,layerName):
     if useKMeans and cluster is None:
         clusterStr = 'kmeans'
         print("{} in progress".format(clusterStr))
-        kmeans = sk_cluster.KMeans(n_clusters=300).fit(clusterData)
+        kmeans = sk_cluster.KMeans(n_clusters=nClusters_kmeans).fit(clusterData)
+        cluster = kmeans
         print(kmeans.labels_.shape)
-        print(kmeans.cluster_centers_)
-        aggregateKmeansCluster(kmeans,clusterData)
-        sys.exit()
+        print(kmeans.cluster_centers_.shape)
+        values = kmeans.cluster_centers_
+        route = np.argsort(-np.abs(values))
+        # aggregateKmeansCluster(kmeans,clusterData)
+
 
     if useCluster:
+        if cacheStr != '': clusterStr = "{}_{}".format(clusterStr,cacheStr)
+        else: clusterStr = clusterStr
         netName = cfg.netName
         saveClusterCache(cluster,clusterStr,netName,layerName)
 
@@ -146,6 +157,7 @@ def routeFromActivations(activations,layerName):
     if 'conv' in layerName and useCluster is False:
         mean = np.mean(activations,axis=(0,1)).ravel()
         route = np.argsort(-np.abs(mean))
+        values = mean.ravel()
         # mean = np.mean(activations,axis=0)
         # # std = np.std(activations,axis=0)
         # mask = (np.abs(mean) > thresh)
@@ -158,6 +170,7 @@ def routeFromActivations(activations,layerName):
     elif useCluster is False:
         mean = np.mean(activations,axis=0)
         route = np.argsort(-np.abs(mean))
+        values = mean.ravel()
         # print(mean)
         # # std = np.std(activations,axis=0)
         # mask = (np.abs(mean) > thresh)
@@ -168,18 +181,21 @@ def routeFromActivations(activations,layerName):
         # if len(route.shape) == 1:
         #     print(mean)
         #     print(route)
-    activeDict = createRouteDict(mean.ravel(),route,cluster=cluster)
+    activeDict = createRouteDict(values,route,cluster=cluster)
     return activeDict
 
-def routingStatisticsByClass(clsDict,thresh=0.01):
+def routingStatisticsByClass(clsDict,thresh=0.01,cacheStr=''):
     if clsDict is None: return None
     routeDict = dict.fromkeys(clsDict.keys())
     # 2nd compute (mean,std) of activations; order the activations based on average
     for layerName,clsLayerDict in clsDict.items():
         routeDict[layerName] = {}
         for clsName,clsLayerActivations_l in clsLayerDict.items():
+            if clsName != "cat": continue # shortcut for computation
             clsLayerActivations = np.concatenate(clsLayerActivations_l,axis=0)
-            routdClsLayerDict = routeFromActivations(clsLayerActivations,layerName)
+            if cacheStr != '': cacheStr = '{}_{}'.format(cacheStr,clsName)
+            else: cacheStr = clsName
+            routdClsLayerDict = routeFromActivationsSet(clsLayerActivations,layerName,cacheStr)
             routeDict[layerName][clsName] = routdClsLayerDict
     return routeDict
 
@@ -205,11 +221,11 @@ def routeActivityVectors(avDict,imdb,roidb,records=None):
     threshold = 0.01
     clsDict,clsDictPos,clsDictNeg = aggregateActivationsByClass(avDict,imdb,roidb,records)
     print("routeDict")
-    routeDict = routingStatisticsByClass(clsDict,thresh=threshold)
+    routeDict = routingStatisticsByClass(clsDict,thresh=threshold,cacheStr='all')
     print("routeDictPos")
-    routeDictPos = routingStatisticsByClass(clsDictPos,thresh=threshold)
+    routeDictPos = routingStatisticsByClass(clsDictPos,thresh=threshold,cacheStr='pos')
     print("routeDictNeg")
-    routeDictNeg = routingStatisticsByClass(clsDictNeg,thresh=threshold)
+    routeDictNeg = routingStatisticsByClass(clsDictNeg,thresh=threshold,cacheStr='neg')
     return routeDict,routeDictPos,routeDictNeg
 
 def compareRoutes(routePrimary,routeSecondary,indexWeightStr=None):
@@ -222,7 +238,7 @@ def compareRoutes(routePrimary,routeSecondary,indexWeightStr=None):
 def compareRoutesWithCluster(routePrimary,routeSecondary,indexWeightStr=None):
     routeIndexA,routeValuesA,routeClusterA = routePrimary['index'],routePrimary['values'],routePrimary['cluster']
     routeIndexB,routeValuesB = routeSecondary['index'],routeSecondary['values']
-    
+
     # ---- routePrimary ----
     # routeValues; an average over clusters in node (the centroids)
     # .size = (# of clusters,# of activations per sample)
@@ -241,21 +257,25 @@ def compareRoutesWithCluster(routePrimary,routeSecondary,indexWeightStr=None):
     # .size = (# of clusters/samples,# of activation per sample)
     
     # assign each centroid in route B to a centroid in route A
-    routeBCentroidsWrtA = routeClusterA.predict(routeValuesB)
+    routeBCentroidsLabelsWrtA = routeClusterA.predict(routeValuesB)
     
     # difference for each cluster
     diff = 0
-    for centroidLabel in np.unique(routeBCentroidsWrtA._labels):
+    for centroidLabel in np.unique(routeBCentroidsLabelsWrtA):
+        # print(centroidLabel)
         if centroidLabel == -1:
             print("ERROR: we shouldn't see a centroid label of -1")
             sys.exit()
+        centroidIndexA = centroidLabel
+        centroidRouteA = createRouteDict(routeValuesA[centroidIndexA,:],routeIndexA[centroidIndexA,:])
 
-        centroidIndexA = np.where(routeClusterOutputA == centroidLabel)[0]
-        centroidRouteA = createRouteDict(routeValuesA[centroidIndexA],routeIndexA[centroidIndexA])
-
-        centroidIndexB = np.where(routeBCentroidsWrtA == centroidLabel)[0]
-        if len(centroidIndexB) == 0: continue # skip nodes not assigned to cluster
-        centroidRouteB = createRouteDict(routeValuesB[centroidIndexB],routeIndexB[centroidIndexB])
+        centroidIndexB = np.where(routeBCentroidsLabelsWrtA == centroidLabel)[0]
+        # skip nodes not assigned to cluster;
+        # but this shouldn't happend since we iterate over b's centoid labels
+        if len(centroidIndexB) == 0:
+            print("ERROR: We shouldn't see a centroid label for which B is not assigned.")
+            sys.exit()
+        centroidRouteB = createRouteDict(routeValuesB[centroidIndexB,:],routeIndexB[centroidIndexB,:])
         diff += compareRoutes(centroidRouteA,centroidRouteB,indexWeightStr=indexWeightStr)
 
     return diff
@@ -272,17 +292,20 @@ def compareRoutesByClass(routeDictA,routeDictB,indexWeightStr=None):
     return recordRouteDifference
 
 def spearmanFootruleDistance(routePrimary,routeSecondary,indexWeightStr=None):
-    routeIndexA = routePrimary['index']
-    routeValuesA = routePrimary['values']
-    routeIndexB = routeSecondary['index']
-    routeValuesB = routeSecondary['values']
+    routeIndexA = np.squeeze(routePrimary['index'])
+    routeValuesA = np.squeeze(routePrimary['values'])
+    routeIndexB = np.squeeze(routeSecondary['index'])
+    routeValuesB = np.squeeze(routeSecondary['values'])
     indexWeight = getIndexWeight(indexWeightStr,routeIndexA,routeValuesA)
+    # print(routeValuesA.shape,routeIndexA.shape)
+    # print(routeValuesB.shape,routeIndexB.shape)
     # relativeValuesA = np.abs(routeValuesA)/float(np.sum(routeValuesA))
     # relativeValuesB = np.abs(routeValuesB)/float(np.sum(routeValuesB))
     absDiff = np.abs(np.abs(routeValuesA[routeIndexA]) - np.abs(routeValuesB[routeIndexA]))
     return np.mean(absDiff * indexWeight)
 
 def getIndexWeight(indexWeightStr,routeIndex,routeValues,verbose=False):
+    #print(routeIndex.shape,routeIndex.size)
     indexWeight = np.ones(routeIndex.size)/(1. * routeIndex.size)
     if verbose: print("indexWeightStr is {}: default uniform".format(indexWeightStr))
     if indexWeight is None: return indexWeight
@@ -315,7 +338,8 @@ def createRouteDict(routeValues,routeIndex,cluster=None):
     routeDict['cluster'] = cluster
     return routeDict
 
-def activationValuesToSVMFormat(avDict,records,layerOrder,routeForIndexOrdering,datasetSize=None,clsName=None,imdb=None,cluster=None):
+def activationValuesToSVMFormat(avDict,records,layerOrder,referenceRoute,datasetSize=None,clsName=None,imdb=None):
+    print("[activationValuesToSVMFormat]: starting")
     imageIdOrder = avDict[layerOrder[0]].keys()
     if datasetSize is not None:
         imageIdOrder = imageIdOrder[:datasetSize]
@@ -337,15 +361,17 @@ def activationValuesToSVMFormat(avDict,records,layerOrder,routeForIndexOrdering,
     data = []
     for layerName in layerOrder:
         avLayerDict = avDict[layerName]
-        #routeValues,routeIndex = aggregateRouteLayerValuesOverCls(routeForIndexOrdering[layerName],clsName)
-        routeLayerDict = routeForIndexOrdering[layerName][clsName]
-        routeValues,routeIndex = routeLayerDict['values'],routeLayerDict['index']
-        routeLayerPrimary = createRouteDict(routeValues,routeIndex,cluster=cluster)
+        #routeValues,routeIndex = aggregateRouteLayerValuesOverCls(referenceRoute[layerName],clsName)
+        routeLayerRef = referenceRoute[layerName][clsName]
         dataLayer = [None for _ in imageIdOrder]
         for index,image_id in enumerate(imageIdOrder):
-            imageLayerActivations = avLayerDict[image_id]
-            routeImageDict = routeFromActivations(imageLayerActivations,layerName)
-            difference = compareRoutes(routeLayerPrimary,routeImageDict,indexWeightStr='relative_routeValues')
+            imageLayerActivations = avLayerDict[image_id].ravel()
+            imageLayerIndex = np.argsort(-imageLayerActivations)
+            routeImageDict = createRouteDict(imageLayerActivations[np.newaxis,:],
+                                             imageLayerIndex[np.newaxis,:])
+            #routeImageDict = routeFromActivationsSet(imageLayerActivations,layerName)
+            difference = compareRoutes(routeLayerRef,routeImageDict,\
+                                       indexWeightStr='relative_routeValues')
             dataLayer[index] = difference
             #dataLayer[index] = layerActivations.ravel()[routeIndex]
         dataLayer = np.array(dataLayer)
@@ -376,10 +402,11 @@ def plotDataWithLabels(dataTrain,labelsTrain,vis=True):
         plt.xlabel(LAYERS[indexA])
         plt.ylabel(LAYERS[indexB])
         pltCount += 1
-    plt.show()
-    sys.exit()
+    plt.savefig("plotDataWithLabels.png")
+    # plt.show()
+    # sys.exit()
 
-def fitSvmModel(avDict_train,avDict_test,records_train,records_test,routeForIndexOrdering,clsName=None,imdbTrain=None,imdbTest=None):
+def fitSvmModel(avDict_train,avDict_test,records_train,records_test,referenceRoute,clsName=None,imdbTrain=None,imdbTest=None):
     clsIndex = None
     if clsName is not None:
         clsIndex = imdbTrain.classes.index(clsName)
@@ -391,12 +418,12 @@ def fitSvmModel(avDict_train,avDict_test,records_train,records_test,routeForInde
     # format data for svm model
     trainSize = 30000
     testSize = 10000
-    dataTrain,labelsTrain,dataClsTrain = activationValuesToSVMFormat(avDict_train,records_train,\
-                                                                     layerOrder,routeForIndexOrdering,\
+    dataTrain,labelsTrain,dataClsTrain = activationValuesToSVMFormat(avDict_train,records_train,
+                                                                     layerOrder,referenceRoute,
                                                                      datasetSize = trainSize,
                                                                      clsName=clsName,imdb=imdbTrain)
-    dataTest,labelsTest,dataClsTest = activationValuesToSVMFormat(avDict_test,records_test,\
-                                                                  layerOrder,routeForIndexOrdering,\
+    dataTest,labelsTest,dataClsTest = activationValuesToSVMFormat(avDict_test,records_test,
+                                                                  layerOrder,referenceRoute,
                                                                   datasetSize = testSize,
                                                                   clsName=clsName,imdb=imdbTest)
     
@@ -514,6 +541,7 @@ def saveClusterCache(clusterOutput,clusterStr,netName,layerName):
     if not osp.exists(dirName):
         os.makedirs(dirName)
     fn = "{dirName}/{clusterStr}_{layerName}.pkl".format(dirName=dirName,clusterStr=clusterStr,layerName=layerName)
+    print("saving cluster cache: {}".format(fn))
     with open(fn,'wb') as f:
         pickle.dump(clusterOutput,f)
 
@@ -521,6 +549,7 @@ def loadClusterCache(clusterStr,netName,layerName):
     dirName = "./data/routing_cache/{netName}".format(netName=netName)
     fn = "{dirName}/{clusterStr}_{layerName}.pkl".format(dirName=dirName,clusterStr=clusterStr,layerName=layerName)
     if not osp.exists(fn): return None
+    print("loading cluster cache: {}".format(fn))
     with open(fn,'rb') as f:
         data = pickle.load(f)
     return data
