@@ -15,7 +15,8 @@ from core.routingConfig import cfg, cfg_from_file, initRouteConfig, imdbFromData
 #from core.config import cfgRouting as cfgRouting
 from sklearn import svm
 from sklearn import cluster as sk_cluster
-from utils.misc import get_roidb,readPickle,writePickle
+from utils.base import readPickle,writePickle
+from utils.misc import get_roidb
 from utils.cluster import *
 from utils.routing import *
 
@@ -84,6 +85,8 @@ def loadDatasets(trainInfo,testInfo,clsIndex):
     #     dataTrain,labelsTrain,dataClsTrain,\
     #     dataTest,labelsTest,dataClsTest = \
     #     splitDataIntoTrainTest(dataTrain,labelsTrain,dataClsTrain,useTrainSplitAsTest)
+    print("[loadDatasets] {{before clsIndex}} len(dataTrain):{} | len(dataTest): {}"\
+          .format(len(dataTrain),len(dataTest)))
     if clsIndex is not None:
         selIndex = np.where(dataClsTrain == clsIndex)[0]
         dataTrain = dataTrain[selIndex,:]
@@ -92,6 +95,8 @@ def loadDatasets(trainInfo,testInfo,clsIndex):
         selIndex = np.where(dataClsTest == clsIndex)[0]
         dataTest = dataTest[selIndex,:]
         labelsTest = labelsTest[selIndex]
+    print("[loadDatasets] {{after clsIndex}} len(dataTrain):{} | len(dataTest): {}"\
+          .format(len(dataTrain),len(dataTest)))
     return dataTrain,labelsTrain,dataClsTrain,dataTest,labelsTest,dataClsTest
 
 def classificationExperiment(trainInfo,testInfo,clsName):
@@ -115,11 +120,11 @@ def classificationExperiment(trainInfo,testInfo,clsName):
     # testing data fit
     predict = clf.predict(dataTest)
     probability = False
-    reportClassificationExperimentResults(predict,labelsTest,clsName,dataClsTest,probability,"test",testInfo['imdb'])
+    reportClassificationExperimentResults(predict,labelsTest,clsName,dataClsTest,probability,"test","test",testInfo['imdb'])
     
     # training data fit
     predict = clf.predict(dataTrain)
-    reportClassificationExperimentResults(predict,labelsTrain,clsName,dataClsTrain,probability,"train",trainInfo['imdb'])
+    reportClassificationExperimentResults(predict,labelsTrain,clsName,dataClsTrain,probability,"train","train",trainInfo['imdb'])
 
 
 def newClassificationExperiment(trainInfo,testInfo,clsIndex):
@@ -140,7 +145,7 @@ def newClassificationExperiment(trainInfo,testInfo,clsIndex):
 
     return dataTrain,labelsTrain,dataClsTrain,dataTest,labelsTest,dataClsTest,clf
     
-def printDatasetInformation(dataTrain,labelsTrain,dataTest,labelsTest):
+def printDatasetInformation(dataTrain,labelsTrain,dataTest,labelsTest): 
     print("train data information")
     print(dataTrain.shape,labelsTrain.shape)
     pos = np.sum(labelsTrain == 1)
@@ -153,6 +158,22 @@ def printDatasetInformation(dataTrain,labelsTrain,dataTest,labelsTest):
     neg = np.sum(labelsTest == 0)
     print("# pos: {}".format(pos))
     print("# neg: {}".format(neg))
+
+def writeDatasetInformation(fid,dataTrain,labelsTrain,dataTest,labelsTest): 
+    myStr = ''
+    myStr += "train data information"
+    myStr += "{},{}".format(dataTrain.shape,labelsTrain.shape)
+    pos = np.sum(labelsTrain == 1)
+    neg = np.sum(labelsTrain == 0)
+    myStr += "# pos: {}".format(pos)
+    myStr += "# neg: {}".format(neg)
+    myStr += "test data information"
+    myStr += "{},{}".format(dataTest.shape,labelsTest.shape)
+    pos = np.sum(labelsTest == 1)
+    neg = np.sum(labelsTest == 0)
+    myStr += "# pos: {}".format(pos)
+    myStr += "# neg: {}".format(neg)
+    fid.write(myStr)
 
 def selectClsReferenceRoute(routeAll,routePos,routeNeg,selStr):
     if selStr == 'All': return routeAll

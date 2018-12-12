@@ -6,7 +6,7 @@ import os,sys,re
 import os.path as osp
 from sklearn import cluster as sk_cluster
 from utils.cluster import clusterDataToCreateRouteFromActicationsSet,averageDataToCreateRouteFromActicationsSet
-from core.routingConfig import cfg, imdbFromDatasetDict, createDensityEstimationCacheStrID, getClassificationExperimentResultsTxtFilenameRouting, getResultsBaseFilenameRouting, unpackClassificationInformation
+from core.routingConfig import cfg, imdbFromDatasetDict, createDensityEstimationCacheStrID, getClassificationExperimentResultsTxtFilenameRouting, getResultsBaseFilenameRouting, unpackClassificationInformation, startTextFile
 
 
 def compareRoutes(routePrimary,routeSecondary,indexWeightStr=None):
@@ -405,14 +405,17 @@ def aggregateRouteLayerValuesOverCls(routeLayer,clsName):
     index = np.argsort(-np.abs(ave))
     return ave,index
 
-def reportClassificationExperimentResults(predict,labels,clsName,clsLabels,probability,dsSplitWRTRoute,imdb):
+def reportClassificationExperimentResults(predict,labels,clsName,clsLabels,probability,splitWRTcls,dsSplitWRTRoute,imdb):
     dsName = imdb.name
     dsSplitOg = imdb._image_set
     dsConfig = 'default' # fix this
-    fn = getClassificationExperimentResultsTxtFilenameRouting(dsName,dsSplitWRTRoute,dsConfig,dsSplitOg,dsConfig)
-    print(fn)
+    size = predict.size
+    fid = startTextFile('results',\
+                        split_wrt_cls=splitWRTcls,imdb_wrt_cls=dsSplitWRTRoute,size=size)
+    # fn = getClassificationExperimentResultsTxtFilenameRouting(dsName,dsSplitWRTRoute,dsConfig,dsSplitOg,dsConfig)
+    # print(fn)
+    # fid = open(fn,'w+')
 
-    fid = open(fn,'w+')
     fid.write("------- RESULTS FOR {} DATASET ----------\n".format(dsSplitWRTRoute))
     fid.write("[SVM] predicted number of 0's: {}\n".format(np.sum(predict == 0)))
     fid.write("[SVM] predicted number of 1's: {}\n".format(np.sum(predict == 1)))

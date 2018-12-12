@@ -1,4 +1,4 @@
-import os
+import os,uuid
 import os.path as osp
 import numpy as np
 # `pip install easydict` if you don't have it
@@ -18,10 +18,6 @@ cfg.verbose = False # only use this if we want to print a lot.
 cfg.netInfo = edict()
 cfg.netInfo.modelName = None
 cfg.netInfo.modelType = None
-cfg.netInfo.trainDataset = edict()
-cfg.netInfo.trainDataset.name = None
-cfg.netInfo.trainDataset.split = None
-cfg.netInfo.trainDataset.config = None
 
 cfg.routingAnalysisInfo = edict()
 #cfg.routingAnalysisInfo.layers = ["conv1","conv2","ip1","cls_score"]
@@ -82,7 +78,7 @@ cfg.clsExperimentInfo.referenceRoute.dataset.config = None
 # if we use clustering for density esimation, these are the configs for each method
 #
 cfg.kmeans = edict()
-cfg.kmeans.nClusters = 100
+cfg.kmeans.nClusters = 50
 
 cfg.dbscan = edict()
 cfg.dbscan.eps = 12500
@@ -265,12 +261,32 @@ def getResultsDirectory():
     fn = "./output/routing/{modelName}".format(modelName=cfg.netInfo.modelName)
     return fn
 
-def getClassificationExperimentResultsTxtFilenameRouting(dsName,dsSplitWRTRoute,dsConfigWRTRoute,dsSplitOg,dsConfigOg):
-    resultDirName = getResultsBaseFilenameRouting()
-    firstDir = "./output/routing/{modelName}".format(modelName=cfg.netInfo.modelName)
+def startTextFile(prefix,**kwargs):
+    dirPath = getResultsDirectory()
     uuidStr = str(uuid.uuid4())
-    resultsFn = "{}/results_{}".format(getResultsDirectory(),uuidStr)
+    resultsFn = "{}/results_{}.txt".format(dirPath,uuidStr)
+    if not osp.exists(dirPath): os.makedirs(dirPath)
+    fid = open(resultsFn,'w+')
+    addConfigToText(fid,**kwargs)
+    return fid
 
+def addConfigToText(fid,**kwargs):
+    clsExpClassName = cfg.loadOnlyClsStr
+    comboTypeStr = cfg.routingAnalysisInfo.comboType
+    deTypeStr = cfg.routingAnalysisInfo.densityEstimation.typeStr
+    clusterTypeStr = cfg.routingAnalysisInfo.densityEstimation.clusterTypeStr
+    dsRefRouteImdbStr = imdbFromDatasetDict(cfg.clsExperimentInfo.referenceRoute.dataset)
+    comboStr = ""
+    for comboID,comboParameters in cfg.routingAnalysisInfo.comboInfo.items():
+        comboStr += createComboInfoStr(comboID,comboParameters,deTypeStr,clsExpClassName)
+    configHeaderStr = "{}\n{}]\n{}\n{}\n{}\n{}\n".format(clsExpClassName,comboTypeStr,\
+                                                 deTypeStr,clusterTypeStr,\
+                                                 dsRefRouteImdbStr,comboStr)
+    for key,value in kwargs.items():
+        configHeaderStr += '{}: {}\n'.format(key,value)
+    fid.write(configHeaderStr)
+    
+def getClassificationExperimentResultsTxtFilenameRouting(dsName,dsSplitWRTRoute,dsConfigWRTRoute,dsSplitOg,dsConfigOg):
 
     secondDir = "{resultDirName}/{dsName}".format(resultDirName=resultDirName,dsName=dsName)
     thirdDir = "{dsSplitWRTRoute}-{dsConfigWRTRoute}_{dsSplitOg}-{dsConfigOg}_{comboType}".\
@@ -327,7 +343,8 @@ def unpackClassificationInformation(info):
     imdb = info['imdb']
     return avDict,records,layerOrder,referenceRoute,datasetSize,clsName,imdb
 
-def packClassificationInformation(avDict,records,layerOrder,referenceRoute,datasetSize,clsName,imdb):
+def packClassificationInformation(avDict,records,layerOrder,referenceRoute,\
+                                  datasetSize,clsName,imdb):
     info = {}
     info['avDict'] = avDict
     info['records'] = records

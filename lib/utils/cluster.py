@@ -2,8 +2,9 @@ import os,sys,re
 #from core.config import cfgRouting as cfg
 import os.path as osp
 import numpy as np
+from utils.base import readPickle,writePickle
 from core.routingConfig import cfg, getResultsBaseFilenameRouting
-from utils.misc import get_roidb,readPickle,writePickle
+from utils.misc import get_roidb
 from sklearn import cluster as sk_cluster
 
 """
