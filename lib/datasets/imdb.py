@@ -357,8 +357,9 @@ class imdb(object):
         if osp.exists(self._imageSetPath) == True:
             return 1
         print("-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-")
-        print("imageSet error:")
-        for imageset in glob.glob(self._path_to_imageSets):
+        print("[lib/datasets/imdb.py: checkImageSet] imageSet path doesn't exist.")
+        print("Globbing available files at: {}".format(self._path_to_imageSets))
+        for imageset in glob.glob(self._path_to_imageSets+"*"):
             print(imageset)
         print("-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-")
         return 0

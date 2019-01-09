@@ -82,25 +82,22 @@ def extractClassGroundTruth(imagenames,annos,classname):
         sys.exit()
     return image_ids,class_probs_dict,npos,nneg
 
-def loadModelCls(detpath,classname):
+def loadModelCls(detpath,classname,dataset_augmentations):
     # read the file with the model detections
     detfile = detpath.format(classname)
     with open(detfile, 'r') as f:
         lines = f.readlines()
-
     # interpret each line from the file
-    if cfg.SUBTASK == "tp_fn":
-        splitlines = [x.strip().split(' ') for x in lines]
-        image_ids = [x[0] for x in splitlines]
-        items = np.array([ [ round(float(y),3) for y in x[1:] ] for x in splitlines])
+    splitlines = [x.strip().split(' ') for x in lines]
+    image_ids = [x[0] for x in splitlines]
+    if cfg.SUBTASK == "tp_fn": items = np.array([ [ round(float(y),3) for y in x[1:] ] for x in splitlines])
     elif cfg.SUBTASK in ["default","al_subset"]:
-        splitlines = [x.strip().split(' ') for x in lines]
-        image_ids = [x[0] for x in splitlines]
-        items = np.array([int(x[1]) for x in splitlines]) # index @ 1 is the guessed class
-    else:
-        print("ERROR: unknown cfg.Subtask {} in [lib/datasets/evaluate/cls_utils.py: loadModelCls]".format(cfg.SUBTASK))
+        item_index = 1
+        if len(dataset_augmentations) != 0: item_index = 2
+        items = np.array([ int(x[item_index]) for x in splitlines]) # index @ 1 is the guessed class
+    else: print("ERROR: unknown cfg.Subtask {} in [lib/datasets/evaluate/cls_utils.py: loadModelCls]".format(cfg.SUBTASK))
+    # TODO: asses impact of model_probs/model_output_cls for evaluation_v1/v2
 
-        
     # sort the detections by confidence for scoring    
     if cfg.SUBTASK == "tp_fn":
         if items.shape[0] == 1 or len(items.shape) == 1:
@@ -149,29 +146,28 @@ def extractImageIdsAndProbs_annoList(imagenames,annos,flatten):
     return image_ids,np.array(gt_classes),npos,nneg
 
 
-def compute_metrics(ovthresh,image_ids,model_probs,gt_classes,num_classes):
+def compute_metrics(ovthresh,image_ids,model_probs,gt_classes,num_classes,class_convert):
     if cfg.SUBTASK == "tp_fn":
-        return compute_metrics_v1(ovthresh,image_ids,model_probs,gt_classes)
+        return compute_metrics_v1(ovthresh,image_ids,model_probs,gt_classes,class_convert)
     elif cfg.SUBTASK in ["default","al_subset"]:
-        return compute_metrics_v2(ovthresh,image_ids,model_probs,gt_classes,num_classes)
+        return compute_metrics_v2(ovthresh,image_ids,model_probs,gt_classes,num_classes,class_convert)
     else:
         print("ERROR: unknown cfg.Subtask {} in [lib/datasets/evaluate/cls_utils.py: loadModelCls]".format(cfg.SUBTASK))
         sys.exit()
 
-def compute_metrics_v2(ovthresh,image_ids,model_output_cls,gt_classes,num_classes):
+def compute_metrics_v2(ovthresh,image_ids,model_output_cls,gt_classes,num_classes,class_convert):
     nd = len(image_ids)
     correct = np.zeros((nd,len(ovthresh))) # "false negative"
     records = {}
     for d in range(nd):
         CLS_GT = gt_classes[image_ids[d]] # should be size 1
         for idx in range(len(ovthresh)):
-
             # thresh = ovthresh[idx]
             # # get a guess
             # guess = 0
             # if prob >= thresh: guess = 1
             # record if correct
-            guess = model_output_cls[d]
+            guess = class_convert[model_output_cls[d]]
             if guess == CLS_GT: correct[d,idx] = 1
         records[image_ids[d]] = [1*np.any(correct[d,:]==1)]
     print(np.sum([sample for sample in records.values()]))
@@ -184,17 +180,38 @@ def compute_metrics_v2(ovthresh,image_ids,model_output_cls,gt_classes,num_classe
     return correct,None,None,None
 
 def saveRecord(objToSave,suffix='cls'):
-    saveDir = osp.join(cfg.TP_FN_RECORDS_PATH,cfg.CALLING_DATASET_NAME)
+    saveDir = osp.join(cfg.TP_FN_RECORDS_PATH,cfg.DATASETS.CALLING_DATASET_NAME)
     if cfg.TP_FN_RECORDS_WITH_IMAGESET:
-        datasetDest = "{}-{}-default".format(cfg.CALLING_DATASET_NAME,cfg.CALLING_IMAGESET_NAME)
+        datasetDest = "{}-{}-default".format(cfg.DATASETS.CALLING_DATASET_NAME,cfg.DATASETS.CALLING_IMAGESET_NAME)
+        if cfg.IMAGE_ROTATE != 0 and cfg.IMAGE_ROTATE != False:
+            datasetDest = "{}-{}-default-rot{}".format(cfg.DATASETS.CALLING_DATASET_NAME,cfg.DATASETS.CALLING_IMAGESET_NAME,cfg.IMAGE_ROTATE)
         saveDir = osp.join(cfg.TP_FN_RECORDS_PATH,datasetDest)
     if not osp.isdir(saveDir):
         os.makedirs(saveDir)
-    savePath = osp.join(saveDir,"records_{}_{}.pkl".format(suffix,cfg.TEST_NET.NET_PATH))
-    with open(savePath,'wb') as f:
-        pickle.dump(objToSave,f)
+    print(saveDir)
+    print(cfg.TP_FN_RECORDS_WITH_KEYS)
+    if cfg.TP_FN_RECORDS_WITH_KEYS:
+        savePath = osp.join(saveDir,"records_{}_{}.pkl".format(suffix,cfg.TEST_NET.NET_PATH))
+        print(savePath)
+        with open(savePath,'wb') as f:
+            pickle.dump(objToSave,f)
+    else:
+        print("IN THE ELSE")
+        print(cfg.TEST_NET.NET_PATH)
+        new_record = remove_keys_from_activity_vector_and_ravel(objToSave)
+        savePath = osp.join(saveDir,"records_{}_{}.npy".format(suffix,cfg.TEST_NET.NET_PATH))
+        print(savePath)
+        np.save(savePath,new_record)
 
-def compute_metrics_v1(ovthresh,image_ids,model_probs,gt_classes):
+def remove_keys_from_activity_vector_and_ravel(record_dict):
+    new_record = [None for _ in range(len(record_dict))]
+    sorted_keys = sorted(record_dict.keys()) # ensures consistency
+    for index,key in enumerate(sorted_keys):
+        new_record[index] = record_dict[key][0]
+    new_record = np.array(new_record)
+    return new_record
+
+def compute_metrics_v1(ovthresh,image_ids,model_probs,gt_classes,class_convert):
     nd = len(image_ids)
     tp = np.zeros((nd,len(ovthresh))) # "true positive"
     tn = np.zeros((nd,len(ovthresh))) # "true negative"
@@ -210,7 +227,7 @@ def compute_metrics_v1(ovthresh,image_ids,model_probs,gt_classes):
             prob = model_probs[d]
         else:
             prob = model_probs[d, :].astype(float) # should be size 1
-        if cfg._DEBUG.datasets.evaluators.cls_utils: print("[compute_TP_FP]",bb,BBGT)
+        # if cfg._DEBUG.datasets.evaluators.cls_utils: print("[compute_TP_FP]",bb,BBGT)
         
         for idx in range(len(ovthresh)):
             thresh = ovthresh[idx]

@@ -116,7 +116,7 @@ if __name__ == '__main__':
         cfg_from_list(args.set_cfgs)
 
     cfg.GPU_ID = args.gpu_id
-    cfg.ROTATE_IMAGE = args.rotate
+    cfg.DATASET_AUGMENTATION.IMAGE_ROTATE = args.rotate
 
     print('Using config:')
     pprint.pprint(cfg)

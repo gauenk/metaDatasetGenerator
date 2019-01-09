@@ -63,13 +63,13 @@ def _get_image_blob(im):
                         interpolation=cv2.INTER_LINEAR)
         M = None
         if cfg._DEBUG.core.test: print("[pre-process] im.shape",im.shape)
-        if cfg.ROTATE_IMAGE != -1:
-        #if cfg.ROTATE_IMAGE !=  0:
+        if cfg.IMAGE_ROTATE != -1:
+        #if cfg.DATASET_AUGMENTATION.IMAGE_ROTATE !=  0:
             rows,cols = im.shape[:2]
             if cfg._DEBUG.core.test: print("cols,rows",cols,rows)
-            rotationMat, scale = getRotationInfo(cfg.ROTATE_IMAGE,cols,rows)
+            rotationMat, scale = getRotationInfo(cfg.IMAGE_ROTATE,cols,rows)
             im = cv2.warpAffine(im,rotationMat,(cols,rows),scale)
-            im_rotate_factors.append([cfg.ROTATE_IMAGE,cols,rows,im_shape])
+            im_rotate_factors.append([cfg.IMAGE_ROTATE,cols,rows,im_shape])
         if cfg.SSD == True:
             im_scale_factors.append([im_scale_x,im_scale_y])
         else:
@@ -93,13 +93,13 @@ def _get_image_blob(im):
     #                         interpolation=cv2.INTER_LINEAR)
     #         M = None
     #         if cfg._DEBUG.core.test: print("[pre-process] im.shape",im.shape)
-    #         if cfg.ROTATE_IMAGE != -1:
-    #         #if cfg.ROTATE_IMAGE !=  0:
+    #         if cfg.IMAGE_ROTATE != -1:
+    #         #if cfg.IMAGE_ROTATE !=  0:
     #             rows,cols = im.shape[:2]
     #             if cfg._DEBUG.core.test: print("cols,rows",cols,rows)
-    #             rotationMat, scale = getRotationInfo(cfg.ROTATE_IMAGE,cols,rows)
+    #             rotationMat, scale = getRotationInfo(cfg.IMAGE_ROTATE,cols,rows)
     #             im = cv2.warpAffine(im,rotationMat,(cols,rows),scale)
-    #             im_rotate_factors.append([cfg.ROTATE_IMAGE,cols,rows,im_shape])
+    #             im_rotate_factors.append([cfg.IMAGE_ROTATE,cols,rows,im_shape])
     #         if cfg.SSD == True:
     #             im_scale_factors.append([im_scale_x,im_scale_y])
     #         else:
@@ -235,7 +235,7 @@ def im_detect(net, im, boxes=None, image_id="",isImBlob=False):
     if cfg._DEBUG.core.test:
         im_shape = forward_kwargs["data"].shape
         rimg = blob_list_im(forward_kwargs["data"])
-        fn = "input_image_{}_{}.png".format(cfg.ROTATE_IMAGE,image_id)
+        fn = "input_image_{}_{}.png".format(cfg.IMAGE_ROTATE,image_id)
         #save_image_with_border(fn,rimg[0],rotation=im_rotates[0])
     if len(cfg.SAVE_ACTIVITY_VECTOR_BLOBS) > 0:
         forward_kwargs['blobs'] = cfg.SAVE_ACTIVITY_VECTOR_BLOBS
@@ -293,7 +293,7 @@ def im_detect(net, im, boxes=None, image_id="",isImBlob=False):
     # are predicted for the rotated version. instead we correct this issue
     # by rotating the groundtruth
     # # rotate boxes back to the original image orientation...
-    # if cfg.ROTATE_IMAGE:
+    # if cfg.IMAGE_ROTATE:
     #     # i think it's just one right now...
     #     M = im_rotates[0]
     #     Minv = cv2.invertAffineTransform(M)

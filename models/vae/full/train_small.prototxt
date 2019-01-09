@@ -1,0 +1,409 @@
+name: "VAE"
+layer {
+  name: 'input-data'
+  type: 'Python'
+  top: 'data'
+  top: 'im_info'
+  top: 'labels'
+  python_param {
+    module: 'vae_data_layer.layer'
+    layer: 'VAE_DataLayer'
+    param_str: "'num_classes': 2"
+  }
+}
+layer {
+  name: "flatdata"
+  type: "Flatten"
+  bottom: "data"
+  top: "flatdata"
+  include {
+    phase: TRAIN
+  }
+  flatten_param {
+    end_axis: 3
+  }
+}
+layer {
+  name: "encode1"
+  type: "InnerProduct"
+  bottom: "data"
+  top: "encode1"
+  param {
+    lr_mult: 1
+    decay_mult: 1
+  }
+  param {
+    lr_mult: 1
+    decay_mult: 0
+  }
+  inner_product_param {
+    num_output: 30
+    weight_filler {
+      type: "gaussian"
+	    std: 0.1
+	    sparse: 15
+	  }
+    bias_filler {
+      type: "constant"
+	    value: 0
+	  }
+  }
+  include {
+    phase: TRAIN
+  }
+}
+layer {
+  name: "encode1neuron"
+  type: "ReLU"
+  bottom: "encode1"
+  top: "encode1neuron"
+  include {
+    phase: TRAIN
+  }
+}
+
+# end encoder, begin VAE z definition
+
+layer {
+  name: "mu"
+  type: "InnerProduct"
+  bottom: "encode1neuron"
+  top: "mu"
+  param {
+    lr_mult: 1
+    decay_mult: 1
+  }
+  param {
+    lr_mult: 1
+    decay_mult: 0
+  }
+  inner_product_param {
+    num_output: 30 # num z's
+    weight_filler {
+      type: "gaussian"
+	    std: 0.1
+	  }
+    bias_filler {
+      type: "constant"
+	    value: 0
+	  }
+  }
+  include {
+    phase: TRAIN
+  }
+}
+# Predict log sd because sd needs to be
+# positive, and the exp ensures that it is.
+layer {
+  name: "logsd"
+  type: "InnerProduct"
+  bottom: "encode1"
+  top: "logsd"
+  param {
+    lr_mult: 1
+    decay_mult: 1
+  }
+  param {
+    lr_mult: 1
+    decay_mult: 0
+  }
+  inner_product_param {
+    num_output: 30 # num z's
+    weight_filler {
+      type: "gaussian"
+	    std: 0.1
+	  }
+    bias_filler {
+      type: "constant"
+	    value: 0
+	  }
+  }
+  include {
+    phase: TRAIN
+  }
+}
+layer{
+  name: "sd"
+  type: "Exp"
+  bottom: "logsd"
+  top: "sd"
+  include {
+    phase: TRAIN
+  }
+}
+# layer {
+#   name: "tame_the_sd"
+#   type: "Scale"
+#   bottom: "sd"
+#   top: "tame_the_sd"
+#   scale_param {
+#     filler: {
+#       type: 'constant',
+#       value: 0.000000000000000000000001
+#       #value: 1.0
+#     }
+#   } 
+#   param {
+#     lr_mult: .000000000000000000000001,
+#     decay_mult: 1.0
+#   }  
+#   include {
+#     phase: TRAIN
+#   }
+# }
+layer{
+  name: "var"
+  type: "Eltwise"
+  bottom: "sd"
+  bottom: "sd"
+  top: "var"
+  eltwise_param{
+    operation: PROD
+  }
+  include {
+    phase: TRAIN
+  }
+}
+layer{
+  name: "meansq"
+  type: "Eltwise"
+  bottom: "mu"
+  bottom: "mu"
+  top: "meansq"
+  eltwise_param{
+    operation: PROD
+  }
+  include {
+    phase: TRAIN
+  }
+}
+layer{
+  name: "kldiv_plus_half"
+  type: "Eltwise"
+  bottom: "meansq"
+  bottom: "var"
+  bottom: "logsd"
+  top: "kldiv_plus_half"
+  eltwise_param{
+    operation: SUM
+    coeff: 0.5
+    coeff: 0.5
+    coeff: -1.0
+  }
+  include {
+    phase: TRAIN
+  }
+}
+layer {
+  name: "kldiv"
+  type: "Power"
+  bottom: "kldiv_plus_half"
+  top: "kldiv"
+  power_param{
+    shift: -0.5
+  }
+  include {
+    phase: TRAIN
+  }
+}
+layer{
+  name: "klloss"
+  type: "Reduction"
+  bottom: "kldiv"
+  top: "klloss"
+  include {
+    phase: TRAIN
+  }
+  #loss_weight: 0.0
+  # loss_weight: 0.000000000000001 # 1 over batch_size, because
+  # SigmoidCrossEntropyLoss
+  # normalizes by batch_size but
+  # Reduction does not.
+}
+layer{
+  name: "mu_dummy" # can't call this 'mu' or
+  # caffe will try to copy
+  # mu's parameters into
+  # this layer at test time
+  type: "DummyData"
+  top: "mu"
+  dummy_data_param{
+    shape {
+      dim: 10 # test-time batch_size
+	    dim: 30 # num z's
+	  }
+    data_filler{
+      type: "constant"
+	    value: 0
+	  }
+  }
+  include {
+    phase: TEST
+  }
+}
+layer{
+  name: "sd"
+  type: "DummyData"
+  top: "sd"
+  dummy_data_param{
+    shape {
+      dim: 10 # test-time batch_size
+	    dim: 30 # num z's
+	  }
+    data_filler{
+      type: "constant"
+	    value: 1
+	  }
+  }
+  include {
+    phase: TEST
+  }
+}
+layer{
+  name: "noise"
+  type: "DummyData"
+  top: "noise"
+  dummy_data_param{
+    shape {
+      dim: 10 # train batch_size
+	    dim: 30 # num z's
+	  }
+    data_filler{
+      type: "gaussian"
+	    std: 1.
+	  }
+  }
+  include {
+    phase: TRAIN
+  }
+}
+layer{
+  name: "noise"
+  type: "DummyData"
+  top: "noise"
+  dummy_data_param{
+    shape {
+      dim: 10 # test batch_size
+      dim: 30 # num z's
+	  }
+    data_filler{
+      type: "gaussian"
+	    std: 1.
+	  }
+  }
+  include {
+    phase: TEST
+  }
+}
+layer{
+  name: "sdnoise"
+  type: "Eltwise"
+  bottom: "noise"
+  bottom: "sd"
+  top: "sdnoise"
+  eltwise_param{
+    operation: PROD
+  }
+}
+layer{
+  name: "sample"
+  type: "Eltwise"
+  bottom: "mu"
+  bottom: "sdnoise"
+  top: "sample"
+  eltwise_param{
+    operation: SUM
+  }
+}
+
+# end VAE z's definition, begin decoder
+layer {
+  name: "decode1"
+  type: "InnerProduct"
+  bottom: "sample"
+  top: "decode1"
+  param {
+    lr_mult: 1
+    decay_mult: 1
+  }
+  param {
+    lr_mult: 1
+    decay_mult: 0
+  }
+  inner_product_param {
+    num_output: 2700
+    weight_filler {
+      type: "gaussian"
+	    std: 0.1
+	    sparse: 15
+	  }
+    bias_filler {
+      type: "constant"
+	    value: 0
+	  }
+  }
+}
+
+layer {
+  name: "loss"
+  type: "EuclideanLoss"
+  bottom: "decode1"
+  bottom: "flatdata"
+  top: "cross_entropy_loss"
+  # loss_weight: .000000000000000000000001
+  loss_param {
+    normalization: BATCH_SIZE
+  }
+  include {
+    phase: TRAIN
+  }
+}
+
+layer {
+  name: "decode1neuron"
+  type: "Sigmoid"
+  bottom: "decode1"
+  top: "decode1neuron"
+}
+layer {
+  name: "just_to_print"
+  type: "Power"
+  bottom: "flatdata"
+  top: "just_to_print"
+  power_param {
+    power: 1
+    scale: 1
+    shift: 0
+  }
+}
+layer {
+  name: "loss"
+  type: "Silence"
+  #type: "EuclideanLoss"
+  bottom: "decode1neuron"
+  bottom: "flatdata"
+  bottom: "just_to_print"
+  #top: "l2_error"
+  # loss_weight: 0
+  # include {
+  # phase: TRAIN
+  #   }
+}
+layer {
+  name: "silence_info"
+  type: "Silence"
+  bottom: "labels"
+  bottom: "im_info"
+}
+layer {
+  name: "kllos_brkdown"
+  type: "Concat"
+  #bottom: "meansq"
+   bottom: "sd"
+  #bottom: "logsd"
+  #bottom: "tame_the_kldiv"
+  top: "kll_brk"
+  include {
+    phase: TEST
+  }
+}

@@ -1,0 +1,70 @@
+airplane:
+   cluster:
+      kmeans:
+	 nClusters: 100
+      dbscan:
+	 eps: 12500
+	 minSamples: 2
+automobile:
+   cluster:
+      kmeans:
+	 nClusters: 100
+      dbscan:
+	 eps: 12500
+	 minSamples: 2
+bird:
+   cluster:
+      kmeans:
+	 nClusters: 100
+      dbscan:
+	 eps: 12500
+	 minSamples: 2
+cat:
+   cluster:
+      kmeans:
+	 nClusters: 100
+      dbscan:
+	 eps: 12500
+	 minSamples: 2
+deer:
+   cluster:
+      kmeans:
+	 nClusters: 100
+      dbscan:
+	 eps: 12500
+	 minSamples: 2
+dog:
+   cluster:
+      kmeans:
+	 nClusters: 100
+      dbscan:
+	 eps: 12500
+	 minSamples: 2
+frog:
+   cluster:
+      kmeans:
+	 nClusters: 100
+      dbscan:
+	 eps: 12500
+	 minSamples: 2
+horse:
+   cluster:
+      kmeans:
+	 nClusters: 100
+      dbscan:
+	 eps: 12500
+	 minSamples: 2
+ship:
+   cluster:
+      kmeans:
+	 nClusters: 100
+      dbscan:
+	 eps: 12500
+	 minSamples: 2
+truck:
+   cluster:
+      kmeans:
+	 nClusters: 100
+      dbscan:
+	 eps: 12500
+	 minSamples: 2

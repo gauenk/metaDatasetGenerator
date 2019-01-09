@@ -16,44 +16,20 @@ Most tools in $ROOT/tools take a --cfg option to specify an override file.
     - See experiments/cfgs/*.yml for example YAML config override files
 """
 
-import os
+import os,pickle
 import os.path as osp
 import numpy as np
-# `pip install easydict` if you don't have it
 from easydict import EasyDict as edict
-
-__C = edict()
-# Consumers can get config by:
-#   from core.config import cfg
-cfg = __C
+from utils.bijectionFunctions import BijectionFunctions
+from core.configBase import *
+from core.configData import *
+from core.configDatasetAugmentation import *
 
 #
 # Dataset options
 #
-__C.DATASETS = edict()
-cfgData = __C.DATASETS
-__C.CALLING_DATASET_NAME = ""
-__C.CALLING_IMAGESET_NAME = ""
-__C.DATASETS.EXP_DATASET = ""
-__C.DATASETS.PATH_ROOT = ""
-__C.DATASETS.PATH_TO_IMAGES = ""
-__C.DATASETS.PATH_TO_ANNOTATIONS = ""
-__C.DATASETS.PATH_TO_IMAGESETS = ""
-__C.DATASETS.PATH_TO_RESULTS = ""
-__C.DATASETS.CLASSES = ""
-__C.DATASETS.COMPID = "defaultCompID"
-__C.DATASETS.IMAGE_TYPE = ""
-__C.DATASETS.ANNOTATION_TYPE = ""
-__C.DATASETS.PARSE_ANNOTATION_REGEX = None
-__C.DATASETS.CONVERT_TO_PERSON = None
-__C.DATASETS.IMAGE_INDEX_TO_IMAGE_PATH = None
-__C.DATASETS.USE_IMAGE_SET = None
-__C.DATASETS.CONVERT_ID_TO_CLS_FILE = None
-__C.DATASETS.ONLY_PERSON = False
-__C.DATASETS.MODEL = None
-__C.DATASETS.ANNOTATION_CLASS = "object_detection"
-__C.DATASETS.IS_IMAGE_INDEX_FLATTENED = False
-__C.DATASETS.HAS_BBOXES = False
+__C = cfg
+
 #
 # Global Options
 #
@@ -70,6 +46,16 @@ __C.TEST_NET = edict()
 __C.TEST_NET.NET_PATH = ""
 __C.TEST_NET.DEF_PATH = ""
 
+
+cfg.modelInfo = edict()
+
+#
+# Global Input Options
+#
+
+__C.INPUT_DATA = edict()
+__C.INPUT_DATA.BIJECTION = None
+
 #
 # Training options
 #
@@ -78,6 +64,9 @@ __C.TRAIN = edict()
 #__C.PATH_YMLDATASETS = "helps"
 __C.PATH_YMLDATASETS = "gauenk"
 __C.PATH_MIXTURE_DATASETS = "./data/mixtureDatasets/"
+
+# create new snapshot name?
+cfg.TRAIN.RECREATE_SNAPSHOT_NAME = True
 
 # limit the number of annotations in a dataset
 cfg.TRAIN.CLIP_SIZE = None
@@ -389,17 +378,13 @@ __C.PATH_TO_X_DATASET_GEN = "./output/xDatasetGen/"
 __C.COMPUTE_IMG_STATS = True
 
 # how much should we rotate each image?
-__C.ROTATE_IMAGE = 0
+__C.IMAGE_ROTATE = 0
 
 # how much should we rotate each image?
 __C.COLOR_CHANNEL = 3 #color == 3 | black&white == 1
 
 # should we write the results?
 __C.WRITE_RESULTS = True
-
-# output for recoding the TP and FN of a model
-__C.TP_FN_RECORDS_PATH = "./output/{}/tp_fn_records/".format("faster_rcnn")
-__C.TP_FN_RECORDS_WITH_IMAGESET = True
 
 # output for recoding the TP and FN of a model
 __C.ROTATE_PATH = "./output/rotate/"
@@ -415,7 +400,7 @@ __C.CLS_PROBS = "cls_prob"
 __C.LOAD_METHOD = None
 
 def GET_SAVE_ACTIVITY_VECTOR_BLOBS_DIR():
-    dirn = "./output/activity_vectors/{}/{}-{}/".format(__C.EXP_DIR.replace("/",""),__C.CALLING_DATASET_NAME,__C.CALLING_IMAGESET_NAME)
+    dirn = "./output/activity_vectors/{}/{}-{}-{}/".format(__C.EXP_DIR.replace("/",""),cfg.DATASETS.CALLING_DATASET_NAME,cfg.DATASETS.CALLING_IMAGESET_NAME,cfg.DATASETS.CALLING_CONFIG)
     if not osp.exists(dirn):
         os.makedirs(dirn)
     return dirn
@@ -423,7 +408,9 @@ def GET_SAVE_ACTIVITY_VECTOR_BLOBS_DIR():
 # used for saving activity vectors
 __C.GET_SAVE_ACTIVITY_VECTOR_BLOBS_DIR = GET_SAVE_ACTIVITY_VECTOR_BLOBS_DIR
 # __C.SAVE_ACTIVITY_VECTOR_BLOBS = [] # the list of blobs to save
-__C.SAVE_ACTIVITY_VECTOR_BLOBS = ['conv1','conv2','ip1','cls_score']
+__C.SAVE_ACTIVITY_VECTOR_BLOBS = ['conv1','conv2','ip1','cls_score','cls_prob']
+__C.SAVE_ACTIVITY_VECTOR_BLOBS_WITH_KEYS = False
+__C.TP_FN_RECORDS_WITH_KEYS = False
 
 # Active Learning Settings
 __C.ACTIVE_LEARNING = edict()
@@ -441,6 +428,15 @@ __C.TRAIN.IMAGE_NOISE = False
 __C.TEST.IMAGE_NOISE = False
 __C.IMAGE_NOISE = False
 
+
+# __C.TRAIN.DATASET_AUGMENTATION = edict()
+# __C.TRAIN.DATASET_AUGMENTATION.SIZE = 64 # TODO: set dynamically later
+# __C.TRAIN.DATASET_AUGMENTATION.EXHAUSTIVE = True
+# __C.TRAIN.DATASET_AUGMENTATION.IMAGE_ROTATE_LIST=0
+# __C.TRAIN.DATASET_AUGMENTATION.IMAGE_CROP_LIST=0
+# __C.TRAIN.DATASET_AUGMENTATION.IMAGE_TRANSLATE_LIST=[[2,2,2,2]] # list of lists: [ [up,down,left,right], ...]; each list element (yes; the element itself is a list) is for *one* transformation
+
+
 def get_output_dir(imdb_name, net=None):
     """Return the directory where experimental artifacts are placed.
     If the directory does not exist, it is created.
@@ -457,42 +453,6 @@ def get_output_dir(imdb_name, net=None):
         os.makedirs(outdir)
     return outdir
 
-
-def _merge_a_into_b(a, b):
-    """Merge config dictionary a into config dictionary b, clobbering the
-    options in b whenever they are also specified in a.
-    """
-    if type(a) is not edict:
-        return
-
-    for k, v in a.iteritems():
-        # a must specify keys that are in b
-        if not b.has_key(k):
-            raise KeyError('{} is not a valid config key'.format(k))
-
-        old_type = type(b[k])
-        # the types must match, too; unless old_type is not edict and not None; and new_type is not None
-        if old_type is not type(v) and \
-        (old_type is edict and old_type is not type(None))\
-        and type(v) is not type(None):
-            if isinstance(b[k], np.ndarray):
-                v = np.array(v, dtype=b[k].dtype)
-            else:
-                raise ValueError(('Type mismatch ({} vs. {}) '
-                                'for config key: {}').format(type(b[k]),
-                                                            type(v), k))
-        # recursively merge dicts
-        if type(v) is edict:
-            try:
-                _merge_a_into_b(a[k], b[k])
-            except:
-                print('Error under config key: {}'.format(k))
-                raise
-        elif v == "None":
-            b[k] = None
-        else:
-            b[k] = v
-
 def set_global_cfg(MODE):
     # set global variables for testing
     cfg.PIXEL_MEANS = np.array(cfg.PIXEL_MEANS)
@@ -506,29 +466,8 @@ def set_global_cfg(MODE):
         cfg.AL_CLS.LAYERS = cfg.TRAIN.AL_CLS.LAYERS
         cfg.SCALES = cfg.TRAIN.SCALES
         cfg.IMAGE_NOISE = cfg.TRAIN.IMAGE_NOISE
-
-def cfg_from_file(filename):
-    """Load a config file and merge it into the default options."""
-    import yaml
-    with open(filename, 'r') as f:
-        yaml_cfg = edict(yaml.load(f))
-
-    _merge_a_into_b(yaml_cfg, __C)
-    load_tp_fn_record_path()
-
-def cfgData_from_file(filename):
-    """Load a config file and merge it into the default options."""
-    import yaml
-    with open(filename, 'r') as f:
-        yaml_cfg = edict(yaml.load(f))
-
-    _merge_a_into_b(yaml_cfg, __C.DATASETS)
-    
-    useClsDerived_Imagenet = (cfg.CALLING_DATASET_NAME == "imagenet_cls") and \
-                             ("train" in cfg.CALLING_IMAGESET_NAME)
-    if useClsDerived_Imagenet:
-        cfgData['ANNOTATION_TYPE'] = "cls_derived"
-    load_tp_fn_record_path()
+    maxPixelNum = int(max(__C.TRAIN.SCALES) * __C.TRAIN.MAX_SIZE / 4.)
+    cfg.INPUT_DATA.BIJECTION = BijectionFunctions('rtVal = self.random_pixel_shuffle({})',maxPixelNum=maxPixelNum)
 
 def cfg_from_list(cfg_list):
     """Set config keys via list (e.g., from command line)."""
@@ -566,14 +505,6 @@ def createPathRepeat(setID,r):
 def createFilenameID(setID,r,size):
     return osp.join(cfg.PATH_MIXTURE_DATASETS,setID,r,size)
 
-def load_tp_fn_record_path():
-    __C.TP_FN_RECORDS_PATH = "./output/{:s}/tp_fn_records/"
-    if type(__C.DATASETS.MODEL) is str:
-        __C.TP_FN_RECORDS_PATH = __C.TP_FN_RECORDS_PATH.format(__C.DATASETS.MODEL)
-    else:
-        __C.TP_FN_RECORDS_PATH = __C.TP_FN_RECORDS_PATH.format("faster_rcnn")
-    return __C.TP_FN_RECORDS_PATH
-    
 def loadDatasetIndexDict():
     # legacy
     return __C.DATASET_NAMES_ORDERED
@@ -594,4 +525,160 @@ def getTestNetConfig(caffemodel,prototxt):
     # find model number of iterations 
     cfg.TEST_NET.NET_PATH = osp.splitext(caffemodel.split('/')[-1])[0]
     cfg.TEST_NET.DEF_PATH = osp.splitext(prototxt.split('/')[-1])[0]
-    
+
+def setModelInfo(solverPrototxt):
+    solverInfo = solverPrototxtInfoDict(solverPrototxt)
+    cfg.modelInfo.train_set = solverInfo['ds_name']
+    cfg.modelInfo.architecture = solverInfo['arch']
+    cfg.modelInfo.optim = solverInfo['optim'].lower()
+    if cfg.TRAIN.IMAGE_NOISE is None or cfg.TRAIN.IMAGE_NOISE is 0:
+        cfg.modelInfo.image_noise = False
+    else:
+        cfg.modelInfo.image_noise = cfg.TRAIN.IMAGE_NOISE
+
+    if cfg.PRUNE_NET is None or cfg.PRUNE_NET is 0:
+        cfg.modelInfo.prune = False
+    else:
+        cfg.modelInfo.prune = cfg.PRUNE_NET
+
+    if cfg.DATASET_AUGMENTATION.BOOL:
+        value = str(round(cfg.DATASET_AUGMENTATION.N_SAMPLES * 100,3))
+        cfg.modelInfo.dataset_augmentation = value.replace('.','-')
+    else:
+        cfg.modelInfo.dataset_augmentation = False
+
+    cls_incl_list_0_bool = len(cfg.DATASETS.CLASS_INCLUSION_LIST) == 0
+    cls_filter_none_bool = cfg.DATASETS.CLASS_FILTER is None
+    cls_filter_false_bool = cfg.DATASETS.CLASS_FILTER is False
+    if cls_filter_none_bool or cls_filter_false_bool or cls_incl_list_0_bool:
+        cfg.modelInfo.classFilter = False
+    else:
+        cfg.modelInfo.classFilter = len(cfg.DATASETS.CLASS_INCLUSION_LIST)
+
+# functions for filling in a prototxt with other prototxts for training.... should probably swtich to pytorch soon...
+
+def mangleFillmePrototxtTemplateFilename(prototxt_path):
+    path = os.path.dirname(prototxt_path)
+    prototxt = os.path.basename(prototxt_path)
+    prototxt_base = prototxt.split('.')[0]
+    if '_template' in prototxt_base:
+        new_prototxt = prototxt_base.replace('_template','') + '.prototxt'
+    else:
+        new_prototxt = prototxt_base + 'fillme-in.prototxt'
+    new_prototxt_path = os.path.join(path,new_prototxt)
+    return new_prototxt_path
+
+def findFillMeLayers(net):
+    layer_list = [l for l in net.layer]
+    found = []
+    for layer in layer_list:
+        layerName = layer.name
+        print(layerName)
+        if 'fillme' in layerName.lower():
+            found.append(layer)
+    return found
+
+def getFillmeLayerFilename(fillmeLayer):
+    # SO HACKY; only temporary solution until change to pytorch
+    return fillmeLayer.convolution_param.weight_filler.type
+
+def getLayerInfo(layer):
+    if type(layer.bottom) is unicode:
+        layer_bottom = str(layer.bottom)
+    else:
+        layer_bottom = [b for b in layer.bottom]
+    if type(layer.top) is unicode:
+        layer_top = str(layer.top)
+    else:
+        layer_top = [b for b in layer.top]
+    layer_name = str(layer.name)
+    # print(layer_name,layer_top)
+    return layer_bottom,layer_top,layer_name
+
+def replaceFillmeLayerValues(layer,fillmeNet):
+    old_layer_bottom,old_layer_top,layer_name = getLayerInfo(layer)
+    oglayer_name_base = layer_name.split('-')[0]
+    replaceName = {}
+    for l in fillmeNet.layer:
+        l_name = l.name + '-' + oglayer_name_base
+        l_bottoms = [b for b in l.bottom]
+        l_tops = [b for b in l.bottom]
+        replaceName[l.name] = l_name
+        # print(l.name)
+        l.name = l_name
+        for idx,l_bottom in enumerate(l_bottoms):
+            if l_bottom == 'bottom':
+                l.bottom[idx] = old_layer_bottom
+                replaceName[l_bottom] = old_layer_bottom
+            elif l_bottom == 'bottom_0':
+                l.bottom[idx] = old_layer_bottom[0]
+                replaceName[l_bottom] = old_layer_bottom[0]
+            elif l_bottom == 'bottom_1':
+                l.bottom[idx] = old_layer_bottom[1]
+                replaceName[l_bottom] = old_layer_bottom
+        for idx,l_top in enumerate(l.top):
+            if l_top == 'top':
+                # print(l.top,old_layer_top)
+                l.top[idx] = old_layer_top[idx]
+                replaceName[l_top] = old_layer_top[idx]
+            elif l_top == 'top_0':
+                l.top[idx] = old_layer_top[0]
+                replaceName[l_top] = old_layer_top[0]
+            elif l_top == 'top_1':
+                l.top[idx] = old_layer_top[1]
+                replaceName[l_top] = old_layer_top
+    # for replace strings now
+    for l in fillmeNet.layer:
+        # print(l.name)
+        l_bottoms = [b for b in l.bottom]
+        l_tops = [t for t in l.top]
+        if l.name in replaceName.keys():
+            l.name = replaceName[l.name]
+        for idx,l_bottom in enumerate(l_bottoms):
+            if l_bottom in replaceName.keys():
+                l.bottom[idx] = replaceName[l_bottom]
+        for idx,l_top in enumerate(l_tops):
+            if l_top in replaceName.keys():
+                if type(l.top) is unicode:
+                    l.top = replaceName[l_top]
+                else:
+                    l.top[idx] = replaceName[l_top]
+
+def replaceFillmeLayer(net,fillmeLayer):
+    # get fillme net info
+    fillmePrototxt = getFillmeLayerFilename(fillmeLayer)
+    fillmeNet = buildNetFromPrototxt(fillmePrototxt)
+    replaceFillmeLayerValues(fillmeLayer,fillmeNet)
+
+    # use new net to replace current fillme layer
+    """
+    ** method outline **
+    1. write layers before current layer to temporary file
+    2. write the replacement network to temporary file
+    3. write the remaining layers to the temporary file
+    4. load file into network from temporary file
+    5. remove temporary file
+    """
+    tmp_prototxt = 'tmp_file_prototxt.prototxt'
+    for layer in net.layer:
+        # print("written tmp_layer: {}".format(layer.name))
+        if layer is fillmeLayer:
+            appendPrototxtWithNet(fillmeNet,tmp_prototxt)
+        else:
+            appendPrototxtWithLayer(layer,tmp_prototxt)
+    newNet = buildNetFromPrototxt(tmp_prototxt)
+    os.remove(tmp_prototxt)
+    return newNet
+
+def replaceFillmeNetwork(prototxt):
+    net = buildNetFromPrototxt(prototxt)
+    fillMeLayerList = findFillMeLayers(net)
+    while len(fillMeLayerList) > 0:
+        layer = fillMeLayerList[0]
+        print(layer.name)
+        net = replaceFillmeLayer(net,layer)
+        fillMeLayerList = findFillMeLayers(net)
+    new_prototxt = mangleFillmePrototxtTemplateFilename(prototxt)
+    writeNetFromProto(net,new_prototxt)
+
+

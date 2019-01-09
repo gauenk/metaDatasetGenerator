@@ -9,6 +9,7 @@
 from core.config import cfg, createFilenameID
 
 # misc imports
+from utils.base import *
 import pprint
 pp = pprint.PrettyPrinter(indent=4)
 import pickle,cv2,uuid,os,sys
@@ -243,15 +244,6 @@ def scaleCroppedImage(im_orig):
 def scaleRawImage(im_orig):
     return scaleImage(im_orig,cfg.RAW_IMAGE_SIZE)
 
-def scaleImage(im_orig,target_size):
-    x_size,y_size = im_orig.shape[0:2]
-    if x_size == 0 or y_size == 0:
-        print("WARNING: image's size 0 for an axis")
-        return im_orig
-    im = cv2.resize(im_orig, (target_size,target_size),
-                    interpolation=cv2.INTER_CUBIC)
-    return im
-
 def computeTotalAnnosFromAnnoCount(annoCount):
     size = 0
     for cnt in annoCount:
@@ -393,9 +385,10 @@ def combineOnlyNewRoidbs(roidbs,pc):
     return newRoidb
 
 
-def loadEvaluationRecords(classname):
-    #saveDir = osp.join(cfg.TP_FN_RECORDS_PATH,cfg.CALLING_DATASET_NAME)
-    saveDirPostfix = "{}-{}-default".format(cfg.CALLING_DATASET_NAME,cfg.CALLING_IMAGESET_NAME)
+def loadEvaluationRecords(classname,saveDirPostfix=None):
+    #saveDir = osp.join(cfg.TP_FN_RECORDS_PATH,cfg.DATASETS.CALLING_DATASET_NAME)
+    if saveDirPostfix is None:
+        saveDirPostfix = "{}-{}-default".format(cfg.DATASETS.CALLING_DATASET_NAME,cfg.DATASETS.CALLING_IMAGESET_NAME)
     saveDir = osp.join(cfg.TP_FN_RECORDS_PATH,saveDirPostfix)
     #savePath = osp.join(saveDir,"records_{}.pkl".format('det_{:s}').format(classname))
     savePath = osp.join(saveDir,"records_{}.pkl".format('cls').format(classname))
@@ -407,10 +400,12 @@ def loadEvaluationRecords(classname):
         records = pickle.load(f)
     return records
 
-def loadEvaluationRecordsFromPath(recordPath):
+def loadEvaluationRecordsFromPath(recordPath,load_pickle=True):
     print("loading evaluation records from: {}".format(recordPath))
-    with open(recordPath, "rb") as f:
-        records = pickle.load(f)
+    if load_pickle:
+        with open(recordPath, "rb") as f: records = pickle.load(f)
+    else:
+        records = np.load(recordPath)
     return records
 
 def split_and_load_ImdbImages(imdb,records):
@@ -424,7 +419,47 @@ def convertFlattenedImageIndextoImageIndex(flattened_image_index):
     image_index = '_'.join(flattened_image_index.split('_')[:-1])
     return image_index,int(bbox_index)
 
+def createRecordsPath(modelArchitecture,netName,imdbName,load_pickle=True):
+    if load_pickle:
+        recordsPath = "./output/{modelArch}/tp_fn_records/{imdbName}/records_cls_{netName}.pkl"\
+                      .format(modelArch=modelArchitecture,imdbName=imdbName,netName=netName)
+    else:
+        recordsPath = "./output/{modelArch}/tp_fn_records/{imdbName}/records_cls_{netName}.npy"\
+                      .format(modelArch=modelArchitecture,imdbName=imdbName,netName=netName)
+    return recordsPath
 
+def loadRecord(imdb_name,modelInfo,load_pickle=True):
+    records_path = createRecordsPath(modelInfo.architecture,modelInfo.name,imdb_name,load_pickle)
+    records = loadEvaluationRecordsFromPath(records_path,load_pickle)
+    return records
 
+def loadActivityVectors(imdb_name,layerList,netName,load_pickle=False,load_bool=False):
+    dirPath = osp.join("./output/activity_vectors/classification/",
+                   "{}".format(imdb_name))
+    fn_prefix = "{}_{}".format(layer,netName)
+    if load_bool:
+        fn_bool = fn_prefix + '_bool'
+        try:
+            avDict = loadActivityVectorsLoadLoop(dirPath,layerList,fn_bool)
+        except:
+            print("'boolizing' the activity vector'")
+            avDict = loadActivityVectorsLoadLoop(dirPath,layerList,fn_prefix)
+            convertAvDictToBool(avDict)
+    else:
+        avDict = loadActivityVectorsLoadLoop(dirPath,layerList,fn_prefix)
+    return avDict
 
+def convertAvDictToBool(avDict):
+    print("[convertAvDictToBool] not done")
 
+def loadActivityVectorsLoadLoop(dirPath,layerList,fn_prefix):
+    avDict = {}
+    for layer in layerList:
+        if load_pickle:
+            fn = osp.join(dirPath,fn_prefix+".pkl")
+            avDict[layer] = readPickle(fn)
+        else:
+            fn = osp.join(dirPath,fn_prefix+".npy")
+            avDict[layer] = np.load(fn)
+    return avDict
+            

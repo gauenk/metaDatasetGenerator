@@ -1,0 +1,33 @@
+svmReferenceRouteStr: 'Pos'
+useTrainSplitAsTest: 0
+clusterType: 'kmeans'
+netInfo:
+   modelName: "cifar_10_lenet5_yesImageNoise_noPrune_iter_100000"
+   modelType: "lenet5"
+   trainDataset:
+      name: "cifar_10"
+      split: "train"
+      config: "default"
+routingAnalysisInfo:
+   layers:  !!python/list ["conv1","conv2","ip1","cls_score"]
+   comboType: 'all'
+   comboInfo: None # generated
+   routeFunctionStr: 'default'
+   routeDifferenceStr: 'default'
+   train:
+      name: "cifar_10"
+      split: "train"
+      config: "default"
+   test:
+      name: "cifar_10"
+      split: "val"
+      config: "default"
+   referenceRoute:
+      referenceName: None
+      indexWeightStr: None
+      dataset:
+         name: "cifar_10"
+         split: "train"
+         config: "default"
+kmeans:
+   nClusters: 100

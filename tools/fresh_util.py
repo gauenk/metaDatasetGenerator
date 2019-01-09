@@ -1,4 +1,4 @@
-from fresh_config import cfg,cfgForCaching,checkConfigEquality
+from fresh_config import cfg,cfgForCaching,checkConfigEquality,update_one_current_config_field
 
 from datasets.factory import get_repo_imdb
 from datasets.ds_utils import loadRecord,loadActivityVectors
@@ -38,7 +38,9 @@ class Cache():
         if cache is None or len(cache) == 0: return None
         self.is_valid = True
         for uuID,expData in cache.items():
-            isEqual = checkConfigEquality(self.config,expData['config'])
+            self.is_valid = True
+            isEqual = checkConfigEquality(expData['config'],self.config)
+            #isEqual = checkConfigEquality(self.config,expData['config'])
             if isEqual:
                 if self.fieldname is not None:
                     if self.fieldname in expData['data'].keys(): return expData['data'][self.fieldname]
@@ -70,10 +72,24 @@ class Cache():
        for key,value in cache.items():
            print(key,value['config'].expName,checkConfigEquality(value['config'],cfg))
 
-def compute_accuracy(truth,guess):
-    return np.mean(truth != guess)
+def transformData(data):
+    if cfg.data.transformations.apply_relu:
+        data = data[np.where(data < 0)[0]]
+    if cfg.data.transformations.normalize:
+        if data.max() == 0:
+            return data
+        norm_data = (data + data.min()) / data.max()
+        return norm_data
+    elif cfg.data.transformations.to_bool:
+        return (data >= 0)
+    else:
+        return data
 
-def getGroundtruthClassLabels(imdb_name,numberOfSamples=-1):
+def compute_accuracy(truth,guess):
+    return np.mean(truth == guess)
+
+def getGroundtruthClassLabels_extra(imdb_name,numberOfSamples=-1):
+    print("WARNING: dont use! only keeping because i am not ready to delete.")
     imdb = get_repo_imdb(imdb_name)
     if numberOfSamples == -1: numberOfSamples = len(imdb.image_index)
     imageIndexIDs = imdb.image_index[:numberOfSamples]
@@ -85,7 +101,18 @@ def getGroundtruthClassLabels(imdb_name,numberOfSamples=-1):
         gt_labels[gt_index] = roidb[roidb_index]['gt_classes'][0]
     return gt_labels,imdb.classes,sorted(imageIndexIDs)
 
-def aggregateActivations(avDict,imageIndexList,numberOfSamples=-1,verbose=False):
+def getGroundtruthClassLabels(imdb_name,numberOfSamples=-1):
+    imdb = get_repo_imdb(imdb_name)
+    roidb = imdb.roidb
+    if numberOfSamples == -1: numberOfSamples = len(imdb.image_index)
+    imageIndexIDs = sorted(imdb.image_index) # always sort the ENTIRE image_index
+    gt_labels = np.zeros(len(imageIndexIDs),dtype=np.uint8)
+    for gt_index,imageID in enumerate(imageIndexIDs[:numberOfSamples]):
+        roidb_index = imdb.image_index.index(imageID)
+        gt_labels[gt_index] = roidb[roidb_index]['gt_classes'][0]
+    return gt_labels,imdb.classes,sorted(imageIndexIDs)
+
+def aggregateActivations(av,imageIndexList,numberOfSamples=-1,verbose=False):
     # init combination dictinaries
     allCombo = {}
     comboInfo = cfg.comboInfo
@@ -94,53 +121,71 @@ def aggregateActivations(avDict,imageIndexList,numberOfSamples=-1,verbose=False)
 
     # aggregate activation information by combination settings
     if numberOfSamples == -1: numberOfSamples = len(imageIndexList)
-    for imageIndexID in imageIndexList[:numberOfSamples]:
+    if type(av[cfg.layerList[0]]) is not dict:
+        imageIndexList = range(numberOfSamples)
         for comboID in comboInfo:
             layerNames = comboID.split("-")
             allComboList = []
             # single samples (e.g. one row; we are building the features)
             for layerName in layerNames:
-                activations = avDict[layerName][imageIndexID].ravel()
-                allComboList.extend(activations)
+                layer_activations = av[layerName][:numberOfSamples,:].reshape(numberOfSamples,-1)
+                allComboList.append(layer_activations)
             # add the single sample to the data list
-            allCombo[comboID].append(allComboList)
+            allComboList = np.hstack(allComboList)
+            allCombo[comboID] = allComboList
+    else:
+        for imageIndexID in imageIndexList[:numberOfSamples]:
+            for comboID in comboInfo:
+                layerNames = comboID.split("-")
+                allComboList = []
+                # single samples (e.g. one row; we are building the features)
+                for layerName in layerNames:
+                    activations = av[layerName][imageIndexID].ravel()
+                    allComboList.extend(activations)
+                # add the single sample to the data list
+                allComboListTrans = transformData(allComboList)
+                print(allComboListTrans)
+                allCombo[comboID].append(allComboList)
 
     # "numpify" all the lists per combo per class
     for comboID in comboInfo:
         allCombo[comboID] = np.array(allCombo[comboID])
         if cfg.verbose or verbose:
-            print("all [#samples x #ftrs]",allCombo[comboID].shape)
+            print("all [#samples x #ftrs]",comboID,allCombo[comboID].shape)
         
     return allCombo
     
 def load_and_reorder_records(imdb_name,modelInfo,imageIndexIDs):
-    records_dict = loadRecord(imdb_name,modelInfo)
-    records = np.zeros((len(imageIndexIDs)),dtype=np.uint8)
-    for record_index,imageIndex in enumerate(imageIndexIDs):
-        records[record_index] = records_dict[imageIndex][0]
+    records_dict = loadRecord(imdb_name,modelInfo,cfg.load_record_pickle)
+    if cfg.load_record_pickle:
+        records = np.zeros((len(imageIndexIDs)),dtype=np.uint8)
+        for record_index,imageIndex in enumerate(imageIndexIDs):
+            records[record_index] = records_dict[imageIndex][0]
+    else: records = records_dict.astype(np.uint8)
     return records
 
 def load_data(imdb_name,layerList,modelInfo):
-    cache_name = "data_debug_cache_" + imdb_name + ".pkl"
-    expDataCache = Cache(cache_name,cfgForCaching)
-    dataset = expDataCache.load()
-    if expDataCache.is_valid: return dataset
+    # cache_name = "data_debug_cache_" + imdb_name + ".pkl"
+    # expDataCache = Cache(cache_name,cfgForCaching)
+    # dataset = expDataCache.load()
+    # if expDataCache.is_valid: return dataset
 
     class_labels,classes,imageIndexIDs = getGroundtruthClassLabels(imdb_name,
                                                                    cfg.data.numberOfSamples)
     records = load_and_reorder_records(imdb_name,modelInfo,imageIndexIDs)
-    av = loadActivityVectors(imdb_name,layerList,modelInfo.name)
+    av = loadActivityVectors(imdb_name,layerList,modelInfo.name,load_pickle=cfg.load_av_pickle,load_bool=cfg.load_bool_activity_vectors)
     av_combos = aggregateActivations(av,imageIndexIDs,cfg.data.numberOfSamples) 
     # ^one line above^ takes 90% of startup time
 
     dataset = FreshData(None,records,class_labels,classes)
     dataset.samples = {}
     for comboID,combo in av_combos.items():
-        assert combo.shape[0] == len(records), "not the same length"
-        assert combo.shape[0] == len(class_labels), "not the same length"
+        a,b,c =  combo.shape[0],len(records),len(class_labels)
+        assert a == b, "not the same length [records]: {} vs {}".format(a,b)
+        assert a == c, "not the same length [class_labels]: {} vs {}".format(a,c)
         dataset.samples[comboID] = combo
 
-    expDataCache.save(dataset)
+    # expDataCache.save(dataset)
     return dataset
 
 def get_unique_strings(alist):
@@ -220,16 +265,20 @@ def list_transpose(list_of_lists):
     return new_list
 
 
-def find_experiment_changes(exp_configs):
+def assert_equal_lists(alist,blist):
+    for a,b in zip(alist,blist): assert a == b,"lists not the same"
+
+def find_experiment_list_changes(exp_configs):
     change_field = []
     for exp_config in exp_configs:
-        print(exp_config.modelInfo.iterations)
-        old_cfg = deepcopy(cfg)
-        update_config(cfg,exp_config)
-        where,what = what_changed(cfg,old_cfg)
-        change_field.append([where,what])
-        # if where not in change_field.keys(): change_field[what] = []
-        # change_field[what].append(what)
+        fieldname,fieldvalue = update_one_current_config_field(exp_config)
+        change_field.append([fieldname,fieldvalue])
     return change_field
+
+def get_unique_experiment_field_change(exp_configs):
+    change_field = find_experiment_list_changes(exp_configs)
+    fieldname_list = [field[0] for field in change_field]
+    unique_changes = get_unique_strings(fieldname_list)
+    return unique_changes
 
 

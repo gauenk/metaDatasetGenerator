@@ -1,0 +1,15 @@
+train_net: "models/cifar_10/resnet50/train.prototxt"
+base_lr: 0.01
+momentum: 0.9
+weight_decay: 0.0005
+lr_policy: "inv"
+gamma: 0.0001
+power: 0.75
+display: 1
+max_iter: 100000
+# snapshot intermediate results
+snapshot: 0
+snapshot_prefix: "cifar_10_resnet50_noImageNoise_noPrune"
+iter_size: 1
+solver_mode: GPU
+# we want to change the output so we don't get overwritten

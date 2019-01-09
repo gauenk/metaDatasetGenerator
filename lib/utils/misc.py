@@ -4,6 +4,7 @@ import os.path as osp
 import numpy as np
 import numpy.random as npr
 from core.config import cfg,iconicImagesFileFormat
+from core.routingConfig import cfg as cfgRouting
 from ntd.hog_svm import plot_confusion_matrix,appendHOGtoRoidb,split_data, scale_data,train_SVM,findMaxRegions, make_confusion_matrix
 from datasets.ds_utils import computeTotalAnnosFromAnnoCount
 
@@ -210,39 +211,51 @@ def vis_dets(im, class_names, dets, _idx_, fn=None, thresh=0.5):
     plt.axis('off')
     plt.tight_layout()
     plt.draw()
+    uuidStr = str(uuid.uuid4())
     if fn is None:
-        plt.savefig("img_{}_{}.png".format(_idx_,str(uuid.uuid4())))
+        plt.savefig("img_{}_{}.png".format(_idx_,uuidStr))
     else:
-        plt.savefig(fn.format(_idx_,str(uuid.uuid4())))
+        plt.savefig(fn.format(_idx_,uuidStr))
 
 
 def toRadians(angle):
     return (np.pi/180 * angle)
+
+def zeroInTheRegion(coordinate,rows,cols):
+    if 0 <= coordinate[0] and coordinate[0] <= rows: coordinate[0] = 0
+    if 0 <= coordinate[1] and coordinate[1] <= cols: coordinate[1] = 0
+
+def overflowOnly(coordinate,rows,cols):
+    if 0 > coordinate[0]: coordinate[0] = np.abs(coordinate[0])
+    elif rows < coordinate[0]: coordinate[0] = rows - coordinate[0]
+    if 0 > coordinate[1]: coordinate[1] = np.abs(coordinate[1])
+    elif cols < coordinate[1]: coordinate[1] = cols - coordinate[1]
+
+def correctTranslatedIndex(coordinate,rows,cols):
+    zeroInTheRegion(coordinate,rows,cols)
+    overflowOnly(coordinate,rows,cols)
 
 def getRotationScale(M,rows,cols):
     a = np.array([cols,0,1])
     b = np.array([0,0,1])
     ta = np.matmul(M,a)
     tb = np.matmul(M,b)
-    if cfg._DEBUG.utils.misc:
-        print("[getRotationScale] ta",ta)
-        print("[getRotationScale] tb",tb)
-    if ta[1] < tb[0]:
-        rotate_y = 2 * (-ta[1]) + rows
-        scale = (rows) / ( rotate_y )
-    else:
-        rotate_y = 2 * (-tb[0]) + cols
-        scale = (cols) / ( rotate_y )
+    correctTranslatedIndex(ta,rows,cols)
+    correctTranslatedIndex(tb,rows,cols)
+    scale_a_0 = rows / ( 2. * np.abs(ta[0]) + rows )
+    scale_a_1 = rows / ( 2. * np.abs(ta[1]) + rows )
+    scale_b_0 = cols / ( 2. * np.abs(tb[0]) + cols )
+    scale_b_1 = cols / ( 2. * np.abs(tb[1]) + cols )
+    scale_list = [scale_a_0,scale_a_1,scale_b_0,scale_b_1]
+    scale = np.min([scale_a_0,scale_a_1,scale_b_0,scale_b_1])
     return scale
 
 def getRotationInfo(angle,cols,rows):
     if cfg._DEBUG.utils.misc: print("cols,rows",cols,rows)
-    rotationMat = cv2.getRotationMatrix2D((cols/2,rows/2),\
-                                          angle,1.0)
+    rotationMat = cv2.getRotationMatrix2D((cols/2,rows/2),angle,1.0)
     scale = getRotationScale(rotationMat,rows,cols)
     if cfg._DEBUG.utils.misc: print("scale: {}".format(scale))
-    rotationMat = cv2.getRotationMatrix2D((cols/2,rows/2),\
-                                          angle,scale)
+    rotationMat = cv2.getRotationMatrix2D((cols/2,rows/2),angle,scale)
     return rotationMat,scale
 
 def addImgBorder(img,border=255):
@@ -448,6 +461,11 @@ def printRoidbImageIds(roidb):
     for sample in roidb:
         print(sample['image'])
 
-
-
+def get_roidb(imdb_name):
+    from datasets.factory import get_repo_imdb
+    from core.train import get_training_roidb
+    imdb = get_repo_imdb(imdb_name)
+    print 'Loaded dataset `{:s}` for training'.format(imdb.name)
+    roidb = get_training_roidb(imdb)
+    return imdb, roidb
 

@@ -13,7 +13,7 @@ TRAIN:
    CLS:
       BATCH_SIZE: 10
    MAX_SIZE: 32
-   IMAGE_NOISE: True
+   IMAGE_NOISE: False
    SCALES: !!python/list [32,]
 TEST:
    BATCH_SIZE: 1

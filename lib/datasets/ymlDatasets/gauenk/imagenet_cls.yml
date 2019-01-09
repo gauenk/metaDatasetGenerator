@@ -4,7 +4,7 @@ PATH_TO_IMAGES: /home/gauenk/Documents/data/ilsvrc/ILSVRC/Data/CLS/
 PATH_TO_ANNOTATIONS: /home/gauenk/Documents/data/ilsvrc/ILSVRC/Annotations/CLS/
 PATH_TO_IMAGESETS: /home/gauenk/Documents/data/ilsvrc/ILSVRC/ImageSets/CLS/
 PATH_TO_RESULTS: /home/gauenk/Documents/data/ilsvrc/ILSVRC/cls_results/
-CLASSES: /home/gauenk/Documents/data/ilsvrc/ILSVRC/classes.txt
+CLASSES: /home/gauenk/Documents/data/ilsvrc/ILSVRC/cls_classes.txt
 COMPID: meaninglessPrefix
 IMAGE_TYPE: .JPEG
 ANNOTATION_TYPE: cls_txt

@@ -106,7 +106,7 @@ if __name__ == '__main__':
     args = parse_args()
     if args.cfg_file is not None:
         cfg_from_file(args.cfg_file)
-    cfg.ROTATE_IMAGE = args.rot
+    cfg.DATASET_AUGMENTATION.IMAGE_ROTATE = args.rot
 
     output_dir = os.path.abspath(args.output_dir[0])
     imdb_name = args.imdb_name

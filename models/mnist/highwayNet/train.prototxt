@@ -1,0 +1,1092 @@
+layer {
+  name: "input-data"
+  type: "Python"
+  top: "data"
+  top: "labels"
+  python_param {
+    module: "cls_data_layer.layer"
+    layer: "ClsDataLayer"
+    param_str: "\'num_classes\': 10"
+  }
+}
+layer {
+  name: "H-highway1"
+  type: "Convolution"
+  bottom: "data"
+  top: "H-highway1"
+  param {
+    lr_mult: 1.0
+  }
+  param {
+    lr_mult: 2.0
+  }
+  convolution_param {
+    num_output: 3
+    kernel_size: 5
+    stride: 1
+    weight_filler {
+      type: "xavier"
+    }
+    bias_filler {
+      type: "constant"
+    }
+    pad_h: 2
+    pad_w: 2
+  }
+}
+layer {
+  name: "reluH-highway1"
+  type: "ReLU"
+  bottom: "H-highway1"
+  top: "H-highway1"
+}
+layer {
+  name: "T-highway1"
+  type: "Convolution"
+  bottom: "data"
+  top: "T-highway1"
+  param {
+    lr_mult: 1.0
+  }
+  param {
+    lr_mult: 2.0
+  }
+  convolution_param {
+    num_output: 3
+    kernel_size: 5
+    stride: 1
+    weight_filler {
+      type: "xavier"
+    }
+    bias_filler {
+      type: "constant"
+      min: -3.0
+      max: -1.0
+    }
+    pad_h: 2
+    pad_w: 2
+  }
+}
+layer {
+  name: "sigmoidT-highway1"
+  type: "Sigmoid"
+  bottom: "T-highway1"
+  top: "T-highway1"
+}
+layer {
+  name: "C-highway1"
+  type: "Power"
+  bottom: "T-highway1"
+  top: "C-highway1"
+  power_param {
+    power: 1.0
+    scale: -1.0
+    shift: 1.0
+  }
+}
+layer {
+  name: "highway_prod_b-highway1"
+  type: "Eltwise"
+  bottom: "C-highway1"
+  bottom: "data"
+  top: "highway_prod_b-highway1"
+  eltwise_param {
+    operation: PROD
+  }
+}
+layer {
+  name: "highway_prod_a-highway1"
+  type: "Eltwise"
+  bottom: "T-highway1"
+  bottom: "H-highway1"
+  top: "highway_prod_a-highway1"
+  eltwise_param {
+    operation: PROD
+  }
+}
+layer {
+  name: "highway_sum-highway1"
+  type: "Eltwise"
+  bottom: "highway_prod_a-highway1"
+  bottom: "highway_prod_b-highway1"
+  top: "highway1-output"
+  eltwise_param {
+    operation: SUM
+  }
+}
+layer {
+  name: "H-highway2"
+  type: "Convolution"
+  bottom: "highway1-output"
+  top: "H-highway2"
+  param {
+    lr_mult: 1.0
+  }
+  param {
+    lr_mult: 2.0
+  }
+  convolution_param {
+    num_output: 3
+    kernel_size: 5
+    stride: 1
+    weight_filler {
+      type: "xavier"
+    }
+    bias_filler {
+      type: "constant"
+    }
+    pad_h: 2
+    pad_w: 2
+  }
+}
+layer {
+  name: "reluH-highway2"
+  type: "ReLU"
+  bottom: "H-highway2"
+  top: "H-highway2"
+}
+layer {
+  name: "T-highway2"
+  type: "Convolution"
+  bottom: "highway1-output"
+  top: "T-highway2"
+  param {
+    lr_mult: 1.0
+  }
+  param {
+    lr_mult: 2.0
+  }
+  convolution_param {
+    num_output: 3
+    kernel_size: 5
+    stride: 1
+    weight_filler {
+      type: "xavier"
+    }
+    bias_filler {
+      type: "constant"
+      min: -3.0
+      max: -1.0
+    }
+    pad_h: 2
+    pad_w: 2
+  }
+}
+layer {
+  name: "sigmoidT-highway2"
+  type: "Sigmoid"
+  bottom: "T-highway2"
+  top: "T-highway2"
+}
+layer {
+  name: "C-highway2"
+  type: "Power"
+  bottom: "T-highway2"
+  top: "C-highway2"
+  power_param {
+    power: 1.0
+    scale: -1.0
+    shift: 1.0
+  }
+}
+layer {
+  name: "highway_prod_b-highway2"
+  type: "Eltwise"
+  bottom: "C-highway2"
+  bottom: "data"
+  top: "highway_prod_b-highway2"
+  eltwise_param {
+    operation: PROD
+  }
+}
+layer {
+  name: "highway_prod_a-highway2"
+  type: "Eltwise"
+  bottom: "T-highway2"
+  bottom: "H-highway2"
+  top: "highway_prod_a-highway2"
+  eltwise_param {
+    operation: PROD
+  }
+}
+layer {
+  name: "highway_sum-highway2"
+  type: "Eltwise"
+  bottom: "highway_prod_a-highway2"
+  bottom: "highway_prod_b-highway2"
+  top: "highway2-output"
+  eltwise_param {
+    operation: SUM
+  }
+}
+layer {
+  name: "H-highway3"
+  type: "Convolution"
+  bottom: "highway2-output"
+  top: "H-highway3"
+  param {
+    lr_mult: 1.0
+  }
+  param {
+    lr_mult: 2.0
+  }
+  convolution_param {
+    num_output: 3
+    kernel_size: 5
+    stride: 1
+    weight_filler {
+      type: "xavier"
+    }
+    bias_filler {
+      type: "constant"
+    }
+    pad_h: 2
+    pad_w: 2
+  }
+}
+layer {
+  name: "reluH-highway3"
+  type: "ReLU"
+  bottom: "H-highway3"
+  top: "H-highway3"
+}
+layer {
+  name: "T-highway3"
+  type: "Convolution"
+  bottom: "highway2-output"
+  top: "T-highway3"
+  param {
+    lr_mult: 1.0
+  }
+  param {
+    lr_mult: 2.0
+  }
+  convolution_param {
+    num_output: 3
+    kernel_size: 5
+    stride: 1
+    weight_filler {
+      type: "xavier"
+    }
+    bias_filler {
+      type: "constant"
+      min: -3.0
+      max: -1.0
+    }
+    pad_h: 2
+    pad_w: 2
+  }
+}
+layer {
+  name: "sigmoidT-highway3"
+  type: "Sigmoid"
+  bottom: "T-highway3"
+  top: "T-highway3"
+}
+layer {
+  name: "C-highway3"
+  type: "Power"
+  bottom: "T-highway3"
+  top: "C-highway3"
+  power_param {
+    power: 1.0
+    scale: -1.0
+    shift: 1.0
+  }
+}
+layer {
+  name: "highway_prod_b-highway3"
+  type: "Eltwise"
+  bottom: "C-highway3"
+  bottom: "data"
+  top: "highway_prod_b-highway3"
+  eltwise_param {
+    operation: PROD
+  }
+}
+layer {
+  name: "highway_prod_a-highway3"
+  type: "Eltwise"
+  bottom: "T-highway3"
+  bottom: "H-highway3"
+  top: "highway_prod_a-highway3"
+  eltwise_param {
+    operation: PROD
+  }
+}
+layer {
+  name: "highway_sum-highway3"
+  type: "Eltwise"
+  bottom: "highway_prod_a-highway3"
+  bottom: "highway_prod_b-highway3"
+  top: "highway3-output"
+  eltwise_param {
+    operation: SUM
+  }
+}
+layer {
+  name: "H-highway4"
+  type: "Convolution"
+  bottom: "highway3-output"
+  top: "H-highway4"
+  param {
+    lr_mult: 1.0
+  }
+  param {
+    lr_mult: 2.0
+  }
+  convolution_param {
+    num_output: 3
+    kernel_size: 5
+    stride: 1
+    weight_filler {
+      type: "xavier"
+    }
+    bias_filler {
+      type: "constant"
+    }
+    pad_h: 2
+    pad_w: 2
+  }
+}
+layer {
+  name: "reluH-highway4"
+  type: "ReLU"
+  bottom: "H-highway4"
+  top: "H-highway4"
+}
+layer {
+  name: "T-highway4"
+  type: "Convolution"
+  bottom: "highway3-output"
+  top: "T-highway4"
+  param {
+    lr_mult: 1.0
+  }
+  param {
+    lr_mult: 2.0
+  }
+  convolution_param {
+    num_output: 3
+    kernel_size: 5
+    stride: 1
+    weight_filler {
+      type: "xavier"
+    }
+    bias_filler {
+      type: "constant"
+      min: -3.0
+      max: -1.0
+    }
+    pad_h: 2
+    pad_w: 2
+  }
+}
+layer {
+  name: "sigmoidT-highway4"
+  type: "Sigmoid"
+  bottom: "T-highway4"
+  top: "T-highway4"
+}
+layer {
+  name: "C-highway4"
+  type: "Power"
+  bottom: "T-highway4"
+  top: "C-highway4"
+  power_param {
+    power: 1.0
+    scale: -1.0
+    shift: 1.0
+  }
+}
+layer {
+  name: "highway_prod_b-highway4"
+  type: "Eltwise"
+  bottom: "C-highway4"
+  bottom: "data"
+  top: "highway_prod_b-highway4"
+  eltwise_param {
+    operation: PROD
+  }
+}
+layer {
+  name: "highway_prod_a-highway4"
+  type: "Eltwise"
+  bottom: "T-highway4"
+  bottom: "H-highway4"
+  top: "highway_prod_a-highway4"
+  eltwise_param {
+    operation: PROD
+  }
+}
+layer {
+  name: "highway_sum-highway4"
+  type: "Eltwise"
+  bottom: "highway_prod_a-highway4"
+  bottom: "highway_prod_b-highway4"
+  top: "highway4-output"
+  eltwise_param {
+    operation: SUM
+  }
+}
+layer {
+  name: "H-highway5"
+  type: "Convolution"
+  bottom: "highway4-output"
+  top: "H-highway5"
+  param {
+    lr_mult: 1.0
+  }
+  param {
+    lr_mult: 2.0
+  }
+  convolution_param {
+    num_output: 3
+    kernel_size: 5
+    stride: 1
+    weight_filler {
+      type: "xavier"
+    }
+    bias_filler {
+      type: "constant"
+    }
+    pad_h: 2
+    pad_w: 2
+  }
+}
+layer {
+  name: "reluH-highway5"
+  type: "ReLU"
+  bottom: "H-highway5"
+  top: "H-highway5"
+}
+layer {
+  name: "T-highway5"
+  type: "Convolution"
+  bottom: "highway4-output"
+  top: "T-highway5"
+  param {
+    lr_mult: 1.0
+  }
+  param {
+    lr_mult: 2.0
+  }
+  convolution_param {
+    num_output: 3
+    kernel_size: 5
+    stride: 1
+    weight_filler {
+      type: "xavier"
+    }
+    bias_filler {
+      type: "constant"
+      min: -3.0
+      max: -1.0
+    }
+    pad_h: 2
+    pad_w: 2
+  }
+}
+layer {
+  name: "sigmoidT-highway5"
+  type: "Sigmoid"
+  bottom: "T-highway5"
+  top: "T-highway5"
+}
+layer {
+  name: "C-highway5"
+  type: "Power"
+  bottom: "T-highway5"
+  top: "C-highway5"
+  power_param {
+    power: 1.0
+    scale: -1.0
+    shift: 1.0
+  }
+}
+layer {
+  name: "highway_prod_b-highway5"
+  type: "Eltwise"
+  bottom: "C-highway5"
+  bottom: "data"
+  top: "highway_prod_b-highway5"
+  eltwise_param {
+    operation: PROD
+  }
+}
+layer {
+  name: "highway_prod_a-highway5"
+  type: "Eltwise"
+  bottom: "T-highway5"
+  bottom: "H-highway5"
+  top: "highway_prod_a-highway5"
+  eltwise_param {
+    operation: PROD
+  }
+}
+layer {
+  name: "highway_sum-highway5"
+  type: "Eltwise"
+  bottom: "highway_prod_a-highway5"
+  bottom: "highway_prod_b-highway5"
+  top: "highway5-output"
+  eltwise_param {
+    operation: SUM
+  }
+}
+layer {
+  name: "H-highway6"
+  type: "Convolution"
+  bottom: "highway5-output"
+  top: "H-highway6"
+  param {
+    lr_mult: 1.0
+  }
+  param {
+    lr_mult: 2.0
+  }
+  convolution_param {
+    num_output: 3
+    kernel_size: 5
+    stride: 1
+    weight_filler {
+      type: "xavier"
+    }
+    bias_filler {
+      type: "constant"
+    }
+    pad_h: 2
+    pad_w: 2
+  }
+}
+layer {
+  name: "reluH-highway6"
+  type: "ReLU"
+  bottom: "H-highway6"
+  top: "H-highway6"
+}
+layer {
+  name: "T-highway6"
+  type: "Convolution"
+  bottom: "highway5-output"
+  top: "T-highway6"
+  param {
+    lr_mult: 1.0
+  }
+  param {
+    lr_mult: 2.0
+  }
+  convolution_param {
+    num_output: 3
+    kernel_size: 5
+    stride: 1
+    weight_filler {
+      type: "xavier"
+    }
+    bias_filler {
+      type: "constant"
+      min: -3.0
+      max: -1.0
+    }
+    pad_h: 2
+    pad_w: 2
+  }
+}
+layer {
+  name: "sigmoidT-highway6"
+  type: "Sigmoid"
+  bottom: "T-highway6"
+  top: "T-highway6"
+}
+layer {
+  name: "C-highway6"
+  type: "Power"
+  bottom: "T-highway6"
+  top: "C-highway6"
+  power_param {
+    power: 1.0
+    scale: -1.0
+    shift: 1.0
+  }
+}
+layer {
+  name: "highway_prod_b-highway6"
+  type: "Eltwise"
+  bottom: "C-highway6"
+  bottom: "data"
+  top: "highway_prod_b-highway6"
+  eltwise_param {
+    operation: PROD
+  }
+}
+layer {
+  name: "highway_prod_a-highway6"
+  type: "Eltwise"
+  bottom: "T-highway6"
+  bottom: "H-highway6"
+  top: "highway_prod_a-highway6"
+  eltwise_param {
+    operation: PROD
+  }
+}
+layer {
+  name: "highway_sum-highway6"
+  type: "Eltwise"
+  bottom: "highway_prod_a-highway6"
+  bottom: "highway_prod_b-highway6"
+  top: "highway6-output"
+  eltwise_param {
+    operation: SUM
+  }
+}
+layer {
+  name: "H-highway7"
+  type: "Convolution"
+  bottom: "highway6-output"
+  top: "H-highway7"
+  param {
+    lr_mult: 1.0
+  }
+  param {
+    lr_mult: 2.0
+  }
+  convolution_param {
+    num_output: 3
+    kernel_size: 5
+    stride: 1
+    weight_filler {
+      type: "xavier"
+    }
+    bias_filler {
+      type: "constant"
+    }
+    pad_h: 2
+    pad_w: 2
+  }
+}
+layer {
+  name: "reluH-highway7"
+  type: "ReLU"
+  bottom: "H-highway7"
+  top: "H-highway7"
+}
+layer {
+  name: "T-highway7"
+  type: "Convolution"
+  bottom: "highway6-output"
+  top: "T-highway7"
+  param {
+    lr_mult: 1.0
+  }
+  param {
+    lr_mult: 2.0
+  }
+  convolution_param {
+    num_output: 3
+    kernel_size: 5
+    stride: 1
+    weight_filler {
+      type: "xavier"
+    }
+    bias_filler {
+      type: "constant"
+      min: -3.0
+      max: -1.0
+    }
+    pad_h: 2
+    pad_w: 2
+  }
+}
+layer {
+  name: "sigmoidT-highway7"
+  type: "Sigmoid"
+  bottom: "T-highway7"
+  top: "T-highway7"
+}
+layer {
+  name: "C-highway7"
+  type: "Power"
+  bottom: "T-highway7"
+  top: "C-highway7"
+  power_param {
+    power: 1.0
+    scale: -1.0
+    shift: 1.0
+  }
+}
+layer {
+  name: "highway_prod_b-highway7"
+  type: "Eltwise"
+  bottom: "C-highway7"
+  bottom: "data"
+  top: "highway_prod_b-highway7"
+  eltwise_param {
+    operation: PROD
+  }
+}
+layer {
+  name: "highway_prod_a-highway7"
+  type: "Eltwise"
+  bottom: "T-highway7"
+  bottom: "H-highway7"
+  top: "highway_prod_a-highway7"
+  eltwise_param {
+    operation: PROD
+  }
+}
+layer {
+  name: "highway_sum-highway7"
+  type: "Eltwise"
+  bottom: "highway_prod_a-highway7"
+  bottom: "highway_prod_b-highway7"
+  top: "highway7-output"
+  eltwise_param {
+    operation: SUM
+  }
+}
+layer {
+  name: "H-highway8"
+  type: "Convolution"
+  bottom: "highway7-output"
+  top: "H-highway8"
+  param {
+    lr_mult: 1.0
+  }
+  param {
+    lr_mult: 2.0
+  }
+  convolution_param {
+    num_output: 3
+    kernel_size: 5
+    stride: 1
+    weight_filler {
+      type: "xavier"
+    }
+    bias_filler {
+      type: "constant"
+    }
+    pad_h: 2
+    pad_w: 2
+  }
+}
+layer {
+  name: "reluH-highway8"
+  type: "ReLU"
+  bottom: "H-highway8"
+  top: "H-highway8"
+}
+layer {
+  name: "T-highway8"
+  type: "Convolution"
+  bottom: "highway7-output"
+  top: "T-highway8"
+  param {
+    lr_mult: 1.0
+  }
+  param {
+    lr_mult: 2.0
+  }
+  convolution_param {
+    num_output: 3
+    kernel_size: 5
+    stride: 1
+    weight_filler {
+      type: "xavier"
+    }
+    bias_filler {
+      type: "constant"
+      min: -3.0
+      max: -1.0
+    }
+    pad_h: 2
+    pad_w: 2
+  }
+}
+layer {
+  name: "sigmoidT-highway8"
+  type: "Sigmoid"
+  bottom: "T-highway8"
+  top: "T-highway8"
+}
+layer {
+  name: "C-highway8"
+  type: "Power"
+  bottom: "T-highway8"
+  top: "C-highway8"
+  power_param {
+    power: 1.0
+    scale: -1.0
+    shift: 1.0
+  }
+}
+layer {
+  name: "highway_prod_b-highway8"
+  type: "Eltwise"
+  bottom: "C-highway8"
+  bottom: "data"
+  top: "highway_prod_b-highway8"
+  eltwise_param {
+    operation: PROD
+  }
+}
+layer {
+  name: "highway_prod_a-highway8"
+  type: "Eltwise"
+  bottom: "T-highway8"
+  bottom: "H-highway8"
+  top: "highway_prod_a-highway8"
+  eltwise_param {
+    operation: PROD
+  }
+}
+layer {
+  name: "highway_sum-highway8"
+  type: "Eltwise"
+  bottom: "highway_prod_a-highway8"
+  bottom: "highway_prod_b-highway8"
+  top: "highway8-output"
+  eltwise_param {
+    operation: SUM
+  }
+}
+layer {
+  name: "H-highway9"
+  type: "Convolution"
+  bottom: "highway8-output"
+  top: "H-highway9"
+  param {
+    lr_mult: 1.0
+  }
+  param {
+    lr_mult: 2.0
+  }
+  convolution_param {
+    num_output: 3
+    kernel_size: 5
+    stride: 1
+    weight_filler {
+      type: "xavier"
+    }
+    bias_filler {
+      type: "constant"
+    }
+    pad_h: 2
+    pad_w: 2
+  }
+}
+layer {
+  name: "reluH-highway9"
+  type: "ReLU"
+  bottom: "H-highway9"
+  top: "H-highway9"
+}
+layer {
+  name: "T-highway9"
+  type: "Convolution"
+  bottom: "highway8-output"
+  top: "T-highway9"
+  param {
+    lr_mult: 1.0
+  }
+  param {
+    lr_mult: 2.0
+  }
+  convolution_param {
+    num_output: 3
+    kernel_size: 5
+    stride: 1
+    weight_filler {
+      type: "xavier"
+    }
+    bias_filler {
+      type: "constant"
+      min: -3.0
+      max: -1.0
+    }
+    pad_h: 2
+    pad_w: 2
+  }
+}
+layer {
+  name: "sigmoidT-highway9"
+  type: "Sigmoid"
+  bottom: "T-highway9"
+  top: "T-highway9"
+}
+layer {
+  name: "C-highway9"
+  type: "Power"
+  bottom: "T-highway9"
+  top: "C-highway9"
+  power_param {
+    power: 1.0
+    scale: -1.0
+    shift: 1.0
+  }
+}
+layer {
+  name: "highway_prod_b-highway9"
+  type: "Eltwise"
+  bottom: "C-highway9"
+  bottom: "data"
+  top: "highway_prod_b-highway9"
+  eltwise_param {
+    operation: PROD
+  }
+}
+layer {
+  name: "highway_prod_a-highway9"
+  type: "Eltwise"
+  bottom: "T-highway9"
+  bottom: "H-highway9"
+  top: "highway_prod_a-highway9"
+  eltwise_param {
+    operation: PROD
+  }
+}
+layer {
+  name: "highway_sum-highway9"
+  type: "Eltwise"
+  bottom: "highway_prod_a-highway9"
+  bottom: "highway_prod_b-highway9"
+  top: "highway9-output"
+  eltwise_param {
+    operation: SUM
+  }
+}
+layer {
+  name: "H-highway10"
+  type: "Convolution"
+  bottom: "highway9-output"
+  top: "H-highway10"
+  param {
+    lr_mult: 1.0
+  }
+  param {
+    lr_mult: 2.0
+  }
+  convolution_param {
+    num_output: 3
+    kernel_size: 5
+    stride: 1
+    weight_filler {
+      type: "xavier"
+    }
+    bias_filler {
+      type: "constant"
+    }
+    pad_h: 2
+    pad_w: 2
+  }
+}
+layer {
+  name: "reluH-highway10"
+  type: "ReLU"
+  bottom: "H-highway10"
+  top: "H-highway10"
+}
+layer {
+  name: "T-highway10"
+  type: "Convolution"
+  bottom: "highway9-output"
+  top: "T-highway10"
+  param {
+    lr_mult: 1.0
+  }
+  param {
+    lr_mult: 2.0
+  }
+  convolution_param {
+    num_output: 3
+    kernel_size: 5
+    stride: 1
+    weight_filler {
+      type: "xavier"
+    }
+    bias_filler {
+      type: "constant"
+      min: -3.0
+      max: -1.0
+    }
+    pad_h: 2
+    pad_w: 2
+  }
+}
+layer {
+  name: "sigmoidT-highway10"
+  type: "Sigmoid"
+  bottom: "T-highway10"
+  top: "T-highway10"
+}
+layer {
+  name: "C-highway10"
+  type: "Power"
+  bottom: "T-highway10"
+  top: "C-highway10"
+  power_param {
+    power: 1.0
+    scale: -1.0
+    shift: 1.0
+  }
+}
+layer {
+  name: "highway_prod_b-highway10"
+  type: "Eltwise"
+  bottom: "C-highway10"
+  bottom: "data"
+  top: "highway_prod_b-highway10"
+  eltwise_param {
+    operation: PROD
+  }
+}
+layer {
+  name: "highway_prod_a-highway10"
+  type: "Eltwise"
+  bottom: "T-highway10"
+  bottom: "H-highway10"
+  top: "highway_prod_a-highway10"
+  eltwise_param {
+    operation: PROD
+  }
+}
+layer {
+  name: "highway_sum-highway10"
+  type: "Eltwise"
+  bottom: "highway_prod_a-highway10"
+  bottom: "highway_prod_b-highway10"
+  top: "highway10-output"
+  eltwise_param {
+    operation: SUM
+  }
+}
+layer {
+  name: "cls_score"
+  type: "InnerProduct"
+  bottom: "highway10-output"
+  top: "cls_score"
+  param {
+    lr_mult: 1.0
+  }
+  param {
+    lr_mult: 2.0
+  }
+  inner_product_param {
+    num_output: 10
+    weight_filler {
+      type: "xavier"
+    }
+    bias_filler {
+      type: "constant"
+    }
+  }
+}
+layer {
+  name: "loss_cls"
+  type: "SoftmaxWithLoss"
+  bottom: "cls_score"
+  bottom: "labels"
+  top: "loss_cls"
+  loss_weight: 1.0
+  propagate_down: true
+  propagate_down: false
+}

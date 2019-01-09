@@ -2,17 +2,15 @@
 
 import matplotlib
 matplotlib.use('Agg')
-import matplotlib.pyplot as plt
-import matplotlib.patches as mpatches
 
 import _init_paths
 
-
-from fresh_plot import init_plot,add_plot_data,mangle_plot_name
-from fresh_config import cfg,create_model_name,create_model_path,reset_model_name
-from fresh_util import Cache,transpose_measures,get_unique_strings,find_experiment_changes
+from fresh_plot import analyze_expfield_results
+from fresh_util import Cache
+from fresh_config import cfg,cfgForCaching,create_model_name,create_model_path,update_config,cfg_from_file
 from fresh import compute_kmean_measures_FOR_model_data_combos
 
+import argparse,sys
 from copy import deepcopy
 from easydict import EasyDict as edict
 import numpy as np
@@ -25,230 +23,82 @@ def generate_experiments_across_iterations():
     # architecture_list = ['lenet5','zf','vgg16','resNet_small']
     #train_set_list = ['cifar_10','mnist']
     architecture_list = ['lenet5']
-    train_set_list = ['cifar_10']
+    # train_set_list = ['cifar_10-train-default','mnist-train-default']
+    train_set_list = ['mnist-train-default']
+    test_set_dict ={
+        'cifar_10':['cifar_10-train-default','cifar_10-val-default'],
+        'mnist':['mnist-train-default','mnist-test-default'],
+    }
+
     # iterations_list = np.arange(0,1000000+1,25000)[1:]
-    iterations_list = [(idx+1)*10000 for idx in range(10)]
+    iterations_list = [(idx+1)*20000 for idx in range(5)]
     # iterations_list = np.arange(0,1000000+1,500000)[1:]
     #prune_list = ['noPrune','yesPrune10','yesPrune100','yesPrune200']
-    prune_list = ['noPrune']
-    image_noise_list = ['yesImageNoise']
+    prune_list = [False]
+    image_noise_list = [False]
+    optim_list = ['adam']
+    ds_aug_list = ['25-0','10-0',False]
 
     modelInfo_list = []
     expConfig = edict()
+    expConfig.data = edict()
     expConfig.modelInfo = edict()
     modelInfo = expConfig.modelInfo
-    for image_noise in image_noise_list:
-        for prune in prune_list:
-            for architecture in architecture_list:
-                for train_set in train_set_list:
-                    for iterations in iterations_list:
-                        modelInfo.iterations = iterations
-                        modelInfo.train_set = train_set
-                        modelInfo.architecture = architecture
-                        modelInfo.prune = prune
-                        modelInfo.image_noise = image_noise
-                        modelInfo.name = create_model_name(modelInfo)
-                        modelInfo.path = create_model_path(modelInfo)
-                        modelInfo_list.append(deepcopy(expConfig))
+    for architecture in architecture_list:
+        for train_set in train_set_list:
+            train_set_name = train_set.split('-')[0]
+            for test_set in test_set_dict[train_set_name]:
+                for optim in optim_list:
+                    for image_noise in image_noise_list:
+                        for prune in prune_list:
+                            for ds_aug in ds_aug_list:
+                                for iterations in iterations_list:
+                                    expConfig.data.train_imdb = train_set
+                                    expConfig.data.test_imdb = test_set
+                                    modelInfo.iterations = iterations
+                                    modelInfo.train_set = train_set_name
+                                    modelInfo.architecture = architecture
+                                    modelInfo.prune = prune
+                                    modelInfo.image_noise = image_noise
+                                    modelInfo.optim = optim
+                                    modelInfo.dataset_augmentation = ds_aug
+                                    modelInfo.classFilter = False
+                                    modelInfo.name = create_model_name(modelInfo)
+                                    modelInfo.path = create_model_path(modelInfo)
+                                    modelInfo_list.append(deepcopy(expConfig))
     return modelInfo_list
 
-def update_config(input_cfg,experiment_config):
-    for key,value in experiment_config.items():
-        if key not in input_cfg.keys(): raise ValueError("key [{}] not in original configuration".format(key))
-        if type(value) is edict: update_config(input_cfg[key],value)
-        input_cfg[key] = value
 
-def what_changed(new_cfg,old_cfg):
-    for key,old_value in old_cfg.items():
-        if key is 'name': continue
-        new_value = new_cfg[key]
-        if key not in new_cfg.keys(): raise ValueError("key [{}] not in original configuration".format(key))
-        if type(old_value) is edict: 
-            a,b = what_changed(new_value,old_value)
-            if a is not None: return a,b
-        if old_value != new_value: return key,new_value
-    return None,None
-
-def analyze_expfield_results(train_results,test_results,exp_configs,expfield_filter,kmeans_search_list):
-    measure_name_dict = {'cluster':['silhouette','homogeneity_ds_labels','homogeneity_correct'],
-                         'separability':['separability_ds_labels','separability_ds_correct']}
-    change_field = find_experiment_changes(exp_configs)    
-    fieldname_list = [field[0] for field in change_field]
-    unique_changes = get_unique_strings(fieldname_list)
+def get_generalization_error_information(train_msrs,test_msrs,exp_config):
+    measure_name_dict = cfg.measure_name_dict
     marker_list = cfg.plot.marker_list
+    unique_changes = get_unique_experiment_field_change(exp_configs)
     marker_index = dict.fromkeys(unique_changes,0)
-    print(marker_index)
     plot_dict = {}
-    handle_dict = {}
-    for field_index,exp_config in enumerate(exp_configs):
-        # update to exp_config
-        old_cfg = deepcopy(cfg)
-        update_config(cfg,exp_config)
-        fieldname,fieldvalue = what_changed(cfg,old_cfg)
-        if fieldname != expfield_filter: continue
-        reset_model_name()
+    
+    pass
 
-        # update to exp_config
-        train_msrs,test_msrs = train_results[field_index],test_results[field_index]
-        print(fieldname)
-        print(train_msrs)
-        # if fieldname not in handle_dict.keys(): handle_dict[fieldname] = {}
-        for measure_type in train_msrs.keys():
-            msr_dict_type = measure_name_dict[measure_type]
-            print("----------------------------------")
-            print(msr_dict_type)
-            print("^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^")
-            print(train_msrs[measure_type])
-            print(test_msrs[measure_type])
-            tr_type_t,tr_msr_name_t = transpose_measures(train_msrs[measure_type],msr_dict_type)
-            te_type_t,te_msr_name_t = transpose_measures(test_msrs[measure_type],msr_dict_type)
-            print("************************************")
-            # always in the same order
-            for tr_msr,te_msr in zip(tr_msr_name_t,te_msr_name_t):
-                assert tr_msr == te_msr,"train/test is not the same order"
-            print("====================================")
-            for tr_msr,te_msr,msr_name in zip(tr_type_t,te_type_t,tr_msr_name_t):
-                plot_title = mangle_plot_name(cfg.modelInfo,fieldname)
-                # if msr_name not in handle_dict[fieldname].keys(): handle_dict[fieldname][msr_name] = []
-                if msr_name not in plot_dict.keys(): init_plot(plot_dict,plot_title,msr_name)
-                add_plot_data(plot_dict,msr_name,tr_msr,fieldname,fieldvalue,'train',marker_list[marker_index[fieldname]],kmeans_search_list)
-                add_plot_data(plot_dict,msr_name,te_msr,fieldname,fieldvalue,'test',marker_list[marker_index[fieldname]],kmeans_search_list)
-        marker_index[fieldname] += 1
-
-    for exp_change in unique_changes:
-    # for exp_config in exp_configs:
-        # update to exp_config
-        # old_cfg = deepcopy(cfg)
-        # update_config(cfg,exp_config)
-        # fieldname,fieldvalue = what_changed(cfg,old_cfg)
-        # if fieldname != expfield_filter: continue
-        # reset_model_name()
-        for measure_type in train_msrs.keys():
-            msr_dict_type = measure_name_dict[measure_type]
-            _,tr_msr_name_t = transpose_measures(train_msrs[measure_type],msr_dict_type)
-            _,te_msr_name_t = transpose_measures(test_msrs[measure_type],msr_dict_type)
-            for tr_msr,te_msr in zip(tr_msr_name_t,te_msr_name_t):
-                assert tr_msr == te_msr,"train/test is not the same order"
-            for msr_name in tr_msr_name_t:
-                if msr_name not in plot_dict.keys(): init_plot(plot_dict,msr_name)
-                save_name = msr_name+'_'+ exp_change + '.png'
-                ylim = plot_dict[msr_name][1].get_ylim()
-                xlim = plot_dict[msr_name][1].get_xlim()
-                ylim = [ylim[0]-.01*ylim[1],1.01*ylim[1]]
-                xlim = [xlim[0]-.05*xlim[1],1.05*xlim[1]]
-                # train_handle, = plot_dict[msr_name][1].plot(None,None,'b')
-                # test_handle, = plot_dict[msr_name][1].plot(None,None,'r')
-                # train_test_legend = plt.legend([train_handle,test_handle],['train','test'])
-                # lines = [matplotlib.lines.Line2D([0], [0], color=c, linewidth=3, linestyle='--') for c in ['b','r']]
-                # train_test_legend = plt.legend(lines,['train','test'])
-                # plot_dict[msr_name][1].add_artist(train_test_legend)
-                train_patch = mpatches.Patch(color='blue',label='train')
-                test_patch = mpatches.Patch(color='green',label='test')
-                plot_dict[msr_name][1].set_ylim(ylim)
-                plot_dict[msr_name][1].set_xlim(xlim)
-                plot_dict[msr_name][0].subplots_adjust(right=0.7)
-                plot_dict[msr_name][0].tight_layout(rect=[0,0,0.75,1])
-                plot_handles = [train_patch,test_patch]
-                plot_labels = ['train','test']
-                handles,labels = plot_dict[msr_name][1].get_legend_handles_labels()
-                plot_handles += handles
-                plot_labels += labels
-                plot_dict[msr_name][1].legend(handles=plot_handles,labels=plot_labels,loc='center left', bbox_to_anchor=(1, 0.5), title=exp_change)
-                plot_dict[msr_name][0].savefig(save_name,bbox_inches='tight')
-
-
-def analyze_expfield_results2(train_results,test_results,exp_configs,expfield_filter,kmeans_search_list):
-    measure_name_dict = {'cluster':['silhouette','homogeneity_ds_labels','homogeneity_correct'],
-                         'separability':['separability_ds_labels','separability_ds_correct']}
-    change_field = find_experiment_changes(exp_configs)    
-    fieldname_list = [field[0] for field in change_field]
-    unique_changes = get_unique_strings(fieldname_list)
-    marker_list = ['o','v','^','<','>','8','s','p','h','H','+','x','X','D','d']
-    marker_index = dict.fromkeys(unique_changes,0)
-    print(marker_index)
-    plot_dict = {}
-    handle_dict = {}
-    for field_index,exp_config in enumerate(exp_configs):
-        # update to exp_config
-        old_cfg = deepcopy(cfg)
-        update_config(cfg,exp_config)
-        fieldname,fieldvalue = what_changed(cfg,old_cfg)
-        if fieldname != expfield_filter: continue
-        reset_model_name()
-
-        # update to exp_config
-        train_msrs,test_msrs = train_results[field_index],test_results[field_index]
-        print(fieldname)
-        print(train_msrs)
-        # if fieldname not in handle_dict.keys(): handle_dict[fieldname] = {}
-        for measure_type in train_msrs.keys():
-            msr_dict_type = measure_name_dict[measure_type]
-            print("----------------------------------")
-            print(msr_dict_type)
-            print("^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^")
-            print(train_msrs[measure_type])
-            print(test_msrs[measure_type])
-            tr_type_t,tr_msr_name_t = transpose_measures(train_msrs[measure_type],msr_dict_type)
-            te_type_t,te_msr_name_t = transpose_measures(test_msrs[measure_type],msr_dict_type)
-            print("************************************")
-            # always in the same order
-            for tr_msr,te_msr in zip(tr_msr_name_t,te_msr_name_t):
-                assert tr_msr == te_msr,"train/test is not the same order"
-            print("====================================")
-            for tr_msr,te_msr,msr_name in zip(tr_type_t,te_type_t,tr_msr_name_t):
-                # if msr_name not in handle_dict[fieldname].keys(): handle_dict[fieldname][msr_name] = []
-                if msr_name not in plot_dict.keys(): init_plot(plot_dict,fieldname,msr_name)
-                add_plot_data(plot_dict,msr_name,tr_msr,fieldname,fieldvalue,'train',marker_list[marker_index[fieldname]],kmeans_search_list)
-                add_plot_data(plot_dict,msr_name,te_msr,fieldname,fieldvalue,'test',marker_list[marker_index[fieldname]],kmeans_search_list)
-        marker_index[fieldname] += 1
-
-    for exp_change in unique_changes:
-    # for exp_config in exp_configs:
-        # update to exp_config
-        # old_cfg = deepcopy(cfg)
-        # update_config(cfg,exp_config)
-        # fieldname,fieldvalue = what_changed(cfg,old_cfg)
-        # if fieldname != expfield_filter: continue
-        # reset_model_name()
-        for measure_type in train_msrs.keys():
-            msr_dict_type = measure_name_dict[measure_type]
-            _,tr_msr_name_t = transpose_measures(train_msrs[measure_type],msr_dict_type)
-            _,te_msr_name_t = transpose_measures(test_msrs[measure_type],msr_dict_type)
-            for tr_msr,te_msr in zip(tr_msr_name_t,te_msr_name_t):
-                assert tr_msr == te_msr,"train/test is not the same order"
-            for msr_name in tr_msr_name_t:
-                if msr_name not in plot_dict.keys(): init_plot(plot_dict,msr_name)
-                save_name = msr_name+'_'+ exp_change + '.png'
-                ylim = plot_dict[msr_name][1].get_ylim()
-                xlim = plot_dict[msr_name][1].get_xlim()
-                ylim = [ylim[0]-.01*ylim[1],1.01*ylim[1]]
-                xlim = [xlim[0]-.05*xlim[1],1.05*xlim[1]]
-                # train_handle, = plot_dict[msr_name][1].plot(None,None,'b')
-                # test_handle, = plot_dict[msr_name][1].plot(None,None,'r')
-                # train_test_legend = plt.legend([train_handle,test_handle],['train','test'])
-                # lines = [matplotlib.lines.Line2D([0], [0], color=c, linewidth=3, linestyle='--') for c in ['b','r']]
-                # train_test_legend = plt.legend(lines,['train','test'])
-                # plot_dict[msr_name][1].add_artist(train_test_legend)
-                train_patch = mpatches.Patch(color='blue',label='train')
-                test_patch = mpatches.Patch(color='green',label='test')
-                plot_dict[msr_name][1].set_ylim(ylim)
-                plot_dict[msr_name][1].set_xlim(xlim)
-                plot_dict[msr_name][0].subplots_adjust(right=0.7)
-                plot_dict[msr_name][0].tight_layout(rect=[0,0,0.75,1])
-                plot_handles = [train_patch,test_patch]
-                plot_labels = ['train','test']
-                handles,labels = plot_dict[msr_name][1].get_legend_handles_labels()
-                plot_handles += handles
-                plot_labels += labels
-                plot_dict[msr_name][1].legend(handles=plot_handles,labels=plot_labels,loc='center left', bbox_to_anchor=(1, 0.5))
-                plot_dict[msr_name][0].savefig(save_name)
-
-
+def parse_args():
+    parser = argparse.ArgumentParser(description='Train a model')
+    parser.add_argument('--cfg', dest='cfg_file',help='optional config file',type=str)
+    if len(sys.argv) == 1:
+        parser.print_help()
+        sys.exit(1)
+    args = parser.parse_args()
+    return args
+    
 
 if __name__ == "__main__":
     print("This file is provided for mangling the results from:")
     print("-> the optimal_k process from fresh.py")
     print("-> the separability of the original model on each dataset")
+
+    args = parse_args()
+    print('Called with args:')
+    print(args)
+    if args.cfg_file is not None:
+        print("SET CFG FILE")
+        cfg_from_file(args.cfg_file)
 
     # get experiment list
     experiment_configs = generate_experiments_across_iterations()
@@ -258,14 +108,15 @@ if __name__ == "__main__":
     # pp(experiment_configs)
 
     # start cache
-    expCache = Cache("experiment_results.pkl",cfg,'results')
+    fn = "experiment_results.pkl"
+    # fn = 'output/fresh/pairs_no_conv1/experiment_results.pkl'
+    expCache = Cache(fn,cfgForCaching,'results')
 
     # run experiments
     train_results = []
     test_results = []
     for experiment in experiment_configs:
         update_config(cfg,experiment)
-        print(cfg)
         # caching: already computed? 
         expCache.config = cfg
         results = expCache.load()

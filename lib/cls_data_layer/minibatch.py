@@ -11,37 +11,38 @@ import numpy as np
 import numpy.random as npr
 import cv2,sys
 from core.config import cfg
+from core.config import formatDatasetAugmentationForGetRawCroppedImage
 from utils.blob import prep_im_for_blob, im_list_to_blob, getRawImageBlob, getCroppedImageBlob, createInfoBlob, addImageNoise, save_blob_list_to_file
 from datasets.ds_utils import cropImageToAnnoRegion
 import matplotlib.pyplot as plt
 
-def get_minibatch(roidb, records, num_classes):
+def get_minibatch(roidb, records, num_classes, augmentation_inds, da_bools):
     """Given a roidb, construct a minibatch sampled from it."""
     num_images = len(roidb)
     # Sample random scales to use for each image in this batch
-    random_scale_inds = npr.randint(0, high=len(cfg.TRAIN.SCALES),
-                                    size=num_images)
-    assert(cfg.TRAIN.BATCH_SIZE % num_images == 0), \
-        'num_images ({}) must divide BATCH_SIZE ({})'. \
-        format(num_images, cfg.TRAIN.OBJ_DET.BATCH_SIZE)
+    random_scale_inds = npr.randint(0, high=len(cfg.TRAIN.SCALES),size=num_images)
+    assert(cfg.TRAIN.BATCH_SIZE % num_images == 0),'num_images ({}) must divide BATCH_SIZE ({})'.format(num_images, cfg.TRAIN.OBJ_DET.BATCH_SIZE)
 
     # Get the input image blob, formatted for caffe
+    da_input_dict = formatDatasetAugmentationForGetRawCroppedImage(cfg.DATASET_AUGMENTATION.CONFIGS,augmentation_inds)
     if cfg.SUBTASK == "tp_fn":
-        im_data, im_scales = getCroppedImageBlob(roidb, records, random_scale_inds)
+        im_data, im_scales = getCroppedImageBlob(roidb, records, random_scale_inds,dataset_augmentation=da_input_dict,dataset_augmentation_bool=da_bools)
     else:
-        im_data, im_scales = getRawImageBlob(roidb, records, random_scale_inds)
+        im_data, im_scales = getRawImageBlob(roidb, records, random_scale_inds,dataset_augmentation=da_input_dict,dataset_augmentation_bool=da_bools)
     im_info = createInfoBlob(im_data,im_scales)
-    if cfg.TRAIN.IMAGE_NOISE: addImageNoise(im_info)
+    if cfg.DATASET_AUGMENTATION.IMAGE_NOISE: addImageNoise(im_info)
+    # print(da_bools)
+    # print(augmentation_inds)
+    # print(len(roidb))
 
     blobs = {'data': im_info['data']}
-
     if cfg.SUBTASK == "tp_fn":
         blobs['labels'] = np.array(records)
     else:
         blobs['labels'] = np.array([ elem['gt_classes'] for elem in roidb ])
 
     # print(blobs['labels'])
-    save_blob_list_to_file(im_info['data'],'',vis=False)
+    # save_blob_list_to_file(im_info['data'],'',vis=False)
 
     # blobs['im_info'] = np.array(
     #     [[im_blob.shape[2], im_blob.shape[3], im_scales[0]]],

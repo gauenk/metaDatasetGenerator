@@ -43,18 +43,6 @@ def clusterDataToCreateRouteFromActicationsSet(data,params,clusterCacheStr):
         cluster,values,index = createClusterDataToCreateRouteFromActicationsSet(data,params,clusterCacheStr)
     return cluster,values,index
 
-def averageDataToCreateRouteFromActicationsSet(activations):
-    # conv layers are ordered by channel; weights are along channel, not across
-    if 'conv' in layerName:
-        mean = np.mean(activations,axis=(0,1)).ravel()
-        index = np.argsort(-np.abs(mean))
-        values = mean.ravel()
-    else:
-        mean = np.mean(activations,axis=0)
-        index = np.argsort(-np.abs(mean))
-        values = mean.ravel()
-    return cluster,values,index
-
 def createClusterDataToCreateRouteFromActicationsSet(data,params,clusterCacheStr):
     clusterData = data.reshape((data.shape[0],-1))
     clusterType = cfg.routingAnalysisInfo.densityEstimation.clusterTypeStr
@@ -68,6 +56,25 @@ def createClusterDataToCreateRouteFromActicationsSet(data,params,clusterCacheStr
     saveClusterCache(cluster,params,clusterCacheStr)
     return cluster,values,index
 
+def clusterWithKMeans(data,clusterParams):
+    printStartClusteringInformation(clusterParams)
+    kmeans = sk_cluster.KMeans(n_clusters=clusterParams['nClusters']).fit(data)
+    # aggregateKmeansCluster(kmeans,clusterData)
+    values,index = routeValuesAndIndexFromKMeans(kmeans,clusterParams)
+    return kmeans,values,index
+
+def averageDataToCreateRouteFromActicationsSet(activations):
+    # conv layers are ordered by channel; weights are along channel, not across
+    if 'conv' in layerName:
+        mean = np.mean(activations,axis=(0,1)).ravel()
+        index = np.argsort(-np.abs(mean))
+        values = mean.ravel()
+    else:
+        mean = np.mean(activations,axis=0)
+        index = np.argsort(-np.abs(mean))
+        values = mean.ravel()
+    return cluster,values,index
+
 def aggregateKmeansCluster(kmeans,data):
     print("[aggregateKmeansCluster]: What does bureaucracy and me have in common? We dont do anything")
     distance_data = kmeans.transform(data)
@@ -76,12 +83,6 @@ def aggregateKmeansCluster(kmeans,data):
     print(distance_data[:10])
     print(distance_data[-10:])
 
-def clusterWithKMeans(data,clusterParams):
-    printStartClusteringInformation(clusterParams)
-    kmeans = sk_cluster.KMeans(n_clusters=clusterParams['nClusters']).fit(data)
-    # aggregateKmeansCluster(kmeans,clusterData)
-    values,index = routeValuesAndIndexFromKMeans(kmeans,clusterParams)
-    return kmeans,values,index
 
 def printStartClusteringInformation(clusterParams):
     clusterType = cfg.routingAnalysisInfo.densityEstimation.clusterTypeStr

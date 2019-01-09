@@ -7,12 +7,15 @@
 
 """Blob helper functions."""
 
+from utils.misc import toRadians
+from utils.base import scaleImage
 from core.config import cfg
 from datasets.ds_utils import cropImageToAnnoRegion
 import numpy as np
 import numpy.random as npr
-import cv2
+import cv2,uuid
 import matplotlib.pyplot as plt
+from utils.misc import getRotationInfo
 
 def im_list_to_blob(ims):
     """Convert a list of images into a network input.
@@ -146,13 +149,13 @@ def _get_image_blob(im,scale_inds):
                             interpolation=cv2.INTER_LINEAR)
             M = None
             if cfg._DEBUG.core.test: print("[pre-process] im.shape",im.shape)
-            if cfg.ROTATE_IMAGE != -1:
-            #if cfg.ROTATE_IMAGE !=  0:
+            if cfg.DATASET_AUGMENTATION.IMAGE_ROTATE != -1:
                 rows,cols = im.shape[:2]
                 if cfg._DEBUG.core.test: print("cols,rows",cols,rows)
-                rotationMat, scale = getRotationInfo(cfg.ROTATE_IMAGE,cols,rows)
+                rotationMat, scale = getRotationInfo(cfg.DATASET_AUGMENTATION.IMAGE_ROTATE,\
+                                                     cols,rows)
                 im = cv2.warpAffine(im,rotationMat,(cols,rows),scale)
-                im_rotate_factors.append([cfg.ROTATE_IMAGE,cols,rows,im_shape])
+                im_rotate_factors.append([cfg.DATASET_AUGMENTATION.IMAGE_ROTATE,cols,rows,im_shape])
             if cfg.SSD == True:
                 im_scale_factors.append([im_scale_x,im_scale_y])
             else:
@@ -181,16 +184,78 @@ def _get_cropped_image_blob(roidb, records, scale_inds):
     """
     return getRawCroppedImageBlob(roidb, records, scale_inds,True)
 
-def getRawImageBlob(roidb,records,scale_inds):
-    return getRawCroppedImageBlob(roidb,records,scale_inds,False)
-    
-def getCroppedImageBlob(roidb,records,scale_inds):
-    return getRawCroppedImageBlob(roidb,records,scale_inds,True)
 
-def getRawCroppedImageBlob(roidb,records,scale_inds,getCropped):
+def rotateImage(img,angle):
+    # print('angle',angle)
+    im_shape = img.shape
+    rows,cols = img.shape[:2]
+    rotationMat, scale = getRotationInfo(angle,cols,rows)
+    img = cv2.warpAffine(img,rotationMat,(cols,rows),scale)
+    rotateInfo = [angle,cols,rows,im_shape]
+    return img,rotateInfo
+
+def translateImage(img,step,direction):
+    if direction == 'u': x_step,y_step=0,step
+    elif direction == 'd': x_step,y_step=0,-step
+    elif direction == 'l': x_step,y_step=-step,0
+    elif direction == 'r': x_step,y_step=step,0
+    else: raise ValueError("[translateImage]: direction not found")
+    im_shape = img.shape
+    rows,cols = img.shape[:2]
+    scale = 1.0
+    translateMat = np.array([[1,0,x_step],[0,1,y_step]],dtype=np.float)
+    # print(translateMat)
+    timg = cv2.warpAffine(img,translateMat,(cols,rows),scale)
+    translateInfo = [step,cols,rows,im_shape]
+    return timg,translateInfo
+
+def cropImage(img,step):
+    img_shape = img.shape
+    if step == 0: return img
+    # print("[cropImage]",step)
+    timg = img[step:-step,step:-step,:]
+    timg = scaleImage(timg,img_shape[0])
+    return timg
+
+def applyDatasetAugmentation(input_img,config):
+    transforms = config['transformations']
+    rotateInfo,translateInfo,cropInfo = transforms
+    img = input_img.copy()
+    img,_ = translateImage(img,translateInfo['step'],translateInfo['direction'])
+    img,_ = rotateImage(img,rotateInfo['angle'])
+    img = cropImage(img,cropInfo['step'])
+    return img
+
+def applyDatasetAugmentationList(input_img,configs):
+    # we need a 'mesh' of transformations to use;
+    # this should be (sent in as):
+    # (i) fix it from random for all images in the dataset
+    # (ii) fix it from random for all images in a batch
+    # (iii) fix it from random for each image 
+    # (iv) exhaustive list of all transformations for each image
+    img_index = 0
+    transform_img_list = [ None for _ in range(len(configs['transformations'][0])) ]
+    # order of the triple in the list is important
+    for translateInfo,rotateInfo,cropInfo in zip(*configs['transformations']):
+        img = input_img.copy()
+        img,_ = translateImage(img,translateInfo['step'],translateInfo['direction'])
+        img,_ = rotateImage(img,rotateInfo['angle'])
+        img = cropImage(img,cropInfo['step'])
+        transform_img_list[img_index] = img.copy()
+        img_index += 1
+    return transform_img_list
+
+def getRawImageBlob(roidb,records,scale_inds,**kwargs):
+    return getRawCroppedImageBlob(roidb,records,scale_inds,False,**kwargs)
+    
+def getCroppedImageBlob(roidb,records,scale_inds,**kwargs):
+    return getRawCroppedImageBlob(roidb,records,scale_inds,True,**kwargs)
+
+def getRawCroppedImageBlob(roidb,records,scale_inds,getCropped,**kwargs):
     """Builds an input blob from the images in the roidb at the specified
     scales.
     """
+    # ? why do we have
     num_images = len(roidb)
     processed_ims = []
     im_scales = []
@@ -203,12 +268,22 @@ def getRawCroppedImageBlob(roidb,records,scale_inds,getCropped):
         if getCropped:
             cimg = cropImageToAnnoRegion(im,roi['boxes'][0]) # always the first box since we are *flattened*
         target_size = cfg.TRAIN.SCALES[0]
-        cimg, cimg_scale = prep_im_for_blob(cimg, cfg.PIXEL_MEANS, target_size,
-                                        cfg.TRAIN.MAX_SIZE)
+        cimg, cimg_scale = prep_im_for_blob(cimg, cfg.PIXEL_MEANS, target_size,cfg.TRAIN.MAX_SIZE)
         cimg_scale = 1.0 # why always "1.0"??
-        processed_ims.append(cimg)
-        im_scales.append(cimg_scale)
+        if 'dataset_augmentation_bool' in kwargs.keys() and kwargs['dataset_augmentation_bool'][idx]:
+            transforms = kwargs['dataset_augmentation'][idx]
+            im_list = [applyDatasetAugmentation(cimg,transforms)]
+        else: im_list = [cimg]
+        cimg_scale_list = [cimg_scale]
+        processed_ims.extend(im_list)
+        im_scales.extend(cimg_scale_list)
     # Create a blob to hold the input images
+    # print("saving the image transformations!")
+    # uuid_str = str(uuid.uuid4())
+    # for index,img in enumerate(processed_ims):
+    #     fn = 'util_blob_getrawcropedimageblob_{}_{}.png'.format(index,uuid_str)
+    #     cv2.imwrite(fn,img)
+
     blob = im_list_to_blob(processed_ims)
 
     return blob, im_scales
@@ -246,13 +321,13 @@ def prep_im_for_vae_blob(im, pixel_means, target_size, max_size):
 
     return im, im_scale
 
-def save_blob_list_to_file(blob_list,append_str_l,vis=False):
+def save_blob_list_to_file(blob_list,append_str_l,vis=False,size=cfg.CROPPED_IMAGE_SIZE):
     print("[./utils/blob.py: save_blob_list_to_file]: saving images")
     imgs = blob_list_im(blob_list)
     useAppendStr = append_str_l is not None and len(append_str_l) == imgs.shape[0]
     for idx,img in enumerate(imgs):
         img[:,:,:] *= 255
-        img[:cfg.CROPPED_IMAGE_SIZE,:cfg.CROPPED_IMAGE_SIZE,:] += cfg.PIXEL_MEANS
+        img[:size,:size,:] += cfg.PIXEL_MEANS
         img = img.astype(np.uint8)
         if useAppendStr:
             fn = "save_blob_list_image_{}_{}.png".format(idx,append_str_l[idx])
@@ -277,5 +352,8 @@ def addImageNoise(im_info):
     img = im_info['data']
     img += npr.randn(img.size).reshape(img.shape)/255.
     im_info['data'] = img
+
+        
+
 
 

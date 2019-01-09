@@ -289,7 +289,7 @@ def record_TP_FP_IMAGE_AND_BBOX_ID(tp,fp,class_recs,gt_image_ids,classname,suffi
         if BBGT.size == 0: continue
         record[image_id] = R['det']
     
-    saveDir = osp.join(cfg.TP_FN_RECORDS_PATH,cfg.CALLING_DATASET_NAME)
+    saveDir = osp.join(cfg.TP_FN_RECORDS_PATH,cfg.DATASETS.CALLING_DATASET_NAME)
     if not osp.isdir(saveDir):
         os.mkdir(saveDir)
     savePath = osp.join(saveDir,"records_{}.pkl".format(suffix))
@@ -355,8 +355,8 @@ def bbox_ap(rec, prec, clsnm,use_07_metric=False,viz=False):
             plt.ylabel('Precision')
             plt.title("AP {}".format(ap))
             fn = clsnm
-            if cfg.ROTATE_IMAGE:
-                fn += "_" + str(cfg.ROTATE_IMAGE)
+            if cfg.IMAGE_ROTATE:
+                fn += "_" + str(cfg.IMAGE_ROTATE)
             fn += "_apPlt.png"
             plt.savefig(fn)
         return ap
@@ -449,7 +449,7 @@ def computeIOU_from_PolygonList(pimgs,bb,rotation,guessNumber,imgId):
             # save_image_with_border("./guess_AND_{}.png".format(idx),npBoolToUint8(inter),rotation=rotation)
             #save_image_with_border("./gt_{}.png".format(idx),pimg,rotation=rotation)
             #cv2.imwrite("./gt_{}.png".format(idx),pimg)
-            save_image_of_overlap_bboxes("./show_overlap_img_{}_rot_{}_guess_{}_gt_{}.png".format(imgId,cfg.ROTATE_IMAGE,guessNumber,idx),guessBoxImg,pimg,rotation_none,rotation)
+            save_image_of_overlap_bboxes("./show_overlap_img_{}_rot_{}_guess_{}_gt_{}.png".format(imgId,cfg.IMAGE_ROTATE,guessNumber,idx),guessBoxImg,pimg,rotation_none,rotation)
             # print("stats\n\
             # inter: {}\n\
             # union: {}\n\

@@ -8,7 +8,7 @@
 """Train a Fast R-CNN network."""
 
 import caffe
-from core.config import cfg
+from core.config import cfg,prototxtToYaml,create_snapshot_prefix
 import roi_data_layer.roidb as rdl_roidb
 import cls_data_layer.roidb as cls_roidb
 import alcls_data_layer.roidb as alcls_roidb
@@ -88,7 +88,7 @@ class SolverWrapper(object):
                 elif self.solver.net.layers[0].name == "AimDataLayer":
                     self.solver.net.layers[0].set_roidb(roidb, person_records,al_net)
                 elif self.solver.net.layers[0].name == "ClsDataLayer":
-                    self.solver.net.layers[0].set_roidb(roidb, person_records)
+                    self.solver.net.layers[0].set_roidb(roidb, person_records,perc_augmented=cfg.DATASET_AUGMENTATION.N_SAMPLES)
                 else:
                     print("WE DONT KNOW THE FIRST LAYER TYPE")
                     print(self.solver.net.layers[0].name)
@@ -97,8 +97,7 @@ class SolverWrapper(object):
             else:
                 print("NOT LOADING PERSON RECORDS SINCE cfg.SUBTASK == '{}'".\
                       format(cfg.SUBTASK))
-                self.solver.net.layers[0].set_roidb(roidb,None)
-
+                self.solver.net.layers[0].set_roidb(roidb,None,perc_augmented=cfg.DATASET_AUGMENTATION.N_SAMPLES)
 
     def snapshot(self):
         """Take a snapshot of the network after unnormalizing the learned
@@ -154,6 +153,7 @@ class SolverWrapper(object):
         last_snapshot_iter = -1
         timer = Timer()
         model_paths = []
+        print("snapshot_prefix = [{}]".format(self.solver_param.snapshot_prefix))
         print("iteration {}/{}".format(self.solver.iter,max_iters))
         while self.solver.iter < max_iters:
             # Make one SGD update
@@ -284,6 +284,7 @@ def get_training_roidb(imdb):
         print('done')
 
     print('Preparing training data...')
+    print(cfg.TASK)
     if cfg.TASK == "object_detection":
         rdl_roidb.prepare_roidb(imdb) # gets image sizes.. might be nice
     elif cfg.TASK == "classification":
@@ -332,7 +333,7 @@ def insertInfixBeforeDecimal(oMsg,infix):
     
 def writeSolverToFile(fn,ymlContent):
     ymlKeys = ymlContent.keys()
-    useQuotesList = ["lr_policy","train_net","snapshot_prefix"]
+    useQuotesList = ["lr_policy","train_net","snapshot_prefix","type"]
     with open(fn, 'w') as f:
         for key in ymlKeys:
             val = ymlContent[key]
@@ -342,41 +343,50 @@ def writeSolverToFile(fn,ymlContent):
             else:
                 f.write("{}: {}\n".format(key,val))                
 
-def addFullPathToSnapshotPrefix(solverPrototxt,outputDir,datasetName):
-    infix = "_generatedByTrainpy"
-    newSolverPrototxtFilename = insertInfixBeforeDecimal(solverPrototxt,infix)
-    import yaml
-    from easydict import EasyDict as edict
-    with open(solverPrototxt, 'r') as f:
-        yaml_cfg = edict(yaml.load(f))
-    # add full path
-    snapshotPrefix = yaml_cfg['snapshot_prefix']
-    if "/home/" not in yaml_cfg['snapshot_prefix']:
-        print("Mangling snapshot_prefix in {}".format(solverPrototxt))
-        finalSubstr = yaml_cfg['snapshot_prefix']
-        snapshotPrefix = osp.join(outputDir,yaml_cfg['snapshot_prefix'])
+def addFullPathToSnapshotPrefix(solverYaml,outputDir):
+    snapshotPrefix = solverYaml['snapshot_prefix']
+    if "/home/" not in solverYaml['snapshot_prefix']:
+        finalSubstr = solverYaml['snapshot_prefix']
+        snapshotPrefix = osp.join(outputDir,solverYaml['snapshot_prefix'])
         # add infix to ymlData
         infix = ('_' + cfg.TRAIN.SNAPSHOT_INFIX
                  if cfg.TRAIN.SNAPSHOT_INFIX != '' else '')
-        yaml_cfg['snapshot_prefix'] = snapshotPrefix + infix
+        solverYaml['snapshot_prefix'] = snapshotPrefix + infix
         print("new snapshot_prefix: {}".format(snapshotPrefix))
-    print("wrote solver_prototxt to read: {}".format(newSolverPrototxtFilename))
+
+def resetSnapshotPrefix(solverYaml,new_snapshot_prefix):
+    solverYaml['snapshot_prefix'] = new_snapshot_prefix
+
+def mangleSolverPrototxt(solverPrototxt,outputDir):
+    print("Mangling solverprototxt {}".format(solverPrototxt))
+    infix = "_generatedByTrainpy"
+    newSolverPrototxtFilename = insertInfixBeforeDecimal(solverPrototxt,infix)
+    solverYaml = prototxtToYaml(solverPrototxt)
+    print("writing new solver_prototxt @ {}".format(newSolverPrototxtFilename))
+    
+    # create snapshot prefix name
+    if cfg.TRAIN.RECREATE_SNAPSHOT_NAME:
+        new_snapshot_prefix = create_snapshot_prefix(cfg.modelInfo)
+        resetSnapshotPrefix(solverYaml,new_snapshot_prefix)
+    
+    # add full path
+    addFullPathToSnapshotPrefix(solverYaml,outputDir)
+    
     # write the new solver_prototxt
-    writeSolverToFile(newSolverPrototxtFilename,yaml_cfg)
+    writeSolverToFile(newSolverPrototxtFilename,solverYaml)
     print("added full path to snapshot_prefix")
-    print("snapshot_prefix: {}".format(snapshotPrefix))
+    print("snapshot_prefix is [{}]".format(solverYaml['snapshot_prefix']))
+
     return newSolverPrototxtFilename
-        
+
 def train_net(solver_prototxt, roidb, output_dir,datasetName="",
               pretrained_model=None, solver_state=None, max_iters=400000,
               al_net=None):
     """Train *any* object detection network."""
 
     #roidb = filter_roidb(roidb)
-    # print(solver_prototxt)
-    newSolverPrototxt = addFullPathToSnapshotPrefix(solver_prototxt,\
-                                                    output_dir,
-                                                    datasetName)
+    print("og solver",solver_prototxt)
+    newSolverPrototxt = mangleSolverPrototxt(solver_prototxt,output_dir)
     sw = SolverWrapper(newSolverPrototxt, roidb, output_dir,
                        pretrained_model=pretrained_model,
                        solver_state=solver_state,

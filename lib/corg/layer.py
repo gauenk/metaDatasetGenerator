@@ -25,43 +25,41 @@ class Corg(caffe.Layer):
         
 
         self._norm = np.array(layer_params['norm'])
-        if 'ssd' in layer_params.keys():
-            self._ssd = layer_params['norm']
-        else:
-            self._ssd = False
-        print("ssd",self._ssd)
+        if 'ssd' in layer_params.keys(): self._ssd = layer_params['norm']
+        else: self._ssd = False
+        if 'cls' in layer_params.keys(): self._cls = layer_params['cls']
+        else: self._cls = False
+
         self._prob_indicies = np.array(layer_params['indicies'])
         self._nclasses = layer_params.get('nclasses', len(self._prob_indicies))
-        self._bbox_indicies = np.empty(len(self._prob_indicies)*4,dtype=np.int)
-        self._prob_dict = \
-            dict(zip(self._prob_indicies,range(len(self._prob_indicies))))
-        
+        if self._ssd: self._prob_dict = dict(zip(self._prob_indicies,range(len(self._prob_indicies))))
+
         # make the bbox indicies expand to capture 4 indicies
         #print(self._prob_indicies)
-        
-        for index in range(len(self._prob_indicies)):
-            bbox_index = 4*index
-            self._bbox_indicies[bbox_index] = 4*self._prob_indicies[index]
-            self._bbox_indicies[bbox_index+1] = 4*self._prob_indicies[index]+1
-            self._bbox_indicies[bbox_index+2] = 4*self._prob_indicies[index]+2
-            self._bbox_indicies[bbox_index+3] = 4*self._prob_indicies[index]+3
+        if self._cls is False:
+            self._bbox_indicies = np.empty(len(self._prob_indicies)*4,dtype=np.int)
+            for index in range(len(self._prob_indicies)):
+                bbox_index = 4*index
+                self._bbox_indicies[bbox_index] = 4*self._prob_indicies[index]
+                self._bbox_indicies[bbox_index+1] = 4*self._prob_indicies[index]+1
+                self._bbox_indicies[bbox_index+2] = 4*self._prob_indicies[index]+2
+                self._bbox_indicies[bbox_index+3] = 4*self._prob_indicies[index]+3
 
         # reshape the top to be the size of the number of output classes
         top[0].reshape(1,len(self._prob_indicies))
-        top[1].reshape(1,len(self._bbox_indicies))
-        print(self._bbox_indicies)
-        print(len(self._bbox_indicies))
         print(len(self._prob_indicies))
+        if self._cls is False:
+            top[1].reshape(1,len(self._bbox_indicies))
+            print(self._bbox_indicies)
+            print(len(self._bbox_indicies))
         if len(self._prob_indicies) > self._nclasses:
             raise ValueError("Number of classes must be >= length of the index vector")
 
-
     def forward(self, bottom, top):
         """Get blobs and copy them into this layer's top blob vector."""
-        if self._ssd:
-            self.forward_ssd(bottom,top)
-        else:
-            self.forward_faster_rcnn(bottom,top)
+        if self._ssd: self.forward_ssd(bottom,top)
+        elif self._cls: self.forward_cls(bottom,top)
+        else: self.forward_faster_rcnn(bottom,top)
 
     def backward(self, top, propagate_down, bottom):
         """This layer does not propagate gradients."""
@@ -70,6 +68,12 @@ class Corg(caffe.Layer):
     def reshape(self, bottom, top):
         """Reshaping happens during the call to forward."""
         pass
+
+    def forward_cls(self,bottom,top):
+        probs = bottom[0].data
+        blob_probs = probs[:,self._prob_indicies]
+        top[0].reshape(blob_probs.shape[0],self._nclasses)
+        top[0].data[0:blob_probs.shape[0],0:blob_probs.shape[1]] = blob_probs
 
     def forward_ssd(self,bottom,top):
         """

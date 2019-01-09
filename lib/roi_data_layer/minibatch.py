@@ -11,7 +11,7 @@ import numpy as np
 import numpy.random as npr
 import cv2,sys
 from core.config import cfg
-from utils.blob import prep_im_for_blob, im_list_to_blob
+from utils.blob import prep_im_for_blob, im_list_to_blob, save_blob_list_to_file
 
 def get_minibatch(roidb, num_classes):
     """Given a roidb, construct a minibatch sampled from it."""
@@ -29,6 +29,8 @@ def get_minibatch(roidb, num_classes):
     im_blob, im_scales = _get_image_blob(roidb, random_scale_inds)
 
     blobs = {'data': im_blob}
+    # rid = str(int(npr.sample(1)*100))
+    # save_blob_list_to_file(blobs['data'],[rid],vis=False,size=300)
 
     if cfg.TRAIN.OBJ_DET.HAS_RPN:
         assert len(im_scales) == 1, "Single batch only"
@@ -139,6 +141,8 @@ def _get_image_blob(roidb, scale_inds):
         target_size = cfg.TRAIN.SCALES[scale_inds[i]]
         im, im_scale = prep_im_for_blob(im, cfg.PIXEL_MEANS, target_size,
                                         cfg.TRAIN.MAX_SIZE)
+        im = cfg.INPUT_DATA.BIJECTION.applyBijection(im)
+
         im_scales.append(im_scale)
         processed_ims.append(im)
 

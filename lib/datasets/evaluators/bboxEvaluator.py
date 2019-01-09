@@ -85,8 +85,8 @@ class bboxEvaluator(object):
         infix = "faster-rcnn"
         if cfgData.MODEL:
             infix = cfgData.MODEL
-        if cfg.ROTATE_IMAGE != -1:
-            infix += "_{}".format(cfg.ROTATE_IMAGE)
+        if cfg.IMAGE_ROTATE != -1:
+            infix += "_{}".format(cfg.IMAGE_ROTATE)
         results_filename = "./results_{}_{}_{}.txt".format(infix,self._datasetName, self._salt)
         results_fd = open(results_filename,"w")
         for kdx in range(len(ovthresh)):

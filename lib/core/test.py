@@ -19,6 +19,7 @@ from fast_rcnn.nms_wrapper import nms
 import cPickle
 from utils.blob import im_list_to_blob,blob_list_im,save_blob_list_to_file
 from datasets.ds_utils import cropImageToAnnoRegion
+from cls_data_layer.minibatch import get_minibatch as cls_get_minibatch
 from alcls_data_layer.minibatch import get_minibatch as alcls_get_minibatch
 from aim_data_layer.minibatch import get_minibatch as aim_get_minibatch
 import os
@@ -63,13 +64,15 @@ def _get_image_blob(im):
                         interpolation=cv2.INTER_LINEAR)
         M = None
         if cfg._DEBUG.core.test: print("[pre-process] im.shape",im.shape)
-        if cfg.ROTATE_IMAGE != -1:
-        #if cfg.ROTATE_IMAGE !=  0:
+        if cfg.IMAGE_ROTATE != -1:
+            # if cfg.ROTATE_IMAGE != -1:
             rows,cols = im.shape[:2]
             if cfg._DEBUG.core.test: print("cols,rows",cols,rows)
-            rotationMat, scale = getRotationInfo(cfg.ROTATE_IMAGE,cols,rows)
+            rotationMat, scale = getRotationInfo(cfg.IMAGE_ROTATE\
+                                                 ,cols,rows)
             im = cv2.warpAffine(im,rotationMat,(cols,rows),scale)
-            im_rotate_factors.append([cfg.ROTATE_IMAGE,cols,rows,im_shape])
+            im_rotate_factors.append([cfg.IMAGE_ROTATE\
+                                      ,cols,rows,im_shape])
         if cfg.SSD == True:
             im_scale_factors.append([im_scale_x,im_scale_y])
         else:
@@ -235,7 +238,7 @@ def im_detect(net, im, boxes=None, image_id="",isImBlob=False):
     if cfg._DEBUG.core.test:
         im_shape = forward_kwargs["data"].shape
         rimg = blob_list_im(forward_kwargs["data"])
-        fn = "input_image_{}_{}.png".format(cfg.ROTATE_IMAGE,image_id)
+        fn = "input_image_{}_{}.png".format(cfg.IMAGE_ROTATE,image_id)
         #save_image_with_border(fn,rimg[0],rotation=im_rotates[0])
     if len(cfg.SAVE_ACTIVITY_VECTOR_BLOBS) > 0:
         forward_kwargs['blobs'] = cfg.SAVE_ACTIVITY_VECTOR_BLOBS
@@ -353,12 +356,18 @@ def apply_nms(all_boxes, thresh):
 
 def loadImage(imdb,image_path,image_index,bbox,al_net,idx):
     isImBlob = False
+    # helper variables for some [if/elif] statements
+    roidb_index = idx // cfg.DATASETS.SIZE
+    augmentation_index = 0
+    if cfg.DATASET_AUGMENTATION.BOOL: augmentation_index = idx % cfg.DATASET_AUGMENTATION.SIZE
+    sampleRoidb = [imdb.roidb[roidb_index]]
+    sampleRoidb[0]['image'] = image_path
+    sampleRecords = []
+    numClasses = len(cfg.DATASETS.CLASSES)
+    aug_bool_list = np.ones(len(sampleRoidb),dtype=np.int)
+
     if cfg.LOAD_METHOD == 'aim_data_layer':
-        sampleRoidb = [imdb.roidb[idx]]
-        sampleRoidb[0]['image'] = image_path
-        sampleRecords = []
-        numClasses = len(cfg.DATASETS.CLASSES)
-        input_data = aim_get_minibatch(sampleRoidb,sampleRecords,al_net,numClasses)
+        input_data = aim_get_minibatch(sampleRoidb,sampleRecords,al_net,numClasses,dataset_augmentation=augmentation_index)
         img = {}
         img['data'] = input_data['data']
         img['avImage'] = input_data['avImage']
@@ -367,11 +376,12 @@ def loadImage(imdb,image_path,image_index,bbox,al_net,idx):
         raw_img = cv2.imread(image_path)
         img = cropImageToAnnoRegion(raw_img,bbox)
     elif imdb.is_image_index_flattened and al_net is not None:
-        sampleRoidb = [imdb.roidb[idx]]
-        sampleRoidb[0]['image'] = image_path
-        sampleRecords = []
-        numClasses = len(cfg.DATASETS.CLASSES)
-        input_data = alcls_get_minibatch(sampleRoidb,sampleRecords,al_net,numClasses)
+        input_data = alcls_get_minibatch(sampleRoidb,sampleRecords,al_net,numClasses,dataset_augmentation=augmentation_index)
+        img = {}
+        img['data'] = input_data['data']
+        isImBlob = True
+    elif cfg.DATASET_AUGMENTATION.BOOL:
+        input_data = cls_get_minibatch(sampleRoidb, sampleRecords, numClasses, augmentation_index,aug_bool_list)
         img = {}
         img['data'] = input_data['data']
         isImBlob = True
@@ -388,8 +398,8 @@ def test_net(net, imdb, max_per_image=100, thresh=1/80., vis=False, al_net=None)
     We need to load cropped images.
     """
 
-    
-    num_images = len(imdb.image_index)
+    if cfg.DATASET_AUGMENTATION.BOOL: num_images = len(imdb.image_index) * cfg.DATASET_AUGMENTATION.SIZE
+    else: num_images = len(imdb.image_index)
     # all detections are collected into:
     #    all_boxes[cls][image] = N x 5 array of detections in
     #    (x1, y1, x2, y2, score)
@@ -431,22 +441,24 @@ def test_net(net, imdb, max_per_image=100, thresh=1/80., vis=False, al_net=None)
     im_rotates_all = dict.fromkeys(imdb.image_index)
 
     print("num_images: {}".format(num_images))
-    for i in xrange(num_images):
+    for loop_index in xrange(num_images):
         # filter out any ground truth boxes
         if cfg.TEST.OBJ_DET.HAS_RPN or cfg.TASK != 'object_detection':
             box_proposals = None
 
         # always send in ['boxes'][0] since we want the first box in the index; we are flattened if we use 'boxes'
-        im,isImBlob = loadImage(imdb,imdb.image_path_at(i),imdb.image_index[i],imdb.roidb[i]['boxes'][0],al_net,i)
+        imdb_index = loop_index
+        if cfg.DATASET_AUGMENTATION.BOOL: imdb_index = loop_index // cfg.DATASET_AUGMENTATION.SIZE
+        im,isImBlob = loadImage(imdb,imdb.image_path_at(imdb_index),imdb.image_index[imdb_index],imdb.roidb[imdb_index]['boxes'][0],al_net,loop_index)
         # save_blob_list_to_file(im,None,vis=True)
 
         _t['im_detect'].tic()
         scores, boxes, im_rotates, activity_vectors = im_detect(net, im, box_proposals,\
-                                                                imdb.image_index[i],isImBlob=isImBlob)
-        # print("image id: {}".format(imdb.image_index[i]))
+                                                                imdb.image_index[imdb_index],isImBlob=isImBlob)
+        # print("image id: {}".format(imdb.image_index[imdb_index]))
         # print_net_activiation_data(net,["data","conv1_2","rpn_cls_prob_reshape","rois"])
 
-        if cfg._DEBUG.core.test: print(imdb.image_index[i])
+        if cfg._DEBUG.core.test: print(imdb.image_index[imdb_index])
         _t['im_detect'].toc()
 
         _t['misc'].tic()
@@ -454,33 +466,43 @@ def test_net(net, imdb, max_per_image=100, thresh=1/80., vis=False, al_net=None)
         # sys.exit()
 
         # skip j = 0, because it's the background class
-        im_rotates_all[imdb.image_index_at(i)] = im_rotates
+        im_rotates_all[imdb.image_index_at(imdb_index)] = im_rotates
 
         if len(cfg.SAVE_ACTIVITY_VECTOR_BLOBS) > 0:
-            aggregateAV(ds_av,activity_vectors,imdb.image_index[i])
+            aggregateActivityVectors(ds_av,activity_vectors,imdb.image_index[imdb_index])
         if cfg.TASK == 'object_detection':
             aggregateDetections(imdb,scores,boxes,all_items,thresh,i,im,vis,max_per_image)
         elif cfg.TASK == 'classification':
-            aggregateClassification(imdb,scores,all_items,i)
+            aggregateClassification(imdb,scores,all_items,loop_index)
 
         if cfg.ACTIVE_LEARNING.REPORT:
-            recordImageForAlReport(imdb,scores,activity_vectors,fidAlReport,i,pctErrorRed)
+            recordImageForAlReport(imdb,scores,activity_vectors,fidAlReport,loop_index,pctErrorRed)
             
         _t['misc'].toc()
         print 'im_detect: {:d}/{:d} {:.3f}s {:.3f}s' \
-              .format(i + 1, num_images, _t['im_detect'].average_time,
+            .format(loop_index + 1, num_images, _t['im_detect'].average_time,
                       _t['misc'].average_time)
 
     if cfg.SAVE_ACTIVITY_VECTOR_BLOBS:
         dirn = cfg.GET_SAVE_ACTIVITY_VECTOR_BLOBS_DIR()
         print("activity vectors saved @")
         for blob_name,av in ds_av.items():
-            fn = os.path.join(dirn,"{}_{}.pkl".format(blob_name,cfg.TEST_NET.NET_PATH))
-            print(fn)
-            with open(fn, 'wb') as f:
-                cPickle.dump(av, f, cPickle.HIGHEST_PROTOCOL)
+            save_av = av
+            if cfg.SAVE_ACTIVITY_VECTOR_BLOBS_WITH_KEYS is False:
+                save_av = remove_keys_from_activity_vector_and_ravel(av)
+                fn = os.path.join(dirn,"{}_{}.npy".format(blob_name,cfg.TEST_NET.NET_PATH))
+                print(fn)
+                np.save(fn,save_av)
+            else:
+                fn = os.path.join(dirn,"{}_{}.pkl".format(blob_name,cfg.TEST_NET.NET_PATH))
+                print(fn)
+                with open(fn, 'wb') as f:
+                    cPickle.dump(save_av, f, cPickle.HIGHEST_PROTOCOL)
 
+    
     save_dict = {}
+    if cfg.DATASET_AUGMENTATION.BOOL:
+        save_dict['dataset_augmentations'] = cfg.DATASET_AUGMENTATION.CONFIGS
     if cfg.TASK == 'object_detection':
         save_dict["all_boxes"] = all_items
         save_dict["im_rotates_all"] = im_rotates_all
@@ -496,6 +518,14 @@ def test_net(net, imdb, max_per_image=100, thresh=1/80., vis=False, al_net=None)
     print 'Evaluating detections'
     imdb.evaluate_detections(save_dict, output_dir)
     
+def remove_keys_from_activity_vector_and_ravel(av):
+    new_av = [None for _ in range(len(av))]
+    sorted_keys = sorted(av.keys()) # ensures consistency
+    for index,key in enumerate(sorted_keys):
+        new_av[index] = av[key].ravel()
+    new_av = np.array(new_av)
+    return new_av
+
 def aggregateDetections(imdb,scores,boxes,all_boxes,thresh,i,im,vis,max_per_image):
 
     for j in xrange(1, imdb.num_classes):
@@ -521,7 +551,7 @@ def aggregateDetections(imdb,scores,boxes,all_boxes,thresh,i,im,vis,max_per_imag
                 all_boxes[j][i] = all_boxes[j][i][keep, :]
 
 
-def aggregateAV(ds_av,activity_vectors,image_id):
+def aggregateActivityVectors(ds_av,activity_vectors,image_id):
     for blob_name,blob_av in activity_vectors.items():
         if blob_name not in ds_av.keys(): ds_av[blob_name] = {}
         ds_av[blob_name][image_id] = blob_av

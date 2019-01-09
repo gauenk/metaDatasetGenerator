@@ -1,0 +1,166 @@
+name: "Small_HighwayNet"
+layer {
+  name: 'input-data'
+  type: 'Python'
+  top: 'data'
+  top: 'labels'
+  python_param {
+    module: 'cls_data_layer.layer'
+    layer: 'ClsDataLayer'
+    param_str: "'num_classes': 10"
+  }
+}
+layer {
+  name: 'highway1-fillme'
+  type: 'Convolution' #only to make loader happy; could be any valid layer type
+  top: 'highway1-output'
+  bottom: 'data'
+  bottom: 'data'
+  convolution_param{
+    weight_filler{ # again any valid field that accepts string values would work
+       type: './models/mnist/highwayNet/highway_version_1.prototxt'
+    }
+  }
+}
+layer {
+  name: 'highway2-fillme'
+  type: 'Convolution' #only to make loader happy; could be any valid layer type
+  top: 'highway2-output'
+  bottom: 'highway1-output'
+  bottom: 'data'
+  convolution_param{
+    weight_filler{ # again any valid field that accepts string values would work
+       type: './models/mnist/highwayNet/highway_version_1.prototxt'
+    }
+  }
+}
+layer {
+  name: 'highway3-fillme'
+  type: 'Convolution' #only to make loader happy; could be any valid layer type
+  top: 'highway3-output'
+  bottom: 'highway2-output'
+  bottom: 'data'
+  convolution_param{
+    weight_filler{ # again any valid field that accepts string values would work
+       type: './models/mnist/highwayNet/highway_version_1.prototxt'
+    }
+  }
+}
+layer {
+  name: 'highway4-fillme'
+  type: 'Convolution' #only to make loader happy; could be any valid layer type
+  top: 'highway4-output'
+  bottom: 'highway3-output'
+  bottom: 'data'
+  convolution_param{
+    weight_filler{ # again any valid field that accepts string values would work
+       type: './models/mnist/highwayNet/highway_version_1.prototxt'
+    }
+  }
+}
+layer {
+  name: 'highway5-fillme'
+  type: 'Convolution' #only to make loader happy; could be any valid layer type
+  top: 'highway5-output'
+  bottom: 'highway4-output'
+  bottom: 'data'
+  convolution_param{
+    weight_filler{ # again any valid field that accepts string values would work
+       type: './models/mnist/highwayNet/highway_version_1.prototxt'
+    }
+  }
+}
+layer {
+  name: 'highway6-fillme'
+  type: 'Convolution' #only to make loader happy; could be any valid layer type
+  top: 'highway6-output'
+  bottom: 'highway5-output'
+  bottom: 'data'
+  convolution_param{
+    weight_filler{ # again any valid field that accepts string values would work
+       type: './models/mnist/highwayNet/highway_version_1.prototxt'
+    }
+  }
+}
+layer {
+  name: 'highway7-fillme'
+  type: 'Convolution' #only to make loader happy; could be any valid layer type
+  top: 'highway7-output'
+  bottom: 'highway6-output'
+  bottom: 'data'
+  convolution_param{
+    weight_filler{ # again any valid field that accepts string values would work
+       type: './models/mnist/highwayNet/highway_version_1.prototxt'
+    }
+  }
+}
+layer {
+  name: 'highway8-fillme'
+  type: 'Convolution' #only to make loader happy; could be any valid layer type
+  top: 'highway8-output'
+  bottom: 'highway7-output'
+  bottom: 'data'
+  convolution_param{
+    weight_filler{ # again any valid field that accepts string values would work
+       type: './models/mnist/highwayNet/highway_version_1.prototxt'
+    }
+  }
+}
+
+layer {
+  name: 'highway9-fillme'
+  type: 'Convolution' #only to make loader happy; could be any valid layer type
+  top: 'highway9-output'
+  bottom: 'highway8-output'
+  bottom: 'data'
+  convolution_param{
+    weight_filler{ # again any valid field that accepts string values would work
+       type: './models/mnist/highwayNet/highway_version_1.prototxt'
+    }
+  }
+}
+
+layer {
+  name: 'highway10-fillme'
+  type: 'Convolution' #only to make loader happy; could be any valid layer type
+  top: 'highway10-output'
+  bottom: 'highway9-output'
+  bottom: 'data'
+  convolution_param{
+    weight_filler{ # again any valid field that accepts string values would work
+       type: './models/mnist/highwayNet/highway_version_1.prototxt'
+    }
+  }
+}
+
+layer {
+  name: "cls_score"
+  type: "InnerProduct"
+  bottom: "highway10-output"
+  top: "cls_score"
+  param {
+    lr_mult: 1
+  }
+  param {
+    lr_mult: 2
+  }
+  inner_product_param {
+    num_output: 10
+    weight_filler {
+      type: "xavier"
+    }
+    bias_filler {
+      type: "constant"
+    }
+  }
+}
+layer {
+  name: "loss_cls"
+  type: "SoftmaxWithLoss"
+  bottom: "cls_score"
+  bottom: "labels"
+  propagate_down: 1
+  propagate_down: 0
+  top: "loss_cls"
+  loss_weight: 1
+}

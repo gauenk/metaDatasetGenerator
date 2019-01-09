@@ -18,7 +18,7 @@ from utils.misc import evaluate_image_detections,printRoidbImageIds,computeEntro
 from datasets.ds_utils import cropImageToAnnoRegion
 import matplotlib.pyplot as plt
 
-def get_minibatch(roidb, records, al_net, num_classes):
+def get_minibatch(roidb, records, al_net, num_classes,**kwargs):
     """Given a roidb, construct a minibatch sampled from it."""
     num_images = len(roidb)
     # Sample random scales to use for each image in this batch

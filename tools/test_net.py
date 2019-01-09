@@ -10,7 +10,7 @@ import matplotlib.pyplot as plt
 
 import _init_paths
 from core.test import test_net
-from core.config import cfg, cfg_from_file, cfg_from_list, set_global_cfg, getTestNetConfig
+from core.config import cfg, cfg_from_file, cfg_from_list, set_global_cfg, getTestNetConfig, set_augmentation_by_calling_dataset, set_class_inclusion_list_by_calling_dataset
 from datasets.factory import get_repo_imdb
 import caffe
 import argparse
@@ -52,6 +52,9 @@ def parse_args():
     parser.add_argument('--rotate', dest='rotate',
                         help='how much should we rotate each image?',
                         default=0, type=int)
+    parser.add_argument('--av_nosave', dest='av_nosave',
+                        help="tell us: don't save the activity vectors",
+                        action='store_true')
     # params for model to which active learning is applied
     parser.add_argument('--al_def', dest='al_def',
                         help='model prototxt to which active learning is applied',
@@ -80,7 +83,8 @@ if __name__ == '__main__':
     set_global_cfg("TEST")
 
     cfg.GPU_ID = args.gpu_id
-    cfg.ROTATE_IMAGE = args.rotate
+    if args.rotate != 0: cfg.IMAGE_ROTATE = args.rotate
+    if args.av_nosave is True: cfg.SAVE_ACTIVITY_VECTOR_BLOBS = []
 
     print('Using config:')
     pprint.pprint(cfg)
@@ -102,13 +106,13 @@ if __name__ == '__main__':
     #     #print(name,layer.blobs[0].data)
     # print("-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-")
     # sys.exit()
-
-
     print(args.imdb_name)
     imdb = get_repo_imdb(args.imdb_name)
     imdb.competition_mode(args.comp_mode)
     if not cfg.TEST.OBJ_DET.HAS_RPN and cfg.TASK == 'object_detection':
         imdb.set_proposal_method(cfg.TEST.PROPOSAL_METHOD)
+    set_augmentation_by_calling_dataset() # reset dataset augmentation settings
+    set_class_inclusion_list_by_calling_dataset() # reset class inclusion list settings
 
     al_net = None
     if args.al_net is not None and args.al_def is not None:

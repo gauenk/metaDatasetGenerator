@@ -30,7 +30,7 @@ __sets.append("cifar_10")
 def get_repo_imdb(name,path_to_imageSets=None,cacheStrModifier=None):
     """Get an imdb (image database) by name."""
     print(name)
-    cfg.CALLING_DATASET_NAME = name
+    cfg.DATASETS.CALLING_DATASET_NAME = name
     di = name.split("-")
     if len(di) != 3:
         raise KeyError('Dataset name [{}] is not correct length'.format(name))

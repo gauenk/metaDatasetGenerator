@@ -1,0 +1,12 @@
+snapshot_prefix: "/home/gauenk/Documents/experiments/metaDatasetGenerator/output/classification/mnist/mnist_highwayNet_adam_noImageNoise_yesPrune0_noDsAug_noClassFilter"
+max_iter: 10000
+base_lr: 0.001
+snapshot: 0
+solver_mode: GPU
+train_net: "models/mnist/highwayNet/train.prototxt"
+momentum2: 0.999
+lr_policy: "fixed"
+type: "Adam"
+display: 100
+momentum: 0.9
+iter_size: 1

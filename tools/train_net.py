@@ -8,7 +8,7 @@ import matplotlib.pyplot as plt
 
 import _init_paths
 from core.train import get_training_roidb, train_net
-from core.config import cfg, cfg_from_file, cfg_from_list, get_output_dir, set_global_cfg
+from core.config import cfg, cfg_from_file, cfg_from_list, get_output_dir, set_global_cfg, set_augmentation_by_calling_dataset, set_class_inclusion_list_by_calling_dataset, setModelInfo
 from datasets.factory import get_repo_imdb
 from datasets.ds_utils import load_mixture_set,print_each_size
 import datasets.imdb
@@ -22,7 +22,7 @@ def parse_args():
     """
     Parse input arguments
     """
-    parser = argparse.ArgumentParser(description='Train a Fast R-CNN network')
+    parser = argparse.ArgumentParser(description='Train a model')
     parser.add_argument('--gpu', dest='gpu_id',
                         help='GPU device id to use [0]',
                         default=0, type=int)
@@ -31,7 +31,7 @@ def parse_args():
                         default=None, type=str)
     parser.add_argument('--iters', dest='max_iters',
                         help='number of iterations to train',
-                        default=1000000, type=int)
+                        default=10000000, type=int)
     parser.add_argument('--weights', dest='pretrained_model',
                         help='initialize with pretrained model weights',
                         default=None, type=str)
@@ -97,6 +97,7 @@ def parse_args():
 
 def get_roidb(imdb_name,args):
     imdb = get_repo_imdb(imdb_name,args.new_path_to_imageset,args.cacheStrModifier)
+    set_class_inclusion_list_by_calling_dataset() # reset class inclusion list settings
     print 'Loaded dataset `{:s}` for training'.format(imdb.name)
     imdb.set_proposal_method(cfg.TRAIN.OBJ_DET.PROPOSAL_METHOD)
     print 'Set proposal method: {:s}'.format(cfg.TRAIN.OBJ_DET.PROPOSAL_METHOD)
@@ -159,32 +160,36 @@ def get_mixed_dataset(args):
     output_dir = get_output_dir("{}_{}_{}".format(ds_name,size,repeat))
     return roidbTr,output_dir
     
+def set_global_variables_from_args(args):
+    if args.solver_state == "None": args.solver_state = None
+    if args.pretrained_model == "None": args.pretrained_model = None
+    if args.cfg_file is not None:
+        print("SET CFG FILE")
+        cfg_from_file(args.cfg_file)
+    if args.set_cfgs is not None:
+        cfg_from_list(args.set_cfgs)
+
+    cfg.GPU_ID = args.gpu_id
+    if args.snapshot_infix is not None:
+        cfg.TRAIN.SNAPSHOT_INFIX = args.snapshot_infix
+    set_global_cfg("TRAIN")
+
+    if not args.randomize:
+        # fix the random seeds (numpy and caffe) for reproducibility
+        np.random.seed(cfg.RNG_SEED)
+        caffe.set_random_seed(cfg.RNG_SEED)
+
+
 if __name__ == '__main__':
     args = parse_args()
 
     print('Called with args:')
     print(args)
 
-    if args.cfg_file is not None:
-        print("SET CFG FILE")
-        cfg_from_file(args.cfg_file)
-    if args.set_cfgs is not None:
-        cfg_from_list(args.set_cfgs)
-    set_global_cfg("TRAIN")
-    if args.snapshot_infix is not None:
-        cfg.TRAIN.SNAPSHOT_INFIX = args.snapshot_infix
-
-    cfg.GPU_ID = args.gpu_id
-    if args.solver_state == "None": args.solver_state = None
-    if args.pretrained_model == "None": args.pretrained_model = None
+    set_global_variables_from_args(args)
 
     print('Using config:')
     pprint.pprint(cfg)
-
-    if not args.randomize:
-        # fix the random seeds (numpy and caffe) for reproducibility
-        np.random.seed(cfg.RNG_SEED)
-        caffe.set_random_seed(cfg.RNG_SEED)
 
     # set up caffe
     caffe.set_mode_gpu()
@@ -198,14 +203,9 @@ if __name__ == '__main__':
         print("Uknown dataset type: {}".format(args.dataset_type))
         sys.exit()
 
-    """
-    for idx,sample in enumerate(roidb):
-        if "width" not in sample.keys():
-            print("no width @ {}".format(idx))
-            print(sample.keys())
-            print(sample['flipped'])
-        
-    """
+    set_augmentation_by_calling_dataset() # reset dataset augmentation settings
+
+    # activation network for active learning
     al_net = None
     if args.al_net is not None and args.al_def is not None:
         al_net = caffe.Net(args.al_def,caffe.TEST, weights=args.al_net)
@@ -216,6 +216,8 @@ if __name__ == '__main__':
     if useDatasetName:
         datasetName = imdb.name
 
+    
+    setModelInfo(args.solver)
     print '{:d} roidb entries'.format(len(roidb))
     print 'Output will be saved to `{:s}`'.format(output_dir)
     train_net(args.solver, roidb, output_dir,

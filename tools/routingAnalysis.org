@@ -1,0 +1,122 @@
+* Goals
+
+
+* TODO FIND K for each model for each layer combination
+  - do we condition on the class and correct?
+    - if we do; we expect separation
+
+  - give fit statistics
+    - internal evalution [only look at cluster] : 
+      - silhouette coefficient (compare ave. distance among same clusters via separate; "how 'clustered- are you")
+    - external evalution [look at class labels as well]:
+
+
+* find optimal K [limitation: just a point] [cluster based on training data only]
+input:
+   - clustering algorithm (CA)
+   - training data
+   - testing data
+   - reform fuction (reform)
+   - evalution criterion (EC)
+   - eval_function
+   - reform function
+   - pick_optimal_from_measures
+output:
+  - optimal k
+
+  for k in k_search_list:
+     clusters = CA(training_data,k)
+     train_measures,test_measures = eval_function(trainData,testData,clusters,reform)
+     K_optim = pick_optimal_from_measures(train_measures,test_measures)
+  return K_optim
+
+* CA(data,k)
+  - config: 
+    where is the data from? (model for activation, data for training, data for testing)
+  clusters = load_cluster_cache(config,k)
+  if is_valid(clusters): return clusters
+  clusters = kmeans.cluster(data,k)
+  return clusters
+
+* eval_function(trainData,testData,clusters)
+
+  train_measures = load_cluster_measures()
+  if is_valid(train_measures,test_measures): return train_measures,test_measures
+
+  reformTrainData = reform(train,clusters) # O(n^2); n is number of samples
+  reformTestData = reform(test,clusters) # O(n^2); n is number of samples
+  train_measures,test_measures = eval(train_data,test_data)
+
+  save_measures(train_measures,test_measures)
+
+  return train_measures,test_measures
+  
+* eval(train_data,test_data)
+   - ec
+      - clustering statistics 
+        - [internal] silhouette coefficient
+	- [external] purity (among data_classes) {correlates with interpretation}
+	- [external] purity (among correct/incorrect) {correlates closes with "how good is my cluster"}
+      - separability 
+	- svm
+   train_clustering_statistics,test_clustering_statistics = compute_clustering_statistics(train_data,test_data)
+   train_separability,test_separability = compute_separability(train_data,test_data)
+   train_measures = combine_measures(train_clustering_statistics,train_separability)
+   test_measures = combine_measures(test_clustering_statistics,test_separability)
+   return train_measures,test_measures
+   
+* compute_clustering_statistics(train_data,test_data)
+  train_cluster_statistics,test_cluster_statistics = check_clustering_statistics_cache()
+  if is_valid(train_cluster_statistics,test_cluster_statistics): return train_cluster_statistics,test_cluster_statistics
+
+  train_cluster_statistics = compute_set_clustering_statistics(train_data)
+  test_cluster_statistics = compute_set_clustering_statistics(test_data)
+
+  save_cluster_statistics(train_cluster_statistics,test_cluster_statistics)
+
+  return train_cluster_statistics,test_cluster_statistics
+
+* compute_set_clustering_statistics(train_data)
+  silhouette_coef = compute_silhouette_coef(data)
+  purity = compute_purity(data)
+  return silhouette_coef,purity
+
+* compute_separability(train_data_unformatted,test_data_unformatted)
+  train_data,test_data = prepare_data_for_svm(train_data_unformatted,test_data_unformatted)
+  svm = svm.fit(train_data)
+  train_separability = svm.test(train_data)
+  test_separability = svm.test(train_data)
+
+* prepare_data_for_svm(train_data_unformatted,test_data_unformatted)
+  train_data,test_data = check_cache()
+  if is_valid(train_data,test_data): return train_data,test_data
+  train_data = prepare_new_data_for_svm(train_data_unformatted)
+  test_data = prepare_new_data_for_svm(test_data_unformatted)
+  save_data_to_cache(train_data,test_data)
+  return train_data,test_data
+
+* reform(data,clusters)
+  cluster_index = clusters.id(data)
+  cluster_difference = np.sum(np.abs(clusters.centroids[cluster_index] - data))
+  reform_data = np.zeros(cluster.number + 1)
+  reform_data[0] = cluster_difference
+  reform_data[cluster_index + 1] = 1
+
+clusters.id(data)
+
+* alg a (data_class separation)
+  for each data_class:
+     for output is (correct,incorrect):
+        find optimal K
+
+* alg a (data_class separation)
+  for each data_class:
+     for output is (correct,incorrect):
+        find optimal K
+
+
+* alg b (no data_class separatation)
+  for output is (correct,incorrect):
+     find optimal K
+
+

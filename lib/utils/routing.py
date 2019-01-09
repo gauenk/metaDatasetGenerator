@@ -172,49 +172,6 @@ def extractActivationValues(avDict,comboID,image_id):
         avVector.extend(avDict[layerName][image_id].ravel())
     avVector = np.array(avVector).ravel()
     return avVector
-
-def aggregateActivationsByClass(avDict,imdb,roidb,records,numSamples,verbose=False):
-    # init combination dictinaries
-    allCombo = {}
-    posCombo = {}
-    negCombo = {}
-    comboInfo = cfg.routingAnalysisInfo.comboInfo
-    for comboID,comboParameters in comboInfo.items():
-        allCombo[comboID] = initComboDictionary(comboParameters,imdb.classes)
-        posCombo[comboID] = initComboDictionary(comboParameters,imdb.classes)
-        negCombo[comboID] = initComboDictionary(comboParameters,imdb.classes)
-
-    # aggregate activation information by combination settings
-    for imageIndexID in imdb.image_index[:numSamples]:
-        clsName = getClassName(imdb,roidb,imageIndexID)
-        if skipSampleForComputation(clsName): continue # shortcut for computation
-        for comboID, comboParameters in comboInfo.items():
-            layerNames = comboID.split("-")
-            allComboList = []
-            posComboList = []
-            negComboList = []
-            for layerName in layerNames:
-                activations = avDict[layerName][imageIndexID].ravel()
-                recordValue = records[imageIndexID][0]
-                #print(layerName,comboID)
-                aggregateActiationsByRecordIntoComboSplits(recordValue,activations,allComboList,posComboList,negComboList)
-            aggregateActiationsOfLayerByRecordIntoComboDicts(allCombo[comboID][clsName],allComboList,
-                                                             posCombo[comboID][clsName],posComboList,
-                                                             negCombo[comboID][clsName],negComboList)
-    # "numpify" all the lists per combo per class
-    for comboID,comboParmeters in comboInfo.items():
-        for clsName in imdb.classes:
-            if skipSampleForComputation(clsName): continue # shortcut for computation
-            allCombo[comboID][clsName] = np.array(allCombo[comboID][clsName])
-            posCombo[comboID][clsName] = np.array(posCombo[comboID][clsName])
-            negCombo[comboID][clsName] = np.array(negCombo[comboID][clsName])
-            if cfg.verbose or verbose:
-                print("comboID: {} || clsName: {}".format(comboID,clsName))
-                print("all",allCombo[comboID][clsName].shape)
-                print("pos",posCombo[comboID][clsName].shape)
-                print("neg",negCombo[comboID][clsName].shape)
-        
-    return allCombo,posCombo,negCombo
     
 def aggregateActiationsOfLayerByRecordIntoComboDicts(allCombo,allComboList,posCombo,posComboList,negCombo,negComboList):
     if cfg.verbose:
@@ -223,12 +180,12 @@ def aggregateActiationsOfLayerByRecordIntoComboDicts(allCombo,allComboList,posCo
     if len(posComboList) > 0: posCombo.append(posComboList)
     if len(negComboList) > 0: negCombo.append(negComboList)
     
-def initComboDictionary(comboParameters,classes):
+def initComboClassDictionary(comboParameters,classes):
     comboDict = {}
     for className in classes: comboDict[className] = []
     return comboDict
 
-def aggregateActiationsByRecordIntoComboSplits(recordValue,activation,allCombo,posCombo,negCombo):
+def aggregateActiationsByRecordIntoComboSplits(recordValue,activation,allCombo,posCombo,negCombo,imageIndexID):
     allCombo.extend(activation)
     if recordValue == 1:
         posCombo.extend(activation)
@@ -249,38 +206,6 @@ def subsampleDictionary(pyDict,subsampleKeys):
     subsampleDict = {subsampleKey:pyDict[subsampleKey] for key in subsampleKeys}
     return subsampleDict
     
-def aggregateActivationsByClassSeparateLayers(avDict,imdb,roidb,records):
-    clsDict = {}
-    clsDictPos = {}
-    clsDictNeg = {}
-    # 1st aggregrate the activations to be within each class within each layer
-    for layer,avLayerDict in avDict.items():
-        print("Layer {}".format(layer))
-        clsDict[layer] = dict.fromkeys(imdb.classes,None)
-        clsDictPos[layer] = dict.fromkeys(imdb.classes,None)
-        clsDictNeg[layer] = dict.fromkeys(imdb.classes,None)
-        for clsName in clsDict[layer].keys():
-            clsDict[layer][clsName] = []
-            clsDictPos[layer][clsName] = []
-            clsDictNeg[layer][clsName] = []
-        for image_id,activation in avLayerDict.items():
-            index = imdb.image_index.index(image_id)
-            clsIndex = roidb[index]['gt_classes'][0]
-            clsName = imdb.classes[clsIndex]
-            clsDict[layer][clsName].append(activation)
-            if records is not None:
-                recordValue = records[image_id][0]
-                if recordValue == 1:
-                    clsDictPos[layer][clsName].append(activation)
-                elif recordValue == 0:
-                    clsDictNeg[layer][clsName].append(activation)
-                else:
-                    print("weirdness worth checking out.\
-                    records gives {} at image_id {}".format(recordValue,image_id))
-    if records is None:
-        clsDictPos = None
-        clsDictNeg = None
-    return clsDict,clsDictPos,clsDictNeg
 
 def routeFromActivationsSet(activations,densityEstimationParameters,clusterCacheStr):
     densityEstimationType = cfg.routingAnalysisInfo.densityEstimation.typeStr
@@ -349,7 +274,7 @@ def routeActivityVectorsByClass(avDict,imdb,roidb,numSamples=-1,records=None,com
     *Note: if "records" is passed in then the output is three dictionaries
     """
     threshold = 0.01
-    clsDict,clsDictPos,clsDictNeg = aggregateActivationsByClass(avDict,imdb,roidb,records,numSamples)
+    comboAll,comboAllLabels,comboPos,comboNeg = aggregateActivations(avDict,imdb,roidb,records,numSamples)
     print("routeDict")
     routeDict = routingStatisticsByClass(clsDict,imdb,'all',thresh=threshold)
     print("routeDictPos")
@@ -364,6 +289,9 @@ def routeActivityVectorsByClass(avDict,imdb,roidb,numSamples=-1,records=None,com
         saveRouteCache(routeAPos,"routePos")
         saveRouteCache(routeANeg,"routeNeg")
 
+
+def computeClustersByData():
+    
 
 def addRouteEntry(fid,routeDifference,label):
     totalDiff = computeTotalRouteDifference(routeDifference)            

@@ -1,0 +1,45 @@
+loadOnlyClsStr: 'cat'
+netInfo:
+   modelName: "cifar_10_lenet5_yesImageNoise_noPrune_iter_100000"
+   modelType: "lenet5"
+   trainDataset:
+      name: "cifar_10"
+      split: "train"
+      config: "default"
+routingAnalysisInfo:
+   layers:  !!python/list ["conv1","conv2","ip1","cls_score"]
+   densityEstimationType: 'all'
+   densityEstimationClusterType: 'kmeans'
+   densityEstimationTypeConfigFilename: None
+   densityEstimationTypeConfigFilename: True
+   comboType: 'all'
+   comboInfo: None # generated
+   routeFunction: 'default'
+   routeDifference: 'default'
+   train:
+      name: "cifar_10"
+      split: "train"
+      config: "default"
+   test:
+      name: "cifar_10"
+      split: "val"
+      config: "default"
+   referenceRoute:
+      referenceName: None
+      indexWeightStr: None
+      dataset:
+         name: "cifar_10"
+         split: "train"
+         config: "default"
+referenceRoute:
+   referenceName: None
+   indexWeightStr: None
+   dataset:
+      name: None
+      split: None
+      config: None
+kmeans:
+   nClusters: 100
+dbscan:
+   eps: 12500
+   minSamples: 2

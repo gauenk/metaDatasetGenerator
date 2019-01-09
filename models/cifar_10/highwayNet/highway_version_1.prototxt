@@ -1,0 +1,106 @@
+layer {
+  name: "H"
+  type: "Convolution"
+  bottom: "bottom_0"
+  top: "H"
+  param {
+    lr_mult: 1
+  }
+  param {
+    lr_mult: 2
+  }
+  convolution_param {
+    num_output: 3
+    kernel_size: 5
+    pad_h: 2
+    pad_w: 2
+    stride: 1
+    weight_filler {
+      type: "xavier"
+    }
+    bias_filler {
+      type: "constant"
+    }
+  }
+}
+layer {
+  name: "reluH"
+  type: "ReLU"
+  bottom: "H"
+  top: "H"
+}
+layer {
+  name: "T"
+  type: "Convolution"
+  bottom: "bottom_0"
+  top: "T"
+  param {
+    lr_mult: 1
+  }
+  param {
+    lr_mult: 2
+  }
+  convolution_param {
+    num_output: 3
+    kernel_size: 5
+    pad_h: 2
+    pad_w: 2
+    stride: 1
+    weight_filler {
+      type: "xavier"
+    }
+    bias_filler {
+      type: "constant"
+      min: -3
+      max: -1
+    }
+  }
+}
+layer {
+  name: "sigmoidT"
+  type: "Sigmoid"
+  bottom: "T"
+  top: "T"
+}
+layer {
+  name: 'C'
+  type: 'Power'
+  bottom: 'T'
+  top: 'C'
+  power_param {
+     power: 1
+     scale: -1
+     shift: 1
+  }
+}  
+layer {
+  name: 'highway_prod_b'
+  top: 'highway_prod_b'
+  type: 'Eltwise'
+  eltwise_param {
+     operation: PROD
+  }
+  bottom: 'C'
+  bottom: 'bottom_1'
+}
+layer {
+  name: 'highway_prod_a'
+  top: 'highway_prod_a'
+  type: 'Eltwise'
+  eltwise_param {
+     operation: PROD
+  }
+  bottom: 'T'
+  bottom: 'H'
+}
+
+layer {
+  name: 'highway_sum'
+  top: 'top'
+  type: 'Eltwise'
+  eltwise_param {
+     operation: SUM
+  }
+  bottom: 'highway_prod_a'
+  bottom: 'highway_prod_b'
+}

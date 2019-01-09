@@ -19,6 +19,7 @@ class classificationEvaluator(object):
                  imageSetPath, imageIndex, annoPath,load_annotation,
                  onlyCls=None):
         self._datasetName = datasetName
+        self._class_convert = [classes.index(cls) for cls in classes]
         self._classes = classes
         self._comp_id = compID
         self._salt = salt
@@ -35,24 +36,39 @@ class classificationEvaluator(object):
         # if self._classes != num_outputs:
         #     raise ValueError("ERROR: the classes and output size don't match!")
         all_probs = classification_object['all_probs']
+
+        if 'dataset_augmentations' in classification_object.keys():  augmentations = classification_object['dataset_augmentations']
+        else: augmentations = []
+        print("# of classes: {}".format(len(all_probs)))
+        print("# of samples to eval: {}".format(len(all_probs[0])))
         self._pathResults = output_dir
         if cfg.SUBTASK == "tp_fn":
             self._write_results_file(all_probs)
             self._do_python_eval(output_dir)
         elif cfg.SUBTASK in ["default","al_subset"]:
-            self._write_softmax_results_file(all_probs)
-            self._do_cls_python_eval(output_dir)
+            self._write_softmax_results_file(all_probs,augmentations)
+            self._do_cls_python_eval(dataset_augmentations=augmentations,output_dir=output_dir)
         else:
             print("ERROR: cfg.SUBTASK = {} is unknown".format(cfg.SUBTASK))
             sys.exit()
 
-    def _write_softmax_results_file(self, all_probs):
+    def _write_softmax_results_file(self, all_probs,augmentations):
         filename = self._get_results_file_template().format("all")
+        print(filename)
         max_indices = np.argmax(all_probs,axis=0)
         max_values = np.max(all_probs,axis=0)
         with open(filename, 'wt') as f:
-            for image_index,max_index,max_value in zip(self.image_index,max_indices,max_values):
-                f.write('{:s} {:d} {:.3f}\n'.format(image_index,max_index,max_value))
+            if len(augmentations) == 0:
+                for image_index,max_index,max_value in zip(self.image_index,max_indices,max_values):
+                    f.write('{:s} {:d} {:.3f}\n'.format(image_index,max_index,max_value))
+            else:
+                n_augmentations = len(augmentations[0])
+                n_samples = n_augmentations * len(self.image_index)
+                for index,max_index,max_value in zip(range(n_samples),max_indices,max_values):
+                    sample_index = index // n_augmentations
+                    aug_index = index % n_augmentations
+                    image_index = self.image_index[sample_index]
+                    f.write('{:s} {:d} {:d} {:.3f}\n'.format(image_index,aug_index,max_index,max_value))
 
     def _write_results_file(self, all_probs):
         for cls_ind, cls in enumerate(self._classes):
@@ -76,7 +92,7 @@ class classificationEvaluator(object):
                             f.write(' {:.3f}'.format(probs[k]))
                         f.write('\n')
 
-    def _do_cls_python_eval(self, output_dir = 'output',rotations = None):
+    def _do_cls_python_eval(self, dataset_augmentations = [], output_dir = 'output',rotations = None):
         annopath = self._annoPath + "/{:s}"
         aps = []
         # The PASCAL VOC metric changed in 2010
@@ -87,7 +103,8 @@ class classificationEvaluator(object):
         suffix = self._get_experiment_suffix_template().format(cls)
         acc, rec, prec, ovthresh = self.cls_eval(
             detfile, annopath, self._imageSetPath, cls, self._cachedir, suffix, \
-            ovthresh=0.5, use_07_metric=use_07_metric, rotations = rotations)
+            ovthresh=0.5, use_07_metric=use_07_metric, rotations = rotations,
+            dataset_augmentations=dataset_augmentations,class_convert=self._class_convert)
         print("\n\n\n\n\n")
         print("IDK what to do from here")
         print("\n\n\n\n\n")
@@ -95,8 +112,8 @@ class classificationEvaluator(object):
         infix = "faster-rcnn"
         if cfgData.MODEL:
             infix = cfgData.MODEL
-        if cfg.ROTATE_IMAGE != -1:
-            infix += "_{}".format(cfg.ROTATE_IMAGE)
+        if cfg.IMAGE_ROTATE != -1:
+            infix += "_{}".format(cfg.IMAGE_ROTATE)
         results_filename = "./results_{}_{}_{}.txt".format(infix,self._datasetName, self._salt)
         results_fd = open(results_filename,"w")
         for kdx in range(len(ovthresh)):
@@ -137,7 +154,7 @@ class classificationEvaluator(object):
         print('--------------------------------------------------------------')
         print('')
         results_fd.close()
-
+        print(results_filename)
         # remove the results since I don't know how to "not write" with the results_fd variable.
         if not cfg.WRITE_RESULTS: os.remove(results_filename)
         
@@ -158,14 +175,15 @@ class classificationEvaluator(object):
             suffix = self._get_experiment_suffix_template().format(cls)
             rec, prec, ap, ovthresh = self.cls_eval(
                 detfile, annopath, self._imageSetPath, cls, self._cachedir, suffix, \
-                ovthresh=0.5, use_07_metric=use_07_metric, rotations = rotations)
+                ovthresh=0.5, use_07_metric=use_07_metric, rotations = rotations,
+                class_convert=self._class_convert)
             aps += [ap]
         aps = np.array(aps)
         infix = "faster-rcnn"
         if cfgData.MODEL:
             infix = cfgData.MODEL
-        if cfg.ROTATE_IMAGE != -1:
-            infix += "_{}".format(cfg.ROTATE_IMAGE)
+        if cfg.IMAGE_ROTATE != -1:
+            infix += "_{}".format(cfg.IMAGE_ROTATE)
         results_filename = "./results_{}_{}_{}.txt".format(infix,self._datasetName, self._salt)
         results_fd = open(results_filename,"w")
         for kdx in range(len(ovthresh)):
@@ -225,9 +243,11 @@ class classificationEvaluator(object):
                   classname,
                   cachedir,
                   suffix,
+                  dataset_augmentations = [],
                   ovthresh=0.5,
                   use_07_metric=False,
-                  rotations = None):
+                  rotations = None,
+                  class_convert = []):
         """rec, prec, ap = bbox_eval(detpath,
                                     annopath,
                                     imagesetfile,
@@ -262,14 +282,14 @@ class classificationEvaluator(object):
         
         gt_image_ids = imagenames
         # read dets from model
-        image_ids, model_probs = loadModelCls(detpath,classname)
+        image_ids, model_probs = loadModelCls(detpath,classname,dataset_augmentations)
 
         # number of detections (nd) from the model
         nd = len(image_ids)
         print("# of detections",nd)
 
         ovthresh = [0.5,0.75,0.95]
-        tp, tn, fp, fn = compute_metrics(ovthresh,image_ids,model_probs,gt_class_probs,len(self._classes))
+        tp, tn, fp, fn = compute_metrics(ovthresh,image_ids,model_probs,gt_class_probs,len(self._classes),class_convert)
         # print(np.sum(tp))
         n_tp = np.sum(tp,axis=0)
         n_tn = np.sum(tn,axis=0)

@@ -1,0 +1,14 @@
+train_net: "models/cifar_10/highwayNet/train.prototxt"
+type: "sgd"
+lr_policy: "inv"
+base_lr: 0.01
+momentum: 0.9
+weight_decay: 0.0005
+gamma: 0.0001
+power: 0.75
+display: 100
+max_iter: 10000
+snapshot: 0
+snapshot_prefix: "cifar-10_lenet5_adam_noImageNoise_noPrune_yesDsAug25_nClasses2"
+iter_size: 1
+solver_mode: GPU

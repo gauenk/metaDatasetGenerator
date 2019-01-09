@@ -7,20 +7,29 @@ def compute_separability(train_data,test_data,clusters):
     if cfg.verbose: print("-> preparing data for svm")
     prepare_data_for_svm(train_data,test_data,clusters) # overwrites 'exp_samples' field
     if cfg.verbose: print("-> compute_separability_by_dataset_class")
-    sep_by_dsclass = compute_separability_by_dataset_class(train_data,test_data,clusters)
+    sep_by_dsclass = compute_separability_by_dataset_class(train_data,test_data)
     if cfg.verbose: print("-> compute_separability_by_correctness")
-    sep_by_correct = compute_separability_by_correctness(train_data,test_data,clusters)
-    train_seps = [sep_by_dsclass[0],sep_by_correct[0]]
-    test_seps = [sep_by_dsclass[1],sep_by_correct[1]]
+    sep_by_correct = compute_separability_by_correctness(train_data,test_data)
+    if cfg.verbose: print("-> compute_separability_by_dataset_class_only_final_layer")
+    sep_by_dsclass_only_final_layer = compute_separability_by_dataset_class_only_final_layer(train_data,test_data)
+    train_seps = [sep_by_dsclass[0],sep_by_correct[0],sep_by_dsclass_only_final_layer[0]]
+    test_seps = [sep_by_dsclass[1],sep_by_correct[1],sep_by_dsclass_only_final_layer[1]]
     return train_seps,test_seps
     
-def compute_separability_by_dataset_class(train_data,test_data,clusters):
-    return compute_separability_template(train_data,test_data,clusters,"svm_by_dataset_class_cache.pkl",'dataset')
+def compute_separability_by_dataset_class_only_final_layer(train_data,test_data):
+    finalLayerName = cfg.layerList[-1]
+    train_data.exp_samples = train_data.samples[finalLayerName]
+    test_data.exp_samples = test_data.samples[finalLayerName]
+    cachname = "svm_by_dataset_class_only_layername_{}_cache.pkl".format(finalLayerName)
+    return compute_separability_template(train_data,test_data,cachname,'dataset')
 
-def compute_separability_by_correctness(train_data,test_data,clusters):
-    return compute_separability_template(train_data,test_data,clusters,"svm_by_correctness_cache.pkl",'correctness')
+def compute_separability_by_dataset_class(train_data,test_data):
+    return compute_separability_template(train_data,test_data,"svm_by_dataset_class_cache.pkl",'dataset')
 
-def compute_separability_template(train_data,test_data,clusters,filename,label_field):
+def compute_separability_by_correctness(train_data,test_data):
+    return compute_separability_template(train_data,test_data,"svm_by_correctness_cache.pkl",'correctness')
+
+def compute_separability_template(train_data,test_data,filename,label_field):
     svmCache = Cache(filename,cfgForCaching,"svm")
     sets_separability = svmCache.load()
     if svmCache.is_valid: return sets_separability[0],sets_separability[1]
@@ -28,19 +37,21 @@ def compute_separability_template(train_data,test_data,clusters,filename,label_f
     if label_field == 'correctness': train_data.exp_labels,test_data.exp_labels = train_data.correct,test_data.correct
     elif label_field == 'dataset': train_data.exp_labels,test_data.exp_labels = train_data.ds_labels,test_data.ds_labels
         
-    train_separability,test_separability = compute_new_separability(train_data,test_data,clusters)
+    train_separability,test_separability = compute_new_separability(train_data,test_data)
 
     svmCache.save([train_separability,train_separability])
     return train_separability,test_separability
 
-def compute_new_separability(train_data,test_data,clusters):
+def compute_new_separability(train_data,test_data):
 
     train_samples = train_data.exp_samples
     train_labels = train_data.exp_labels
     test_samples = test_data.exp_samples
     test_labels = test_data.exp_labels
+    
+    dual_bool = train_samples.shape[0] <= train_samples.shape[1]
 
-    clf = sk_svm.LinearSVC(class_weight='balanced')
+    clf = sk_svm.LinearSVC(class_weight='balanced',dual=dual_bool)
     if cfg.verbose: print("[compute_new_sep] pre-sk_svm.fit")
     svm = clf.fit(train_samples,train_labels)
     if cfg.verbose: print("[compute_new_sep] post-sk_svm.fit")
