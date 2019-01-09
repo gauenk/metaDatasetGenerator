@@ -30,6 +30,13 @@ class imdb(object):
         # Use this dict for storing dataset specific config options
         self.config = {}
 
+    # we add an iterator
+    def __iter__(self):
+        raise NotImplemented("no iterator defined")
+
+    def __next__(self):
+        raise NotImplemented("no iterator defined")
+    
     @property
     def name(self):
         return self._name

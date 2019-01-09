@@ -246,6 +246,8 @@ __C.TEST.OBJ_DET.RPN_POST_NMS_TOP_N = 300
 # Proposal height and width both need to be greater than RPN_MIN_SIZE (at orig image scale)
 __C.TEST.OBJ_DET.RPN_MIN_SIZE = 16
 
+# max # of detections per image over all classes
+__C.TEST.OBJ_DET.MAX_PER_IMAGE = 100
 
 __C.TEST.CLASSIFICATION = edict()
 __C.TEST.CLASSIFICATION.TASK = 'tp_fn'
@@ -406,6 +408,11 @@ def GET_SAVE_ACTIVITY_VECTOR_BLOBS_DIR():
     return dirn
 
 # used for saving activity vectors
+__C.ACTIVATION_VALUES = edict()
+__C.ACTIVATION_VALUES.SAVE_BOOL = False
+__C.ACTIVATION_VALUES.LAYER_NAMES = ['conv1','conv2','ip1','cls_score','cls_prob']
+__C.ACTIVATION_VALUES.SAVE_DIR = GET_SAVE_ACTIVITY_VECTOR_BLOBS_DIR
+__C.ACTIVATION_VALUES.SAVE_OBJ = 'order' # 'image_id','order'
 __C.GET_SAVE_ACTIVITY_VECTOR_BLOBS_DIR = GET_SAVE_ACTIVITY_VECTOR_BLOBS_DIR
 # __C.SAVE_ACTIVITY_VECTOR_BLOBS = [] # the list of blobs to save
 __C.SAVE_ACTIVITY_VECTOR_BLOBS = ['conv1','conv2','ip1','cls_score','cls_prob']
@@ -419,6 +426,7 @@ __C.ACTIVE_LEARNING.VAL_SIZE = 30000
 __C.ACTIVE_LEARNING.SUBSET_SIZE = 500
 __C.ACTIVE_LEARNING.N_COVERS = 300
 __C.ACTIVE_LEARNING.REPORT = False
+__C.ACTIVE_LEARNING.LAYER_NAMES = ['conv1','conv2','ip1','cls_score','cls_prob']
 
 # Prune Network: the number is the modulous for the frequency of pruning
 cfg.PRUNE_NET = 0 

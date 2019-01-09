@@ -46,7 +46,7 @@ def parse_args():
                         nargs=argparse.REMAINDER)
     parser.add_argument('--vis', dest='vis', help='visualize detections',
                         action='store_true')
-    parser.add_argument('--num_dets', dest='max_per_image',
+    parser.add_argument('--num_dets', dest='max_dets_per_image',
                         help='max number of detections per image',
                         default=100, type=int)
     parser.add_argument('--rotate', dest='rotate',
@@ -119,7 +119,7 @@ if __name__ == '__main__':
         al_net = caffe.Net(args.al_def,caffe.TEST, weights=args.al_net)
         al_net.name = "al_"+os.path.splitext(os.path.basename(args.al_def))[0]
 
-    test_net(net, imdb, max_per_image=args.max_per_image, vis=args.vis, al_net=al_net)
+    test_net(net, imdb, max_dets_per_image=args.max_dets_per_image, vis=args.vis, al_net=al_net)
     
 '''
 argparse.ArgumentParser
