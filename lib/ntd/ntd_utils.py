@@ -334,8 +334,36 @@ def saveNtdSummaryStats(cmRaw_l,cmCropped_l,cmDiff_l):
                               cmap = plt.cm.bwr_r,vmin=-100,vmax=100)
     print(p_values)
 
-    
-    
+def saveNtdConfMats(cmRaw,cmCropped,ntdGameInfo,infix=None):
+    fn = "confMats_{}_{}_{}_{}.pkl".format(ntdGameInfo['setID'],ntdGameInfo['repeat'],
+                                           ntdGameInfo['size'],cfg.uuid)
+    fid = open(iconicImagesFileFormat().format(fn),"wb")
+    pickle.dump({"raw":cmRaw,"cropped":cmCropped},fid)
+    fid.close()
+
+def plotNtdConfMats(cmRaw,cmCropped,cmDiff,ntdGameInfo,infix=None):
+
+    if infix in ntdGameInfo.keys():
+        appendStr = '{}_{}_{}_{}_{}'.format(ntdGameInfo['setID'],ntdGameInfo['size'],
+                                                 cfg.uuid,infix,ntdGameInfo[infix])
+    else:
+        appendStr = '{}_{}_{}_{}'.format(ntdGameInfo['setID'],ntdGameInfo['repeat'],
+                                         ntdGameInfo['size'],cfg.uuid)
+                                  
+    pathToRaw = osp.join(cfg.PATH_TO_NTD_OUTPUT, 'ntd_raw_{}'.format(appendStr))
+    pathToCropped = osp.join(cfg.PATH_TO_NTD_OUTPUT, 'ntd_cropped_{}'.format(appendStr))
+    pathToDiff = osp.join(cfg.PATH_TO_NTD_OUTPUT, 'ntd_diff_raw_cropped_{}'.format(appendStr))
+    plot_confusion_matrix(np.copy(cmRaw), cfg.clsToSet,
+                          pathToRaw, title="Raw Images",
+                          cmap = plt.cm.bwr_r,vmin=-100,vmax=100)
+    plot_confusion_matrix(np.copy(cmCropped), cfg.clsToSet,
+                          pathToCropped, title="Cropped Images",
+                          cmap = plt.cm.bwr_r,vmin=-100,vmax=100)
+    plot_confusion_matrix(np.copy(cmDiff), cfg.clsToSet, 
+                          pathToDiff,title="Raw - Cropped",
+                          cmap = plt.cm.bwr_r,vmin=-100,vmax=100)
+
+
 
     
 

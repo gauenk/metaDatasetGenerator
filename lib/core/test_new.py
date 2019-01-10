@@ -379,7 +379,7 @@ def test_net(net, imdb, max_dets_per_image=100, thresh=1/80., vis=False, al_net=
     We need to load cropped images.
     """
 
-    roidb = imdb.roidb
+    roidb = imdb.roidb #imdb weirdness
     output_dir = get_output_dir(imdb, net)
 
     alReport = activeLearningReportAppendActivationValueData(net,imdb,cfg.ACTIVE_LEARNING)

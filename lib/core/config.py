@@ -555,13 +555,13 @@ def setModelInfo(solverPrototxt):
     else:
         cfg.modelInfo.dataset_augmentation = False
 
-    cls_incl_list_0_bool = len(cfg.DATASETS.CLASS_INCLUSION_LIST) == 0
-    cls_filter_none_bool = cfg.DATASETS.CLASS_FILTER is None
-    cls_filter_false_bool = cfg.DATASETS.CLASS_FILTER is False
+    cls_incl_list_0_bool = len(cfg.DATASETS.FILTERS.CLASS_INCLUSION_LIST) == 0
+    cls_filter_none_bool = cfg.DATASETS.FILTERS.CLASS is None
+    cls_filter_false_bool = cfg.DATASETS.FILTERS.CLASS is False
     if cls_filter_none_bool or cls_filter_false_bool or cls_incl_list_0_bool:
         cfg.modelInfo.classFilter = False
     else:
-        cfg.modelInfo.classFilter = len(cfg.DATASETS.CLASS_INCLUSION_LIST)
+        cfg.modelInfo.classFilter = len(cfg.DATASETS.FILTERS.CLASS_INCLUSION_LIST)
 
 # functions for filling in a prototxt with other prototxts for training.... should probably swtich to pytorch soon...
 

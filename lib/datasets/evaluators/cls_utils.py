@@ -61,7 +61,7 @@ def load_cls_groundTruth(classname,cachedir,imagesetfile,annopath,annoReader,ind
 def load_groundTruth(classname,cachedir,imagesetfile,annopath,\
                      _load_annotation,_classes):
     if cfg.SUBTASK == 'tp_fn':
-        records = ds_utils.loadEvaluationRecords(classname)
+        records = ds_utils.loadEvaluationRecords(classname,cfg.TP_FN_RECORDS_PATH,cfg.DATASETS)
         imagenames,probs = zip(*records.items())
         probsOrAnnos = probs
     elif cfg.SUBTASK in ["default","al_subset"]:

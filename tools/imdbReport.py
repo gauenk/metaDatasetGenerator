@@ -14,9 +14,10 @@ matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 import _init_paths
 from utils.misc import createNoisyBox,vis_dets
-from utils.blob import applyDatasetAugmentations,getRawImageBlob
+from utils.blob import applyDatasetAugmentationList,getRawImageBlob
 from core.train import get_training_roidb
 from core.config import cfg, cfg_from_file, cfg_from_list, get_output_dir,loadDatasetIndexDict
+from core.configDatasetAugmentation import *
 from datasets.factory import get_repo_imdb
 from datasets.ds_utils import load_mixture_set,print_each_size,roidbSampleBox,pyroidbTransform_cropImageToBox,pyroidbTransform_normalizeBox,roidbSampleImageAndBox
 import os.path as osp
@@ -139,7 +140,10 @@ if __name__ == '__main__':
         cfg_from_file(args.cfg_file)
 
     print('Using config:')
-    pprint.pprint(cfg)
+    import copy
+    cfgPrint = copy.deepcopy(cfg)
+    del cfgPrint.DATASET_AUGMENTATION
+    pprint.pprint(cfgPrint)
 
     if not args.randomize:
         np.random.seed(cfg.RNG_SEED)
@@ -184,82 +188,24 @@ if __name__ == '__main__':
         print("\t\t{}".format(v))
 
     print("showing dataset augmentation")
-    def createExhaustiveTranslationConfigs(translation_input_list):
-        translation_list = []
-        for trans in translation_input_list:
-            trans_dict = [{'step':trans} for _ in range(4)]
-            trans_dict[0]['direction'] = 'u'
-            trans_dict[1]['direction'] = 'd'
-            trans_dict[2]['direction'] = 'l'
-            trans_dict[3]['direction'] = 'r'
-            translation_list.extend(trans_dict)
-        return translation_list
 
-    def createExhaustiveCropConfigs(crop_input_list):
-        crop_list = []
-        for crop in crop_input_list:
-            crop_dict = {'step':crop}
-            crop_list.append(crop_dict)
-        return crop_list
-
-    def createExhaustiveRotationConfigs(rotation_input_list):
-        rotation_list = []
-        for angle in rotation_input_list:
-            rotation_dict = {'angle':angle}
-            rotation_list.append(rotation_dict)
-        return rotation_list
-
-    def getnumel(alist_of_lists):
-        numel = 1
-        if alist_of_lists is None: return numel
-        for alist in alist_of_lists: numel *= len(alist)
-        return numel
-
-    def createDatasetAugmentationMesh(alist_of_lists):
-        return create_mesh_from_lists(alist_of_lists)
-
-    def create_mesh_from_lists(alist_of_lists,verbose=False):
-        numel = getnumel(alist_of_lists)
-        mesh = [ [ None for _ in range(numel) ] for transList in alist_of_lists ]
-        for transListIndex,transList in enumerate(alist_of_lists):
-            assert (numel % len(transList)) == 0,"translation index zero"
-            numberOfRepeats = numel // len(transList)
-            numberOfUniqueValues = len(transList)
-            alist_of_lists_copy = alist_of_lists[:]
-            for pop_index in range(transListIndex+1): alist_of_lists_copy.pop(0)
-            numberTogether = getnumel(alist_of_lists_copy)
-            numberOfBlocks = numberOfRepeats // numberTogether
-            blockSpacing = numberTogether * numberOfUniqueValues
-            if verbose:
-                print("-=-=-=-=-=-=-=-=-=-=-=-=-=-")
-                print("transListIndex: {}".format(transListIndex))
-                print("numberOfRepeats: {}".format(numberOfRepeats))
-                print("numberOfUniqueValues: {}".format(numberOfUniqueValues))
-                print("numberTogether: {}".format(numberTogether))
-                print("numberOfBlocks: {}".format(numberOfBlocks))
-            for start_index,unique_value in enumerate(transList):                
-                for block_index in range(numberOfBlocks):
-                    mesh_index = start_index * numberTogether + block_index * blockSpacing
-                    for repeat in range(numberTogether):
-                        mesh[transListIndex][mesh_index+repeat] = unique_value
-                
-        return mesh
-            
     translation_input_list = [2]
     translation_list = createExhaustiveTranslationConfigs(translation_input_list)
     crop_input_list = [i+1 for i in range(6)]
     crop_list = createExhaustiveCropConfigs(crop_input_list)
     rotation_input_list = [4*i-30 for i in range(15+1)] + [0]
     rotation_list = createExhaustiveRotationConfigs(rotation_input_list)
-    mesh = create_mesh_from_lists([rotation_list,translation_list,crop_list])
+    mesh = create_mesh_from_lists([translation_list,rotation_list,crop_list])
     input_config = {'dataset_augmentation':{'transformations':mesh}}
 
     im = cv2.imread(roidb[0]['image'])
-    im_list = applyDatasetAugmentations(im,configs)
-    for index,img in enumerate(im_list):
-        fn = 'da_image_index_{}.png'.format(index)
-        cv2.imwrite(fn,img)
-    
+    im_list = applyDatasetAugmentationList(im,input_config['dataset_augmentation'])
+    if False:
+        for index,img in enumerate(im_list):
+            fn = 'da_image_index_{}.png'.format(index)
+            print("saving filename [{}]".format(fn))
+            cv2.imwrite(fn,img)
+
 #     getRawImageBlob([roidb[0]],[],[28],config=dataset_augmentation_config)
 #     getRawImageBlob(
 

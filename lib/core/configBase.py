@@ -151,3 +151,101 @@ def writeNetFromProto(net,new_prototxt):
     with open(new_prototxt,'w') as f:
         f.write(str(net))
 
+def checkListEqualityWithOrder(list_a,list_b):
+    print(list_a)
+    if len(list_a) == 0 and len(list_b) == 0:
+        return True
+    if len(list_a) != len(list_b):
+        return False
+    for item_a in list_a:
+        for item_b in list_b:        
+            if type(item_a) is list and type(item_b) is list:
+                if not checkListEqualityWithOrder(item_a,item_b):
+                    return False
+            elif type(item_a) is edict and type(item_b) is edict:
+                if checkEdictEquality(item_a,item_b):
+                    return False
+            elif type(item_a) is dict and type(item_b) is dict:
+                if checkEdictEquality(item_a,item_b):
+                    return False
+            elif item_a != item_b:
+                return False
+    return True
+
+
+# def check_list_equal_any(list_a,list_b):
+#     # assumes the types are aligned
+#     if len(list_a) == 0 or len(list_b) == 0:
+#         return False
+#     for item_a in list_a:
+#         if item_b in list_b:
+#             if type(item_a) is list:
+#                 if check_list_equal_any(item_a,item_b):
+#                     return True
+#             if type(item_a) is 
+#             if item_a == item_b:
+#                 return True
+#     return False
+
+def any_true_in_list(boolList):
+    anyTrue = False
+    for boolValue in boolList:
+        if boolValue is True:
+            anyTrue = True
+    anyTrue = boolList
+
+def checkListEqualityWithOrderIgnored(list_a,list_b):
+    # all the elements in list_a are somewhere in list_b
+    if len(list_a) == 0 and len(list_b) == 0:
+        return True
+    if len(list_a) != len(list_b):
+        return False
+    for item_a in list_a:
+        boolList = []
+        for item_b in list_b:        
+            if type(item_a) is list and type(item_b) is list:
+                if checkListEqualityWithOrderIgnored(item_a,item_b):
+                    boolList.append(True)
+                else:
+                    boolList.append(False)
+            elif type(item_a) is edict and type(item_b) is edict:
+                if checkEdictEquality(item_a,item_b):
+                    boolList.append(True)
+                else:
+                    boolList.append(False)
+            elif type(item_a) is dict and type(item_b) is dict:
+                if checkEdictEquality(item_a,item_b):
+                    boolList.append(True)
+                else:
+                    boolList.append(False)
+            elif item_a != item_b:
+                boolList.append(True)
+            else:
+                boolList.append(True)
+        if any_true_in_list(boolList):
+            return False
+    return True
+
+
+def checkEdictEquality(validConfig,proposedConfig):
+    """
+    check if the input config edict is the same
+    as the current config edict
+    """
+    for key,validValue in validConfig.items(): # iterate through the "truth"
+        if key not in proposedConfig.keys():
+            return False
+        proposedValue = proposedConfig[key]
+        if type(validValue) is list:
+            isValid = checkListEqualityWithOrderIgnored(validValue,proposedValue)
+            if not isValid:
+                return False
+            continue
+        if type(validValue) is edict or type(validValue) is dict:
+            isValid = checkEdictEquality(validValue,proposedValue)
+            if not isValid:
+                return False
+            continue
+        if proposedValue != validValue:
+            return False
+    return True

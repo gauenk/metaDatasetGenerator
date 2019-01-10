@@ -63,9 +63,9 @@ def create_mesh_from_lists(alist_of_lists,verbose=False):
                     mesh[transListIndex][mesh_index+repeat] = unique_value
     return mesh
 
-def getDatasetAugmentationConfigurationsRandomSubset(da_config,n_percent):
+def getDatasetAugmentationConfigurationsSubset(da_config,n_percent,random_bool):
     nconfigs = int(len(da_config[0]) * n_percent) + 1
-    if cfg.DATASET_AUGMENTATION.RANDOMIZE: indicies = npr.permutation(len(da_config[0]))[:nconfigs]
+    if random_bool: indicies = npr.permutation(len(da_config[0]))[:nconfigs]
     else: indicies = np.arange(len(da_config[0]))[:nconfigs]
     da_cfg = [ [ transList[index] for index in indicies] for transList in da_config ]
     return da_cfg
@@ -89,7 +89,7 @@ def formatDatasetAugmentationForGetRawCroppedImage(input_da_config,da_inds):
 
 def reset_dataset_augmentation_with_mesh(mesh):
     cfg.DATASET_AUGMENTATION.EXHAUSTIVE_CONFIGS = mesh
-    cfg.DATASET_AUGMENTATION.CONFIGS = getDatasetAugmentationConfigurationsRandomSubset(cfg.DATASET_AUGMENTATION.EXHAUSTIVE_CONFIGS,cfg.DATASET_AUGMENTATION.N_PERC)
+    cfg.DATASET_AUGMENTATION.CONFIGS = getDatasetAugmentationConfigurationsSubset(cfg.DATASET_AUGMENTATION.EXHAUSTIVE_CONFIGS,cfg.DATASET_AUGMENTATION.N_PERC,cfg.DATASET_AUGMENTATION.RANDOMIZE_SUBSET)
     cfg.DATASET_AUGMENTATION.SIZE = len(cfg.DATASET_AUGMENTATION.CONFIGS[0])
     
 
@@ -115,7 +115,7 @@ def set_augmentation_by_calling_dataset():
     translation_list = createExhaustiveTranslationConfigs(configs['translation'])
     rotation_list = createExhaustiveRotationConfigs(configs['rotation'])
     crop_list = createExhaustiveCropConfigs(configs['crop'])
-    mesh = create_mesh_from_lists([rotation_list,translation_list,crop_list])
+    mesh = create_mesh_from_lists([translation_list,rotation_list,crop_list])
     reset_dataset_augmentation_with_mesh(mesh)
 
 translation_input_list = [2]
@@ -158,14 +158,16 @@ cfg.DATASET_AUGMENTATION.PRESET_ARGS_BY_SET = {
 cfg.DATASET_AUGMENTATION.BOOL = True
 cfg.DATASET_AUGMENTATION.N_SAMPLES = 0.25
 cfg.DATASET_AUGMENTATION.RANDOMIZE = False
+cfg.DATASET_AUGMENTATION.RANDOMIZE_SUBSET = True
 cfg.DATASET_AUGMENTATION.IMAGE_NOISE=0 #[0,1] for intensity
 cfg.DATASET_AUGMENTATION.IMAGE_TRANSLATE=translation_input_list
 cfg.DATASET_AUGMENTATION.IMAGE_ROTATE=rotation_input_list
 cfg.DATASET_AUGMENTATION.IMAGE_CROP=crop_input_list #[0,1] for cropping; 0 = no cropping; 1 = crop to (i) bbox edge, (ii) center pixel; nominally use [0,.5]
 cfg.DATASET_AUGMENTATION.N_PERC = 1.0
 cfg.DATASET_AUGMENTATION.EXHAUSTIVE_CONFIGS = mesh
-cfg.DATASET_AUGMENTATION.CONFIGS = getDatasetAugmentationConfigurationsRandomSubset(cfg.DATASET_AUGMENTATION.EXHAUSTIVE_CONFIGS,cfg.DATASET_AUGMENTATION.N_PERC)
+cfg.DATASET_AUGMENTATION.CONFIGS = getDatasetAugmentationConfigurationsSubset(cfg.DATASET_AUGMENTATION.EXHAUSTIVE_CONFIGS,cfg.DATASET_AUGMENTATION.N_PERC,cfg.DATASET_AUGMENTATION.RANDOMIZE_SUBSET)
 cfg.DATASET_AUGMENTATION.SIZE = len(cfg.DATASET_AUGMENTATION.CONFIGS[0])
+cfg.DATASET_AUGMENTATION.VERSION = 'v0.1'
 # cfg.DATASET_AUGMENTATION.EXHAUSTIVE_CONFIGS = []
 # cfg.DATASET_AUGMENTATION.CONFIGS = []
 # cfg.DATASET_AUGMENTATION.SIZE = 0

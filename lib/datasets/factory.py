@@ -11,6 +11,7 @@ import os, glob
 import numpy as np
 from core.config import cfg, cfg_from_file, cfg_from_list
 from datasets.repo_imdb import RepoImdb
+from datasets.ds_obj import DatasetObject
 from datasets.coco import coco
 
 __sets.append("pascal_voc_2012")
@@ -37,7 +38,8 @@ def get_repo_imdb(name,path_to_imageSets=None,cacheStrModifier=None):
     for __set in __sets:
         if di[0] == __set:
             print(di)
-            return RepoImdb(di[0],di[1],di[2],path_to_imageSets=path_to_imageSets,cacheStrModifier=cacheStrModifier)
+            return DatasetObject(di[0],di[1],di[2],path_to_imageSets=path_to_imageSets,cacheStrModifier=cacheStrModifier)
+            #return RepoImdb(di[0],di[1],di[2],path_to_imageSets=path_to_imageSets,cacheStrModifier=cacheStrModifier)
             # if __set == "coco":
             #     return coco(di[0],di[1],di[2])
             # else:

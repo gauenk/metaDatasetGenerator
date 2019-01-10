@@ -1,4 +1,5 @@
 from core.configBase import *
+from core.configDatasetAugmentation import *
 from easydict import EasyDict as edict
 
 
@@ -28,17 +29,22 @@ cfg.DATASETS.MODEL = None
 cfg.DATASETS.ANNOTATION_CLASS = "object_detection"
 cfg.DATASETS.IS_IMAGE_INDEX_FLATTENED = False
 cfg.DATASETS.HAS_BBOXES = False
+cfg.DATASETS.SUBSAMPLE_BOOL = False
 cfg.DATASETS.SUBSAMPLE_SIZE = -1
-cfg.DATASETS.CLASS_FILTER = True
-cfg.DATASETS.CLASS_INCLUSION_LIST = []   # NOTE! THIS FEATURE IS INCOMPLETE!!
-cfg.DATASETS.CLASS_INCLUSION_LIST_BY_DATASET = {
+
+cfg.DATASETS.FILTERS = edict()
+cfg.DATASETS.FILTERS.CLASS = False
+cfg.DATASETS.FILTERS.EMPTY_ANNOTATIONS = True
+
+cfg.DATASETS.FILTERS.CLASS_INCLUSION_LIST = []   # NOTE! THIS FEATURE IS INCOMPLETE!!
+cfg.DATASETS.FILTERS.CLASS_INCLUSION_LIST_BY_DATASET = {
     'mnist': [3,8],
     'cifar_10': ['aeroplane','automobile']
 }
 
 def set_class_inclusion_list_by_calling_dataset():
     if cfg.DATASETS.CALLING_DATASET_NAME == '': raise ValueError("Dataset must be loaded before this function can be called")
-    cfg.DATASETS.CLASS_INCLUSION_LIST = cfg.DATASETS.CLASS_INCLUSION_LIST_BY_DATASET[cfg.DATASETS.CALLING_DATASET_NAME]
+    cfg.DATASETS.FILTERS.CLASS_INCLUSION_LIST = cfg.DATASETS.FILTERS.CLASS_INCLUSION_LIST_BY_DATASET[cfg.DATASETS.CALLING_DATASET_NAME]
 
 def cfgData_from_file(filename):
     """Load a config file and merge it into the default options."""
@@ -53,4 +59,8 @@ def cfgData_from_file(filename):
     if useClsDerived_Imagenet:
         cfgData['ANNOTATION_TYPE'] = "cls_derived"
     load_tp_fn_record_path()
+
+
+
+
 

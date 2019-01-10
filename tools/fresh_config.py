@@ -115,22 +115,6 @@ cfg.plot.marker_list = ['o','v','^','<','>','8','s','p','h','H','+','x','X','D',
 cfg.plot.color_dict = {'train':'b','test':'g'}
 
 
-def checkConfigEquality(validConfig,proposedConfig):
-    """
-    check if the input config edict is the same
-    as the current config edict
-    """
-    for key,validValue in validConfig.items(): # iterate through the "truth"
-        if key not in proposedConfig.keys(): return False
-        proposedValue = proposedConfig[key]
-        print(proposedValue,validValue)
-        if type(validValue) is edict or type(validValue) is dict:
-            isValid = checkConfigEquality(validValue,proposedValue)
-            if not isValid: return False
-            continue
-        if proposedValue != validValue: return False
-    return True
-
 def update_config(input_cfg,experiment_config):
     for key,value in experiment_config.items():
         if key not in input_cfg.keys(): raise ValueError("key [{}] not in original configuration".format(key))
