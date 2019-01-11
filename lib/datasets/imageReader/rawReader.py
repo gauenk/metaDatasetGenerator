@@ -30,12 +30,10 @@ class rawReader(object):
         if self._is_image_index_flattened:
             bbox_index = int(index.split('_')[-1])
             image_index = '_'.join(index.split('_')[:-1])
-            image_path = os.path.join(self._imgPath,
-                                      image_index + self._imgExt)
+            image_path = os.path.join(self._imgPath,image_index + self._imgExt)
         else:
-            image_path = os.path.join(self._imgPath,
-                                      index + self._imgExt)
-            
+            image_path = os.path.join(self._imgPath,index + self._imgExt)
+
         assert os.path.exists(image_path), \
                 'Path does not exist: {}'.format(image_path)
         return image_path

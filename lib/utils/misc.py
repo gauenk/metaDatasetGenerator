@@ -42,43 +42,6 @@ def vis_dets(im, class_names, dets, _idx_, fn=None, thresh=0.5):
 def toRadians(angle):
     return (np.pi/180 * angle)
 
-def zeroInTheRegion(coordinate,rows,cols):
-    if 0 <= coordinate[0] and coordinate[0] <= rows: coordinate[0] = 0
-    if 0 <= coordinate[1] and coordinate[1] <= cols: coordinate[1] = 0
-
-def overflowOnly(coordinate,rows,cols):
-    if 0 > coordinate[0]: coordinate[0] = np.abs(coordinate[0])
-    elif rows < coordinate[0]: coordinate[0] = rows - coordinate[0]
-    if 0 > coordinate[1]: coordinate[1] = np.abs(coordinate[1])
-    elif cols < coordinate[1]: coordinate[1] = cols - coordinate[1]
-
-def correctTranslatedIndex(coordinate,rows,cols):
-    zeroInTheRegion(coordinate,rows,cols)
-    overflowOnly(coordinate,rows,cols)
-
-def getRotationScale(M,rows,cols):
-    a = np.array([cols,0,1])
-    b = np.array([0,0,1])
-    ta = np.matmul(M,a)
-    tb = np.matmul(M,b)
-    correctTranslatedIndex(ta,rows,cols)
-    correctTranslatedIndex(tb,rows,cols)
-    scale_a_0 = rows / ( 2. * np.abs(ta[0]) + rows )
-    scale_a_1 = rows / ( 2. * np.abs(ta[1]) + rows )
-    scale_b_0 = cols / ( 2. * np.abs(tb[0]) + cols )
-    scale_b_1 = cols / ( 2. * np.abs(tb[1]) + cols )
-    scale_list = [scale_a_0,scale_a_1,scale_b_0,scale_b_1]
-    scale = np.min([scale_a_0,scale_a_1,scale_b_0,scale_b_1])
-    return scale
-
-def getRotationInfo(angle,cols,rows):
-    if cfg._DEBUG.utils.misc: print("cols,rows",cols,rows)
-    rotationMat = cv2.getRotationMatrix2D((cols/2,rows/2),angle,1.0)
-    scale = getRotationScale(rotationMat,rows,cols)
-    if cfg._DEBUG.utils.misc: print("scale: {}".format(scale))
-    rotationMat = cv2.getRotationMatrix2D((cols/2,rows/2),angle,scale)
-    return rotationMat,scale
-
 def networkForwardBackward(net,inputBlob):
     output = net.forward(**inputBlob)
     net.backward()
@@ -123,27 +86,6 @@ def save_list_of_bbox_imgs(fn,pimgs):
         
 def npBoolToUint8(a):
     return a.astype(np.uint8)*255
-
-def centerAndScaleBBox(bbox,rotMat,scale):
-    if cfg._DEBUG.utils.misc: print("[centerAndScaleBBox] before bbox",bbox)
-
-    cx = np.mean([bbox[0],bbox[2]])
-    cy = np.mean([bbox[1],bbox[3]])
-    center = np.array([cx,cy,1])
-    new_center = np.matmul(rotMat,center)
-
-    x_len = bbox[2] - bbox[0]
-    y_len = bbox[3] - bbox[1]
-
-    x1 = int(new_center[0] - 0.5 * scale * x_len)
-    x2 = int(new_center[0] + 0.5 * scale * x_len)
-    y1 = int(new_center[1] - 0.5 * scale * y_len)
-    y2 = int(new_center[1] + 0.5 * scale * y_len)
-    new_bbox = [x1,y1,x2,y2]
-    if cfg._DEBUG.utils.misc: print("[centerAndScaleBBox] after bbox",new_bbox)
-
-    return new_bbox
-
 
 def print_net_activiation_data(net,layers_to_print):
     print("-"*50)

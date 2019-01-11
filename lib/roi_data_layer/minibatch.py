@@ -17,11 +17,8 @@ def get_minibatch(roidb, num_classes):
     """Given a roidb, construct a minibatch sampled from it."""
     num_images = len(roidb)
     # Sample random scales to use for each image in this batch
-    random_scale_inds = npr.randint(0, high=len(cfg.TRAIN.SCALES),
-                                    size=num_images)
-    assert(cfg.TRAIN.OBJ_DET.BATCH_SIZE % num_images == 0), \
-        'num_images ({}) must divide BATCH_SIZE ({})'. \
-        format(num_images, cfg.TRAIN.OBJ_DET.BATCH_SIZE)
+    random_scale_inds = npr.randint(0, high=len(cfg.TRAIN.SCALES),size=num_images)
+    assert(cfg.TRAIN.OBJ_DET.BATCH_SIZE % num_images == 0),'num_images ({}) must divide BATCH_SIZE ({})'.format(num_images, cfg.TRAIN.OBJ_DET.BATCH_SIZE)
     rois_per_image = cfg.TRAIN.OBJ_DET.BATCH_SIZE / num_images
     fg_rois_per_image = np.round(cfg.TRAIN.OBJ_DET.FG_FRACTION * rois_per_image)
 

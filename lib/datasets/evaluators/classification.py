@@ -31,14 +31,11 @@ class classificationEvaluator(object):
         self._imageSet = imageSetPath.split("/")[-1].split(".")[0] # "...asdf/imageSet.txt"
         self._onlyCls = onlyCls
 
-    def evaluate_detections(self, classification_object, output_dir):
+    def evaluate_detections(self, all_probs, output_dir):
         # num_outpus = 
         # if self._classes != num_outputs:
         #     raise ValueError("ERROR: the classes and output size don't match!")
-        all_probs = classification_object['all_probs']
-
-        if 'dataset_augmentations' in classification_object.keys():  augmentations = classification_object['dataset_augmentations']
-        else: augmentations = []
+        augmentations = []
         print("# of classes: {}".format(len(all_probs)))
         print("# of samples to eval: {}".format(len(all_probs[0])))
         self._pathResults = output_dir

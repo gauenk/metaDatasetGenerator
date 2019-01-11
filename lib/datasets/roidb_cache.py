@@ -3,7 +3,7 @@ import os.path as osp
 from easydict import EasyDict as edict
 
 from utils.base import readPickle,writePickle
-from utils.cache import Cache
+from cache.two_level_cache import TwoLevelCache
 
 """
 roidbCacheCfg = edict() # set of parameters to follow when loading the dataset from the lookup cache
@@ -13,14 +13,12 @@ roidbCacheCfg.CACHE_PROMPT.DATASET_AUGMENTATION_RANDOMIZE_SUBSET = True
 roidbCacheCfg.CACHE_PROMPT.DATASET.SUBSAMPLE_BOOL = True
 """
 
-class RoidbCache():
+class RoidbCache(TwoLevelCache):
 
-    def __init__(self,root_dir,imdb_str,cfg,ds_config,roidb_cache_cfg):
-        self.cache_dir = osp.join(root_dir,imdb_str)
-        self.config = roidb_cache_cfg
+    def __init__(self,cache_path,imdb_str,cfg,ds_config,roidb_settings):
+        root_dir = osp.join(cache_path,imdb_str)
         self.cacheConfig = self.construct_data_cache_config(cfg,ds_config)
-        lookup_filename = osp.join(self.cache_dir,'lookup.pkl')
-        self.lookup_cache = Cache(lookup_filename,self.cacheConfig)
+        super(RoidbCache,self).__init__(root_dir,self.cacheConfig,roidb_settings)
 
     def construct_data_cache_config(self,cfg,ds_config):
         cacheDataCfg = edict()
@@ -63,37 +61,7 @@ class RoidbCache():
         # TODO: put theses somewhere else
         # ? assert len(roidb) == cacheDataCfg.DATASET.SIZE
         # ? assert imdb.classes == cacheDataCfg.DATASET.CLASSES
-    
-    def save(self,roidb):
-        # cache the roidb
-        uuid_str = str(uuid.uuid4())
-        self.roidb_filename = osp.join(self.cache_dir,'{}.pkl'.format(uuid_str))
-        if osp.exists(self.cache_dir) is False:
-            os.makedirs(self.cache_dir)
-        writePickle(self.roidb_filename,roidb)
-        self.lookup_cache.save(self.roidb_filename)
 
-    def load_roidb_filename(self):
-        # 1. collect all the matches in a list
-        ds_filenames = self.lookup_cache.load_all_matches()
-        if len(ds_filenames) is 0:
-            return None
-        # 2. use policy to determine which matches to use
-        if self.config is None:
-            match_index = 0
-        else:
-            match_index = self.config.match_index
-        return ds_filenames[match_index]
-
-    def load(self):
-        self.roidb_filename = self.load_roidb_filename()
-        print(self.roidb_filename)
-        if self.roidb_filename:
-            roidb = readPickle(self.roidb_filename)
-            return roidb
-        else:
-            return None
-    
     def print_dataset_summary_by_uuid(datasetConfigList,uuid_str):
         pass
     

@@ -10,13 +10,14 @@ matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 
 import _init_paths
-from core.test import apply_nms
+from fast_rcnn.nms_wrapper import apply_nms
 from core.config import cfg, cfg_from_file, cfg_from_list
 from datasets.factory import get_repo_imdb
 import cPickle
 import os, sys, argparse
 import numpy as np
-from utils.misc import getRotationInfo,centerAndScaleBBox
+from utils.box_utils import centerAndScaleBBox
+from datasets.data_utils.dataset_augmentation_utils import getRotationInfo
 from core.train import get_training_roidb
 
 def parse_args():
@@ -62,12 +63,13 @@ def from_elems(imdb_name, output_dir, args):
                 elems = cPickle.load(f)
 
     if args.apply_nms and cfg.TASK == 'object_detection':
-        print 'Applying NMS to all detections'
+        print('Applying NMS to all detections')
         nms_elems = apply_nms(elems, cfg.TEST.NMS)
     else:
         nms_elems = elems
 
-    print 'Evaluating elements'
+    print(nms_elems['all_probs'])
+    print('Evaluating elements')
     imdb.evaluate_detections(nms_elems, output_dir)
 
 def build_gt_roidb(imdb,rot):

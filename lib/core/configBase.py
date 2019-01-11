@@ -8,6 +8,19 @@ __C = edict()
 #   from core.config import cfg
 cfg = __C
 
+# DEBUG Bools
+cfg.DEBUG = edict()
+cfgDebug = cfg.DEBUG
+cfg.DEBUG.ALL = False
+cfg.DEBUG.datasets = edict()
+cfg.DEBUG.data_loader = False
+cfg.DEBUG.utils = edict()
+cfg.DEBUG.utils.misc = False
+cfg.DEBUG.utils.box_utils = False
+cfg.DEBUG.utils.image_utils = False
+
+# ... you get the idea...
+
 # output for recoding the TP and FN of a model
 __C.TP_FN_RECORDS_PATH = "./output/{}/tp_fn_records/".format("faster_rcnn")
 __C.TP_FN_RECORDS_WITH_IMAGESET = True

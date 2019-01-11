@@ -134,7 +134,10 @@ class RepoImdb(imdb):
         """
         # if self._roidb is None:
         #     self._roidb = self.roidb_handler()
-        index = self._image_index[i]
+        if type(i) is int:
+            index = self._image_index[i]
+        elif type(i) is str:
+            index = i
         return self.imgReader.image_path_from_index(index)
 
     def image_index_at(self,i):

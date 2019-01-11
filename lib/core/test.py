@@ -11,7 +11,9 @@ from core.config import cfg, get_output_dir
 from fast_rcnn.bbox_transform import clip_boxes, bbox_transform_inv
 import argparse
 from utils.timer import Timer
-from utils.misc import getRotationScale,toRadians,getRotationInfo,print_net_activiation_data,save_image_with_border,createAlReportHeader,transformField,openAlResultsCsv,startAlReport,computeEntropy
+from datasets.data_utils.dataset_augmentation_utils import getRotationInfo,getRotationScale
+from utils.image_utils import save_image_with_border
+from utils.misc import toRadians,print_net_activiation_data #transformField
 import numpy as np
 import cv2
 import caffe
@@ -332,28 +334,6 @@ def vis_detections(im, class_name, dets, thresh=0.3):
             plt.title('{}  {:.3f}'.format(class_name, score))
             plt.show()
 
-def apply_nms(all_boxes, thresh):
-    """Apply non-maximum suppression to all predicted boxes output by the
-    test_net method.
-    """
-    num_classes = len(all_boxes)
-    num_images = len(all_boxes[0])
-    nms_boxes = [[[] for _ in xrange(num_images)]
-                 for _ in xrange(num_classes)]
-    for cls_ind in xrange(num_classes):
-        for im_ind in xrange(num_images):
-            dets = all_boxes[cls_ind][im_ind]
-            if dets == []:
-                continue
-            # CPU NMS is much faster than GPU NMS when the number of boxes
-            # is relative small (e.g., < 10k)
-            # TODO(rbg): autotune NMS dispatch
-            keep = nms(dets, thresh, force_cpu=True)
-            if len(keep) == 0:
-                continue
-            nms_boxes[cls_ind][im_ind] = dets[keep, :].copy()
-    return nms_boxes
-
 def loadImage(imdb,image_path,image_index,bbox,al_net,idx):
     isImBlob = False
     # helper variables for some [if/elif] statements
@@ -389,7 +369,7 @@ def loadImage(imdb,image_path,image_index,bbox,al_net,idx):
         img = cv2.imread(image_path)
     return img,isImBlob
 
-def test_net(net, imdb, max_per_image=100, thresh=1/80., vis=False, al_net=None):
+def test_net(net, imdb, max_dets_per_image=100, thresh=1/80., vis=False, al_net=None):
     """Test a Fast R-CNN network on an image database."""
     roidb = imdb.roidb
 
@@ -413,6 +393,7 @@ def test_net(net, imdb, max_per_image=100, thresh=1/80., vis=False, al_net=None)
                      for _ in xrange(imdb.num_classes)]
         all_items = all_probs
 
+    box_proposals = None
 
     # threshold = 0.05
     # for name,layer in net.layer_dict.items():
@@ -429,55 +410,8 @@ def test_net(net, imdb, max_per_image=100, thresh=1/80., vis=False, al_net=None)
 
     # timers
     _t = {'im_detect' : Timer(), 'misc' : Timer()}
-    
-    # information to generate Active Learning Report
-    fidAlReport = None
-    pctErrorRed = None
-    if cfg.ACTIVE_LEARNING.REPORT:
-        pctErrorRed = openAlResultsCsv()
-        fidAlReport = startAlReport(imdb,net)
-
 
     im_rotates_all = dict.fromkeys(imdb.image_index)
-
-    print("num_samples: {}".format(num_samples))
-    for sample from sample_generator:
-        # handle region proposal network
-        if cfg.TEST.OBJ_DET.HAS_RPN is False and cfg.TASK == 'object_detection':
-            raise ValueError("We can't handle rpn correctly. See [box_proposals] in original faster-rcnn code.")
-
-        imageBlob = sample.loadImage()
-        _t['im_detect'].tic()
-        scores, boxes, im_rotates, activity_vectors = im_detect(net, im, box_proposals, imdb.image_index[imdb_index],isImBlob=isImBlob)
-        _t['im_detect'].toc()
-
-        _t['misc'].tic()
-        im_rotates_all[imdb.image_index_at(imdb_index)] = im_rotates
-
-        saveInformation(scores,boxes,activity_vectors)
-        model_output = {"scores":scores,"boxes":boxes,"activity_vectors":activity_vectors}
-
-        def aggregateModelOutput(imdb,scores,boxes,all_items,thresh,i,im,vis,max_per_image):
-            if cfg.TASK == 'object_detection':
-                aggregateDetections(imdb,scores,boxes,all_items,thresh,i,im,vis,max_per_image)
-            elif cfg.TASK == 'classification':
-                aggregateClassification(imdb,scores,all_items,loop_index)
-
-
-        def saveInformation(model_output):
-            aggregateActivityVectors(ds_av,activity_vectors,imdb.image_index[imdb_index]))
-            aggregateModelOutput(imdb,scores,boxes,all_items,thresh,i,im,vis,max_per_image)
-            aggregateDetections(imdb,scores,boxes,all_items,thresh,i,im,vis,max_per_image)
-            
-            if cfg.TASK == 'object_detection':
-                aggregateDetections(imdb,scores,boxes,all_items,thresh,i,im,vis,max_per_image)
-            elif cfg.TASK == 'classification':
-                aggregateClassification(imdb,scores,all_items,loop_index)
-            if cfg.ACTIVE_LEARNING.REPORT:
-                recordImageForAlReport(imdb,scores,activity_vectors,fidAlReport,loop_index,pctErrorRed)
-            
-        _t['misc'].toc()
-        print('im_detect: {:d}/{:d} {:.3f}s {:.3f}s').format(loop_index + 1, num_samples, _t['im_detect'].average_time,_t['misc'].average_time)
 
     for loop_index in xrange(num_samples):
 
@@ -502,38 +436,18 @@ def test_net(net, imdb, max_per_image=100, thresh=1/80., vis=False, al_net=None)
         # skip j = 0, because it's the background class
         im_rotates_all[imdb.image_index_at(imdb_index)] = im_rotates
 
-        aggregateActivityVectors(ds_av,activity_vectors,imdb.image_index[imdb_index]))
-
         if cfg.TASK == 'object_detection':
-            aggregateDetections(imdb,scores,boxes,all_items,thresh,i,im,vis,max_per_image)
+            aggregateDetections(imdb,scores,boxes,all_items,thresh,i,im,vis,max_dets_per_image)
         elif cfg.TASK == 'classification':
             aggregateClassification(imdb,scores,all_items,loop_index)
-
-        if cfg.ACTIVE_LEARNING.REPORT:
-            recordImageForAlReport(imdb,scores,activity_vectors,fidAlReport,loop_index,pctErrorRed)
             
         _t['misc'].toc()
         print 'im_detect: {:d}/{:d} {:.3f}s {:.3f}s' \
             .format(loop_index + 1, num_samples, _t['im_detect'].average_time,
                       _t['misc'].average_time)
 
-    if cfg.SAVE_ACTIVITY_VECTOR_BLOBS:
-        dirn = cfg.GET_SAVE_ACTIVITY_VECTOR_BLOBS_DIR()
-        print("activity vectors saved @")
-        for blob_name,av in ds_av.items():
-            save_av = av
-            if cfg.SAVE_ACTIVITY_VECTOR_BLOBS_WITH_KEYS is False:
-                save_av = remove_keys_from_activity_vector_and_ravel(av)
-                fn = os.path.join(dirn,"{}_{}.npy".format(blob_name,cfg.TEST_NET.NET_PATH))
-                print(fn)
-                np.save(fn,save_av)
-            else:
-                fn = os.path.join(dirn,"{}_{}.pkl".format(blob_name,cfg.TEST_NET.NET_PATH))
-                print(fn)
-                with open(fn, 'wb') as f:
-                    cPickle.dump(save_av, f, cPickle.HIGHEST_PROTOCOL)
-
     
+    results = None
     save_dict = {}
     if cfg.DATASET_AUGMENTATION.BOOL:
         save_dict['dataset_augmentations'] = cfg.DATASET_AUGMENTATION.CONFIGS
@@ -550,7 +464,7 @@ def test_net(net, imdb, max_per_image=100, thresh=1/80., vis=False, al_net=None)
         cPickle.dump(save_dict, f, cPickle.HIGHEST_PROTOCOL)
 
     print 'Evaluating detections'
-    imdb.evaluate_detections(save_dict, output_dir)
+    imdb.evaluate_detections(all_items, output_dir)
     
 def remove_keys_from_activity_vector_and_ravel(av):
     new_av = [None for _ in range(len(av))]

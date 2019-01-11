@@ -28,6 +28,13 @@ def createExhaustiveRotationConfigs(rotation_input_list):
         rotation_list.append(rotation_dict)
     return rotation_list
 
+def createExhaustiveFlipConfigs(flip_input_list):
+    flip_list = []
+    for flip in flip_input_list:
+        flip_dict = {'flip':flip}
+        flip_list.append(flip_dict)
+    return flip_list
+
 def getnumel(alist_of_lists):
     numel = 1
     if alist_of_lists is None: return numel
@@ -39,7 +46,7 @@ def createDatasetAugmentationMesh(alist_of_lists):
 
 def create_mesh_from_lists(alist_of_lists,verbose=False):
     numel = getnumel(alist_of_lists)
-    mesh = [ [ None for _ in range(numel) ] for transList in alist_of_lists ]
+    mesh = [ [ None for transList in alist_of_lists ] for _ in range(numel) ] 
     for transListIndex,transList in enumerate(alist_of_lists):
         assert (numel % len(transList)) == 0,"translation index zero"
         numberOfRepeats = numel // len(transList)
@@ -60,19 +67,20 @@ def create_mesh_from_lists(alist_of_lists,verbose=False):
             for block_index in range(numberOfBlocks):
                 mesh_index = start_index * numberTogether + block_index * blockSpacing
                 for repeat in range(numberTogether):
-                    mesh[transListIndex][mesh_index+repeat] = unique_value
+                    mesh[mesh_index+repeat][transListIndex] = unique_value
     return mesh
 
-def getDatasetAugmentationConfigurationsSubset(da_config,n_percent,random_bool):
-    nconfigs = int(len(da_config[0]) * n_percent) + 1
-    if random_bool: indicies = npr.permutation(len(da_config[0]))[:nconfigs]
-    else: indicies = np.arange(len(da_config[0]))[:nconfigs]
-    da_cfg = [ [ transList[index] for index in indicies] for transList in da_config ]
-    return da_cfg
+def getDatasetAugmentationConfigurationsSubset(exhaustive_augmentation_list,n_percent,random_bool):
+    total_number_of_augmentations = len(exhaustive_augmentation_list)
+    number_of_augmentations = int(total_number_of_augmentations * n_percent) + 1
+    if random_bool: indices = npr.permutation(total_number_of_augmentations)[:number_of_augmentations]
+    else: indices = np.arange(total_number_of_augmentations)[:number_of_augmentations]
+    augmentation_list = getDatasetAugmentationConfigurationsFromIndices(exhaustive_augmentation_list,indices)
+    return augmentation_list
 
-def getDatasetAugmentationConfigurationsFromIndices(da_config,da_inds):
-    da_cfg = [ [ transList[index] for index in da_inds] for transList in da_config ]
-    return da_cfg
+def getDatasetAugmentationConfigurationsFromIndices(exhaustive_augmentation_list,indices):
+    augmentation_list = [ exhaustive_augmentation_list[index] for index in indices ]
+    return augmentation_list
 
 def formatDatasetAugmentationForGetRawCroppedImage(input_da_config,da_inds):
     if type(da_inds) is not list: da_inds = [da_inds]
@@ -90,7 +98,7 @@ def formatDatasetAugmentationForGetRawCroppedImage(input_da_config,da_inds):
 def reset_dataset_augmentation_with_mesh(mesh):
     cfg.DATASET_AUGMENTATION.EXHAUSTIVE_CONFIGS = mesh
     cfg.DATASET_AUGMENTATION.CONFIGS = getDatasetAugmentationConfigurationsSubset(cfg.DATASET_AUGMENTATION.EXHAUSTIVE_CONFIGS,cfg.DATASET_AUGMENTATION.N_PERC,cfg.DATASET_AUGMENTATION.RANDOMIZE_SUBSET)
-    cfg.DATASET_AUGMENTATION.SIZE = len(cfg.DATASET_AUGMENTATION.CONFIGS[0])
+    cfg.DATASET_AUGMENTATION.SIZE = len(cfg.DATASET_AUGMENTATION.CONFIGS)
     
 
 def reset_dataset_augmentation(new_list,transformation_type):
@@ -103,9 +111,11 @@ def reset_dataset_augmentation(new_list,transformation_type):
     elif transformation_type == 'crop':
         crop_list = createExhaustiveCropConfigs(crop_input_list)
         cfg.DATASET_AUGMENTATION.IMAGE_CROP = crop_list
-    mesh = create_mesh_from_lists([cfg.DATASET_AUGMENTATION.IMAGE_TRANSLATE,
+    mesh = create_mesh_from_lists([cfg.DATASET_AUGMENTATION.FLIP,
+                                   cfg.DATASET_AUGMENTATION.IMAGE_TRANSLATE,
                                    cfg.DATASET_AUGMENTATION.IMAGE_ROTATE,
-                                   cfg.DATASET_AUGMENTATION.IMAGE_CROP])
+                                   cfg.DATASET_AUGMENTATION.IMAGE_CROP
+                                   ])
     reset_dataset_augmentation_with_mesh(mesh)
 
 def set_augmentation_by_calling_dataset():
@@ -115,7 +125,8 @@ def set_augmentation_by_calling_dataset():
     translation_list = createExhaustiveTranslationConfigs(configs['translation'])
     rotation_list = createExhaustiveRotationConfigs(configs['rotation'])
     crop_list = createExhaustiveCropConfigs(configs['crop'])
-    mesh = create_mesh_from_lists([translation_list,rotation_list,crop_list])
+    flip_list = createExhaustiveFlipConfigs(configs['flip'])
+    mesh = create_mesh_from_lists([flip_list,translation_list,rotation_list,crop_list])
     reset_dataset_augmentation_with_mesh(mesh)
 
 translation_input_list = [2]
@@ -124,7 +135,9 @@ rotation_input_list = [4*i-30 for i in range(15+1)] + [0]
 rotation_list = createExhaustiveRotationConfigs(rotation_input_list)
 crop_input_list = [i+1 for i in range(6)]
 crop_list = createExhaustiveCropConfigs(crop_input_list)
-mesh = create_mesh_from_lists([rotation_list,translation_list,crop_list])
+flip_input_list = [True,False]
+flip_list = createExhaustiveFlipConfigs(flip_input_list)
+mesh = create_mesh_from_lists([flip_list,translation_list,rotation_list,crop_list])
 
 # dataset augmentation
 cfg.DATASET_AUGMENTATION = edict()
@@ -145,12 +158,14 @@ cfg.DATASET_AUGMENTATION.PRESET_ARGS_BY_SET = {
     'mnist': {
         'translation': [2],
         'rotation': [4*i-30 for i in range(15+1)] + [0],
-        'crop': [i+1 for i in range(6)]
+        'crop': [i+1 for i in range(6)],
+        'flip': [False]
     },
     'cifar_10': {
         'translation': [3],
         'rotation': [(2/3)*i-5 for i in range(15+1)] + [0],
-        'crop': [2]
+        'crop': [2],
+        'flip': [False,True]
     },
 }            
 
@@ -163,12 +178,15 @@ cfg.DATASET_AUGMENTATION.IMAGE_NOISE=0 #[0,1] for intensity
 cfg.DATASET_AUGMENTATION.IMAGE_TRANSLATE=translation_input_list
 cfg.DATASET_AUGMENTATION.IMAGE_ROTATE=rotation_input_list
 cfg.DATASET_AUGMENTATION.IMAGE_CROP=crop_input_list #[0,1] for cropping; 0 = no cropping; 1 = crop to (i) bbox edge, (ii) center pixel; nominally use [0,.5]
+cfg.DATASET_AUGMENTATION.IMAGE_FLIP=flip_input_list
 cfg.DATASET_AUGMENTATION.N_PERC = 1.0
 cfg.DATASET_AUGMENTATION.EXHAUSTIVE_CONFIGS = mesh
 cfg.DATASET_AUGMENTATION.CONFIGS = getDatasetAugmentationConfigurationsSubset(cfg.DATASET_AUGMENTATION.EXHAUSTIVE_CONFIGS,cfg.DATASET_AUGMENTATION.N_PERC,cfg.DATASET_AUGMENTATION.RANDOMIZE_SUBSET)
-cfg.DATASET_AUGMENTATION.SIZE = len(cfg.DATASET_AUGMENTATION.CONFIGS[0])
+cfg.DATASET_AUGMENTATION.SIZE = len(cfg.DATASET_AUGMENTATION.CONFIGS)
 cfg.DATASET_AUGMENTATION.VERSION = 'v0.1'
 # cfg.DATASET_AUGMENTATION.EXHAUSTIVE_CONFIGS = []
 # cfg.DATASET_AUGMENTATION.CONFIGS = []
 # cfg.DATASET_AUGMENTATION.SIZE = 0
 
+
+## TODO: add "flipped" as an augmentation

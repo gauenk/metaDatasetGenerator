@@ -15,7 +15,7 @@ import numpy as np
 import numpy.random as npr
 import cv2,uuid
 import matplotlib.pyplot as plt
-from utils.misc import getRotationInfo
+from datasets.data_utils.dataset_augmentation_utils import *
 
 def im_list_to_blob(ims):
     """Convert a list of images into a network input.
@@ -183,7 +183,6 @@ def _get_cropped_image_blob(roidb, records, scale_inds):
     scales.
     """
     return getRawCroppedImageBlob(roidb, records, scale_inds,True)
-
 
 def rotateImage(img,angle):
     # print('angle',angle)

@@ -14,7 +14,8 @@ from core.config import cfg
 from fast_rcnn.bbox_transform import clip_boxes, bbox_transform_inv
 from fast_rcnn.nms_wrapper import nms
 from utils.blob import prep_im_for_blob, im_list_to_blob, _get_cropped_image_blob, save_blob_list_to_file, _get_blobs_from_roidb,getRawImageBlob,getCroppedImageBlob,createInfoBlob,addImageNoise
-from utils.misc import evaluate_image_detections,printRoidbImageIds,computeEntropy
+from datasets.data_utils.roidb_utils import printRoidbImageIds
+from utils.misc import evaluate_image_detections,computeEntropyOfNumpyArray
 from datasets.ds_utils import cropImageToAnnoRegion
 import matplotlib.pyplot as plt
 

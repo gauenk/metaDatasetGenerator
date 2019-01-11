@@ -29,6 +29,7 @@ def filterSampleWithEmptyAnnotations(gt_roidb,image_index):
 def filterImagesByClass(gt_roidb,image_index,class_inclusion_list):
     print("[roidb_utils.py: filterImagesByClass]")
     if len(class_inclusion_list) == 0:
+        print("NOTHING")
         return gt_roidb,image_index
     toRemove = []
     for idx,sample in enumerate(gt_roidb):
@@ -49,6 +50,10 @@ def filterSampleByClass(sample,class_inclusion_list):
     toRemove = []
     for gt_obj_index,gt_object_class in enumerate(sample['gt_classes']):
         if gt_object_class in class_inclusion_list:
+            continue
+        elif str(gt_object_class) in class_inclusion_list:
+            continue
+        elif int(gt_object_class) in class_inclusion_list:
             continue
         else:
             toRemove.append(gt_obj_index)
@@ -154,6 +159,20 @@ def addRoidbField(roidb,fieldName,transformFunction):
 #
 # misc roidb functions
 #
+
+
+def mangleClassInclusionList(class_inclusion_list,gt_roidb):
+    if len(class_inclusion_list) == 0:
+        return class_inclusion_list
+    if type(class_inclusion_list[0]) == type(gt_roidb[0]['gt_classes'][0]):
+        return class_inclusion_list
+    elif type(class_inclusion_list[0]) is str and ( type(gt_roidb[0]['gt_classes'][0]) is np.uint8 or type(gt_roidb[0]['gt_classes'][0]) is int):
+        return [int(cls) for cls in class_inclusion_list]
+    elif type(class_inclusion_list[0]) is int and type(gt_roidb[0]['gt_classes'][0]) is str:
+        return [str(cls) for cls in class_inclusion_list]
+    else:
+        print("ERROR. How do we match the 'class_inclusion_list' type with the 'gt_roidb['gt_classes']' type?")
+        exit()
 
 def computeRoidbDictLens(roidbTrDict,roidbTeDict):
     lenTr = 0

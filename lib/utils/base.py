@@ -31,7 +31,7 @@ def check_list_equal_any(list_a,list_b):
     if len(list_a) == 0 or len(list_b) == 0:
         return False
     for item_a in list_a:
-        if item_b in list_b:
+        for item_b in list_b:
             if item_a == item_b:
                 return True
     return False
@@ -39,8 +39,8 @@ def check_list_equal_any(list_a,list_b):
 def check_list_equal_all(list_a,list_b):
     if len(list_a) == 0 or len(list_b) == 0:
         return False
-    for item in list_a:
-        if item not in list_b:
+    for item_a in list_a:
+        for item_b in list_b:
             if item_a != item_b:
                 return False
     return True

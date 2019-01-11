@@ -9,7 +9,7 @@ class activeLearningReportAppendActivationValueData():
     def __init__(self,net,imdb,activeLearningCfg,recordBool):
         self.recordBool = activeLearningCfg.REPORT
         self.layerNameList = activeLearningCfg.LAYER_NAMES # list of layers to save data from
-        self.allModelLayerNames = [str(l.name) for l in  net.layer]
+        self.allModelLayerNames = [str(layer_name) for layer_name in  net._layer_names]
         # start the results file
         self.alReportFilename = "alReport_{}_{}.csv".format(imdb.name,net.name)
         if recordBool:
@@ -20,7 +20,7 @@ class activeLearningReportAppendActivationValueData():
     def startAlReportCsvFile(self,num_classes):
         fidAlReport = open(self.alReportFilename,"w+")
         # this is gross to use 'self' when i don't use any class variables...
-        self.createAlReportCsvHeader(fidAlReport,num_classes):
+        self.createAlReportCsvHeader(fidAlReport,num_classes)
         fidAlReport.close()
 
     def createAlReportCsvHeader(self,fidAlReport,num_classes):

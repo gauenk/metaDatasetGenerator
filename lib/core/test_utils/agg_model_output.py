@@ -1,12 +1,16 @@
 from fast_rcnn.nms_wrapper import nms
 import numpy as np
 import cPickle
+import os
+from cache.test_results_cache import TestResultsCache
+
 
 class aggregateModelOutput():
     
-    def __init__(self,imdb,output_dir,task,score_thresh,nms_thresh,max_dets_per_image,visualize_bool):
+    def __init__(self,imdb,num_samples,output_dir,task,score_thresh,nms_thresh,max_dets_per_image,visualize_bool,cfg):
         self.visualize_bool = visualize_bool
         self.score_thresh = score_thresh
+        self.num_samples = num_samples
         self.nms_thresh = nms_thresh
         self.task = task
         self.results = None
@@ -16,18 +20,20 @@ class aggregateModelOutput():
         self.classes = imdb.classes
         self.num_classes = imdb.num_classes
         self.max_dets_per_image = max_dets_per_image
+        root_dir = output_dir
+        self.save_cache = TestResultsCache(output_dir,None,cfg,imdb.config)
 
-    def init_results_obj(self,imdb):
+    def init_results_obj(self,imdb,output_dir):
         if self.task == 'object_detection':
-            all_boxes = [[[] for _ in xrange(num_samples)]
+            all_boxes = [[[] for _ in xrange(self.num_samples)]
                          for _ in xrange(imdb.num_classes)]
             self.results = all_boxes
             self.det_file = os.path.join(output_dir, 'probs.pkl')
             self.save_key = 'all_boxes'
         elif self.task == 'classification':
-            all_probs = [[-1 for _ in xrange(num_samples)]
+            all_probs = [[-1 for _ in xrange(self.num_samples)]
                          for _ in xrange(imdb.num_classes)]
-            self.results = all_boxes
+            self.results = all_probs
             self.det_file = os.path.join(output_dir, 'probs.pkl')
             self.save_key = 'all_probs'
         else:
@@ -37,16 +43,22 @@ class aggregateModelOutput():
         if self.task == 'object_detection':
             self.aggregateDetections(model_output,sample_index)
         elif self.task == 'classification':
-            self.aggregateClassification(model_output,sample_index)
+            self.aggregateClassification(model_output['scores'],sample_index)
         else:
             raise ValueError("unknown task [agg_model_output.py]: {}".format(self.task))
 
+    def load(self):
+        return self.save_cache.load()
+
     def save(self,transformation_list):
-        save_dict = {}
-        save_dict[self.save_key] = self.results
-        save_dict['transformations'] = transformation_list
-        with open(self.det_file, 'wb') as f:
-            cPickle.dump(save_dict, f, cPickle.HIGHEST_PROTOCOL)
+        print(len(self.results))
+        self.save_cache.save(self.results)
+        # save_dict = {}
+        # self.save_cache
+        # save_dict[self.save_key] = self.results
+        # save_dict['transformations'] = transformation_list
+        # with open(self.det_file, 'wb') as f:
+        #     cPickle.dump(save_dict, f, cPickle.HIGHEST_PROTOCOL)
 
     def aggregateClassification(self,scores,sample_index):
         # handle special case
@@ -58,7 +70,7 @@ class aggregateModelOutput():
             self.results[0][sample_index] = float(scores[0])
         else:
             for class_index in xrange(0, self.num_classes):
-                self.results[class_index][sample_index] = float(scores[j])
+                self.results[class_index][sample_index] = float(scores[class_index])
 
     def aggregateDetections(self,model_output,sample_index):
         scores = model_output['scores']
@@ -72,7 +84,7 @@ class aggregateModelOutput():
             keep = nms(cls_dets, self.nms_thresh)
             cls_dets = cls_dets[keep, :]
             if vis:
-                vis_detections(im, self.classes[j], cls_dets)
+                vis_detections(im, self.classes[class_index], cls_dets)
             self.results[class_index][sample_index] = cls_dets
         # Limit to max_per_image detections *over all classes*
         if self.max_dets_per_image:

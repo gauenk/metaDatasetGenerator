@@ -3,7 +3,8 @@ import os.path as osp
 import xml.etree.ElementTree as ET
 import numpy as np
 from core.config import cfg
-from utils.misc import getRotationScale,toRadians,save_image_with_border,getRotationInfo,npBoolToUint8,save_image_of_overlap_bboxes,save_list_of_bbox_imgs
+from utils.misc import save_image_with_border,npBoolToUint8,save_image_of_overlap_bboxes,save_list_of_bbox_imgs,toRadians
+from datasets.data_utils.dataset_augmentation_utils import getRotationScale,getRotationInfo
 
 cfg._DEBUG.datasets.evaluators.bbox_utils = False
 WESHOULDSAVE = False

@@ -11,7 +11,6 @@ from core.config import cfg, get_output_dir
 from fast_rcnn.bbox_transform import clip_boxes, bbox_transform_inv
 import argparse
 from utils.timer import Timer
-from utils.misc import getRotationScale,toRadians,getRotationInfo,print_net_activiation_data,save_image_with_border
 import numpy as np
 import numpy.random as npr
 import cv2

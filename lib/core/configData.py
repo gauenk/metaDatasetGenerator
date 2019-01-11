@@ -38,7 +38,7 @@ cfg.DATASETS.FILTERS.EMPTY_ANNOTATIONS = True
 
 cfg.DATASETS.FILTERS.CLASS_INCLUSION_LIST = []   # NOTE! THIS FEATURE IS INCOMPLETE!!
 cfg.DATASETS.FILTERS.CLASS_INCLUSION_LIST_BY_DATASET = {
-    'mnist': [3,8],
+    'mnist': ['3','8'],
     'cifar_10': ['aeroplane','automobile']
 }
 

@@ -16,17 +16,13 @@ class DataLoader():
         self.dataset_augmentation.any_augmented = dataset_augmentation.BOOL
         self.dataset_augmentation.dataset_percent = dataset_augmentation.N_SAMPLES
         self.dataset_augmentation.size = dataset_augmentation.SIZE
-        self.dataset_augmentation.configs = dataset_augmentation.CONFIG_LIST
+        self.dataset_augmentation.configs = dataset_augmentation.CONFIGS
         self.num_samples = self.get_dataset_size(len(self.roidb))
         self.dataset_augmentation.sample_bools = self.get_sample_augmentation_bools()
         self.dataset_augmentation.augmentation_indices = self.get_augmentation_indices()
 
     def __len__(self):
         return self.num_samples
-
-    @property
-    def image_id(self):
-        return self.image_id
 
     def get_dataset_size(self,num_original_samples):
         if not self.dataset_augmentation.any_augmented:
@@ -41,7 +37,7 @@ class DataLoader():
 
     def get_sample_augmentation_bools(self):
         if not self.dataset_augmentation.any_augmented:
-            return None
+            return np.zeros(self.roidb_size,dtype=np.bool)
         sample_bools = np.zeros(self.roidb_size,dtype=np.int)
         augmented_sample_indices = npr.permutation(self.roidb_size)[:self.num_samples_to_augment]
         sample_bools[augmented_sample_indices] = 1
@@ -93,12 +89,15 @@ class DataLoader():
         
     def add_records_information(self,sample,roidb_index):
         if self.correctness_records:
-            sample['correct'] = self.correctness_records[roidb_index]        
+            sample['correctness_record'] = self.correctness_records[roidb_index]        
+            sample['correctness_bool'] = True
         else:
-            sample['correct'] = None
+            sample['correctness_record'] = None
+            sample['correctness_bool'] = False
 
     def add_image_id_information(self,sample,roidb_index):
         sample['image_id'] = self.image_index[roidb_index]
+        sample['index'] = roidb_index
         
     def get_sample_with_info(self,index):
         sample,roidb_index = self.add_dataset_augmentation_information(index)
@@ -167,12 +166,10 @@ class DataLoader():
     #
 
     def load_sample(self,sample,loadConfig,load_as_blob=False):
-        print(sample)
         image_path = self.imdb.image_path_at(sample['image_id'])
         img = cv2.imread(image_path)
         if loadConfig.cropped_to_box_bool:
             img = cropImageToAnnoRegion(img,sample['boxes'][loadConfig.cropped_to_box_index]) 
-        img, scales = prep_im_for_blob(img, loadConfig.dataset_means,loadConfig.target_size,loadConfig.max_sample_single_dimension_size)
         if sample['aug_bool']:
             transforms = self.dataset_augmentation.configs[sample['aug_index']]
             inputTransDict = {'transformations':transforms}
@@ -181,6 +178,12 @@ class DataLoader():
             raise ValueError("unknown handling of records")
         if loadConfig.load_rois_bool:
             raise ValueError("unknown handling of rois")
-        if loadConfig.load_activation_image_bool:
+        if loadConfig.activation_sample.bool_value:
             raise ValueError("unknown handling of activation values")
+        if load_as_blob:
+            blobDict = {}
+            img, scales = prep_im_for_blob(img, loadConfig.dataset_means,loadConfig.target_size,loadConfig.max_sample_single_dimension_size)
+            img = im_list_to_blob([img]) # returns blob
+            blobDict['data'] = img
+            return blobDict,scales
         return img,scales

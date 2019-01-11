@@ -1,4 +1,5 @@
 # misc imports
+from core.configBase import cfgDebug
 import os.path as osp
 import numpy as np
 from numpy import transpose as npt
@@ -79,4 +80,25 @@ def get_bbox_info(roidb,size):
             idx += 1
     print("actual: {} | theoretical: {}".format(idx,size))
     return areas,widths,heights
+
+def centerAndScaleBBox(bbox,rotMat,scale):
+    if cfgDebug.utils.misc: print("[centerAndScaleBBox] before bbox",bbox)
+
+    cx = np.mean([bbox[0],bbox[2]])
+    cy = np.mean([bbox[1],bbox[3]])
+    center = np.array([cx,cy,1])
+    new_center = np.matmul(rotMat,center)
+
+    x_len = bbox[2] - bbox[0]
+    y_len = bbox[3] - bbox[1]
+
+    x1 = int(new_center[0] - 0.5 * scale * x_len)
+    x2 = int(new_center[0] + 0.5 * scale * x_len)
+    y1 = int(new_center[1] - 0.5 * scale * y_len)
+    y2 = int(new_center[1] + 0.5 * scale * y_len)
+    new_bbox = [x1,y1,x2,y2]
+    if cfgDebug.utils.misc: print("[centerAndScaleBBox] after bbox",new_bbox)
+
+    return new_bbox
+
 

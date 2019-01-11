@@ -29,6 +29,7 @@ import numpy.random as npr
 import sys,os,cv2,uuid
 from anno_analysis.metrics import annotationDensityPlot,plotDensityPlot,computeAnnoMapListEntropy
 
+from datasets.data_loader import DataLoader
 # pytorch imports
 from datasets.pytorch_roidb_loader import RoidbDataset
 
@@ -197,6 +198,30 @@ if __name__ == '__main__':
     rotation_list = createExhaustiveRotationConfigs(rotation_input_list)
     mesh = create_mesh_from_lists([translation_list,rotation_list,crop_list])
     input_config = {'dataset_augmentation':{'transformations':mesh}}
+
+    # test iteration over data_loader
+    import copy
+    daCfg = copy.deepcopy(cfg.DATASET_AUGMENTATION)
+    # loadConfig = edict()
+    # loadConfig.cropped_to_box = 1
+    # loadConfig.cropped_to_box_index = 1
+    # loadConfig.dataset_means = 1
+    # loadConfig.max_sample_single_dimension_size = 1
+    daCfg.BOOL = True
+    print(daCfg.SIZE)
+    for i in range(10):
+        daCfg.N_SAMPLES = 0.1 * (i+1)
+        ds_loader = DataLoader(imdb.roidb,None,daCfg)
+        sample_bools = ds_loader.dataset_augmentation.sample_bools
+        actual_fraction = np.sum(sample_bools)/float(len(sample_bools))
+        print(round(daCfg.N_SAMPLES,2),len(ds_loader),actual_fraction)
+        print(sample_bools)
+        indices = np.arange(ds_loader.num_samples)
+        count = 0
+        for sample in ds_loader.sample_minibatch_roidbs_generator(indices):
+            count += 1
+        print(count,ds_loader.num_samples,len(ds_loader))
+    exit()
 
     im = cv2.imread(roidb[0]['image'])
     im_list = applyDatasetAugmentationList(im,input_config['dataset_augmentation'])

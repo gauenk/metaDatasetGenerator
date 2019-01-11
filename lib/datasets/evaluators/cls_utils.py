@@ -37,6 +37,14 @@ def load_cls_groundTruth(classname,cachedir,imagesetfile,annopath,annoReader,ind
     with open(imagesetfile, 'r') as f:
         lines = f.readlines()
     imagenames = [x.strip() for x in lines]
+    
+    """
+    ^I think this is the same as the "image_index" in the imdb
+    """
+    
+    """
+    _ I think we can get the annotation from 
+    """
 
     if not osp.isfile(cachefile):
         # load annots
@@ -58,15 +66,13 @@ def load_cls_groundTruth(classname,cachedir,imagesetfile,annopath,annoReader,ind
 
     return imagenames, annos
 
-def load_groundTruth(classname,cachedir,imagesetfile,annopath,\
-                     _load_annotation,_classes):
+def load_groundTruth(classname,cachedir,imagesetfile,annopath,_load_annotation,_classes):
     if cfg.SUBTASK == 'tp_fn':
         records = ds_utils.loadEvaluationRecords(classname,cfg.TP_FN_RECORDS_PATH,cfg.DATASETS)
         imagenames,probs = zip(*records.items())
         probsOrAnnos = probs
     elif cfg.SUBTASK in ["default","al_subset"]:
-        imagenames,annos = load_cls_groundTruth(classname,cachedir,imagesetfile,annopath,\
-                                                _load_annotation,_classes)
+        imagenames,annos = load_cls_groundTruth(classname,cachedir,imagesetfile,annopath,_load_annotation,_classes)
         probsOrAnnos = annos
     return imagenames, probsOrAnnos
 
@@ -156,7 +162,9 @@ def compute_metrics(ovthresh,image_ids,model_probs,gt_classes,num_classes,class_
         sys.exit()
 
 def compute_metrics_v2(ovthresh,image_ids,model_output_cls,gt_classes,num_classes,class_convert):
+    print("[cls_utils.py: compute_metrics_v2]")
     nd = len(image_ids)
+    print("nd: {}".format(nd))
     correct = np.zeros((nd,len(ovthresh))) # "false negative"
     records = {}
     for d in range(nd):
@@ -168,6 +176,8 @@ def compute_metrics_v2(ovthresh,image_ids,model_output_cls,gt_classes,num_classe
             # if prob >= thresh: guess = 1
             # record if correct
             guess = class_convert[model_output_cls[d]]
+            # if idx == 0:
+            #     print(guess,CLS_GT)
             if guess == CLS_GT: correct[d,idx] = 1
         records[image_ids[d]] = [1*np.any(correct[d,:]==1)]
     print(np.sum([sample for sample in records.values()]))
@@ -212,6 +222,7 @@ def remove_keys_from_activity_vector_and_ravel(record_dict):
     return new_record
 
 def compute_metrics_v1(ovthresh,image_ids,model_probs,gt_classes,class_convert):
+    print("[cls_utils.py: compute_metrics_v1]")
     nd = len(image_ids)
     tp = np.zeros((nd,len(ovthresh))) # "true positive"
     tn = np.zeros((nd,len(ovthresh))) # "true negative"

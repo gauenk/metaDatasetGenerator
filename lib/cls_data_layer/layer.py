@@ -1,11 +1,3 @@
-
-# --------------------------------------------------------
-# Fast R-CNN
-# Copyright (c) 2015 Microsoft
-# Licensed under The MIT License [see LICENSE for details]
-# Written by Ross Girshick
-# --------------------------------------------------------
-
 """The data layer used during training to train a Fast R-CNN network.
 
 ClsDataLayer implements a Caffe Python layer.
