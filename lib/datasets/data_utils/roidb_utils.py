@@ -26,34 +26,33 @@ def filterSampleWithEmptyAnnotations(gt_roidb,image_index):
     gt_roidb,filtered_image_index = removeListFromGtRoidb(gt_roidb,image_index,toRemove)
     return gt_roidb,filtered_image_index
 
-def filterImagesByClass(gt_roidb,image_index,class_inclusion_list):
+def filterImagesByClass(gt_roidb,image_index,class_filter):
     print("[roidb_utils.py: filterImagesByClass]")
-    if len(class_inclusion_list) == 0:
-        print("NOTHING")
+    if len(class_filter.new_names) == 0:
+        print("no classes to filter")
         return gt_roidb,image_index
     toRemove = []
     for idx,sample in enumerate(gt_roidb):
-        keepBool = filterSampleByClass(sample,class_inclusion_list)
+        keepBool = filterSampleByClass(sample,class_filter)
         if keepBool is False:
             toRemove.append(idx)
     gt_roidb,filtered_image_index = removeListFromGtRoidb(gt_roidb,image_index,toRemove)
     return gt_roidb,filtered_image_index
 
-def filterSampleByClass(sample,class_inclusion_list):
+def filterSampleByClass(sample,class_filter):
     # if no gt_classes match, return None
-    if check_list_equal_any(sample['gt_classes'],class_inclusion_list) is False:
-        return False
-    # if all gt_classes match, return original input
-    if check_list_equal_all(sample['gt_classes'],class_inclusion_list) is True:
+    # gt_class_names = [class_filter.original_names[cls] for cls in sample['gt_classes']]
+    # class_inclusion_list = class_filter.new_names
+    if check_list_equal_any(sample['gt_classes'],-1) is False:
         return True
+    # if all gt_classes match, return original input
+    if check_list_equal_all(sample['gt_classes'],-1) is True:
+        return False
     # filter out all other samples; we should never have zero remaining because of first "if" check
     toRemove = []
-    for gt_obj_index,gt_object_class in enumerate(sample['gt_classes']):
-        if gt_object_class in class_inclusion_list:
-            continue
-        elif str(gt_object_class) in class_inclusion_list:
-            continue
-        elif int(gt_object_class) in class_inclusion_list:
+    for gt_obj_index,gt_class_index in enumerate(sample['gt_classes']):
+        print(gt_class_index)
+        if gt_class_index != -1:
             continue
         else:
             toRemove.append(gt_obj_index)
@@ -156,10 +155,10 @@ def addRoidbField(roidb,fieldName,transformFunction):
             # sample[fieldName].append(transformFunction(sample))
         sample[fieldName] = transformFunction(sample)
         
-#
-# misc roidb functions
-#
 
+#
+# start: class filter functions
+#
 
 def mangleClassInclusionList(class_inclusion_list,gt_roidb):
     if len(class_inclusion_list) == 0:
@@ -173,6 +172,22 @@ def mangleClassInclusionList(class_inclusion_list,gt_roidb):
     else:
         print("ERROR. How do we match the 'class_inclusion_list' type with the 'gt_roidb['gt_classes']' type?")
         exit()
+
+def createClassConversionDict(class_inclusion_list,original_classes):
+    print(class_inclusion_list)
+    print(original_classes)
+    conversion_dict = {}
+    for cls in class_inclusion_list:
+        conversion_dict[original_classes.index(cls)] = cls
+    return conversion_dict
+
+#
+# end:
+#
+
+#
+# misc roidb functions
+#
 
 def computeRoidbDictLens(roidbTrDict,roidbTeDict):
     lenTr = 0

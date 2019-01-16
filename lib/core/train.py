@@ -25,6 +25,8 @@ from caffe.proto import caffe_pb2
 import google.protobuf as pb2
 import google.protobuf.text_format
 
+from net_utils.misc import setNetworkMasksToOne
+from net_utils.initialize_net import mangleSolverPrototxt,initializeNetworkWeights,setNetForWarpAffineLayerType
 
 class SolverWrapper(object):
     """A simple wrapper around Caffe's solver.
@@ -32,10 +34,11 @@ class SolverWrapper(object):
     use to unnormalize the learned bounding-box regression weights.
     """
 
-    def __init__(self, solver_prototxt, roidb, output_dir,
+    def __init__(self, solver_prototxt, imdb, output_dir,
                  pretrained_model=None, solver_state=None,al_net=None):
         """Initialize the SolverWrapper."""
-        self.output_dir = output_dir
+        roidb = imdb.roidb
+        self.imdb = imdb
 
         if (cfg.TRAIN.OBJ_DET.HAS_RPN and cfg.TRAIN.OBJ_DET.BBOX_REG and
             cfg.TRAIN.OBJ_DET.BBOX_NORMALIZE_TARGETS and
@@ -45,16 +48,19 @@ class SolverWrapper(object):
             assert cfg.TRAIN.OBJ_DET.BBOX_NORMALIZE_TARGETS_PRECOMPUTED
 
         if cfg.TRAIN.OBJ_DET.BBOX_REG and cfg.TASK == 'object_detection':
-            print 'Computing bounding-box regression targets...'
+            print('Computing bounding-box regression targets...')
             self.bbox_means, self.bbox_stds = \
                     rdl_roidb.add_bbox_regression_targets(roidb)
-            print 'done'
+            print('done')
 
+        print(caffe.SGDSolver(solver_prototxt))
         self.solver = caffe.SGDSolver(solver_prototxt)
-        
+
         if solver_state is not None:
             print("Loading solver state from {:s}".format(solver_state))
             self.solver.restore(solver_state)
+        else:
+            initializeNetworkWeights(self.solver.net)
 
         if pretrained_model is not None:
             print ('Loading pretrained model '
@@ -64,6 +70,10 @@ class SolverWrapper(object):
         self.solver_param = caffe_pb2.SolverParameter()
         with open(solver_prototxt, 'rt') as f:
             pb2.text_format.Merge(f.read(), self.solver_param)
+
+        # handle special needs for different layer types
+        setNetForWarpAffineLayerType(self.solver.net,solver_prototxt)
+
 
         # HANDLE THE MASK ISSUES (yikes)
         net = self.solver.net
@@ -88,16 +98,20 @@ class SolverWrapper(object):
                 elif self.solver.net.layers[0].name == "AimDataLayer":
                     self.solver.net.layers[0].set_roidb(roidb, person_records,al_net)
                 elif self.solver.net.layers[0].name == "ClsDataLayer":
-                    self.solver.net.layers[0].set_roidb(roidb, person_records,perc_augmented=cfg.DATASET_AUGMENTATION.N_SAMPLES)
+                    ds_loader = imdb.create_data_loader(cfg,person_records,al_net)
+                    self.solver.net.layers[0].set_data_loader(ds_loader,imdb.data_loader_config)
                 else:
                     print("WE DONT KNOW THE FIRST LAYER TYPE")
                     print(self.solver.net.layers[0].name)
                     print("PROG. QUITTING")
                     sys.exit()
             else:
-                print("NOT LOADING PERSON RECORDS SINCE cfg.SUBTASK == '{}'".\
-                      format(cfg.SUBTASK))
-                self.solver.net.layers[0].set_roidb(roidb,None,perc_augmented=cfg.DATASET_AUGMENTATION.N_SAMPLES)
+                print("NOT LOADING PERSON RECORDS SINCE cfg.SUBTASK == '{}'".format(cfg.SUBTASK))
+                ds_loader = imdb.create_data_loader(cfg,None,al_net)
+                print("number of samples: {}".format(ds_loader.num_samples))
+                print("batch size: {}".format(cfg.TRAIN.BATCH_SIZE))
+                print("iterations per epoch: {}".format(ds_loader.num_samples // cfg.TRAIN.BATCH_SIZE))
+                self.solver.net.layers[0].set_data_loader(ds_loader,imdb.data_loader_config)
 
     def snapshot(self):
         """Take a snapshot of the network after unnormalizing the learned
@@ -161,14 +175,14 @@ class SolverWrapper(object):
             self.solver.step(1)
             timer.toc()
 
-            if self.solver.iter % (10 * self.solver_param.display) == 0:
+            if self.solver.iter % (1 * self.solver_param.display) == 0:
                 if 'Sigmoid' in self.solver.net.layers[-1].type:
                     self.view_sigmoid_output()
                 elif 'Softmax' in self.solver.net.layers[-1].type:
                     self.view_softmax_output()
                 print('speed: {:.3f}s / iter'.format(timer.average_time))
 
-            if self.solver.iter % cfg.TRAIN.SNAPSHOT_ITERS == 0:
+            if self.solver.iter % cfg.TRAIN.SNAPSHOT_ITERS == 0 or self.solver.iter == 100:
                 last_snapshot_iter = self.solver.iter
                 model_paths.append(self.snapshot())
                 
@@ -258,17 +272,30 @@ class SolverWrapper(object):
         layer = caffe.create_layer(lp)
         bottom = [net.blobs['cls_score']]
         top = [caffe.Blob([])]
-        labels = net.blobs['labels'].data
+        labels = np.squeeze(net.blobs['labels'].data).astype(np.int64)
         layer.SetUp(bottom, top)
         layer.Reshape(bottom, top)
         layer.Forward(bottom, top)
         np.set_printoptions(precision=3,suppress=True)
+        guess_class = np.argmax(top[0].data,axis=1)
+        all_class_probs = top[0].data
+        class_ave_probs = [] # how confident are the guesses?
+        print(all_class_probs.shape)
+        for class_index in range(all_class_probs.shape[1]):
+            class_probs_indices = np.where(guess_class == class_index)[0]
+            class_probs = all_class_probs[class_probs_indices,class_index]
+            class_ave_probs.append(np.mean(class_probs))
+        if len(class_ave_probs) != self.imdb.num_classes:
+            print("Possible error: num_classes for (model,data) = ({},{})".format(len(class_ave_probs),self.imdb.num_classes))
+        n_classes = np.max([len(class_ave_probs),self.imdb.num_classes])
+        class_ave_probs_np = np.zeros(n_classes)
+        class_ave_probs_np[:len(class_ave_probs)] = np.array(class_ave_probs)
+        #class_ave_probs = np.mean(all_class_probs,axis=0)
+        class_guess_frequency = np.bincount(np.argmax(top[0].data,axis=1),minlength=n_classes)
+        class_gt_frequency = np.bincount(labels,minlength=n_classes)
         print("Softmax output v.s. Labels: ")
-        # print(np.sum(top[0].data,axis=1))
-        # print(np.sum(top[0].data,axis=0))
-        # print(top[0].data.shape)
-        # print(np.c_[top[0].data, labels])
-        print(np.c_[np.argmax(top[0].data,axis=1), labels])
+        print(np.c_[guess_class, labels])
+        print(np.c_[class_gt_frequency,class_guess_frequency,class_ave_probs_np])
 
 
 def get_training_roidb(imdb):
@@ -314,72 +341,10 @@ def filter_roidb(roidb):
     num = len(roidb)
     filtered_roidb = [entry for entry in roidb if is_valid(entry)]
     num_after = len(filtered_roidb)
-    print('Filtered {} roidb entries: {} -> {}'.format(num - num_after,
-                                                       num, num_after))
+    print('Filtered {} roidb entries: {} -> {}'.format(num - num_after,num, num_after))
     return filtered_roidb
 
-def setNetworkMasksToOne(net):
-    for name,layer in net.layer_dict.items():
-        if len(layer.blobs) == 0: continue
-        for idx in range(len(layer.blobs)):
-            mask = layer.blobs[idx].mask
-            layer.blobs[idx].mask[...] = np.ones(mask.shape)
-
-def insertInfixBeforeDecimal(oMsg,infix):
-    splitList = oMsg.split(".")
-    assert len(splitList) in [2,3], "splitList is length not 2 or 3: {}".format(len(splitList))
-    splitList[-2] += infix
-    return '.'.join(splitList)
-    
-def writeSolverToFile(fn,ymlContent):
-    ymlKeys = ymlContent.keys()
-    useQuotesList = ["lr_policy","train_net","snapshot_prefix","type"]
-    with open(fn, 'w') as f:
-        for key in ymlKeys:
-            val = ymlContent[key]
-            useQuotes = key in useQuotesList
-            if useQuotes:
-                f.write("{}: \"{}\"\n".format(key,val))
-            else:
-                f.write("{}: {}\n".format(key,val))                
-
-def addFullPathToSnapshotPrefix(solverYaml,outputDir):
-    snapshotPrefix = solverYaml['snapshot_prefix']
-    if "/home/" not in solverYaml['snapshot_prefix']:
-        finalSubstr = solverYaml['snapshot_prefix']
-        snapshotPrefix = osp.join(outputDir,solverYaml['snapshot_prefix'])
-        # add infix to ymlData
-        infix = ('_' + cfg.TRAIN.SNAPSHOT_INFIX
-                 if cfg.TRAIN.SNAPSHOT_INFIX != '' else '')
-        solverYaml['snapshot_prefix'] = snapshotPrefix + infix
-        print("new snapshot_prefix: {}".format(snapshotPrefix))
-
-def resetSnapshotPrefix(solverYaml,new_snapshot_prefix):
-    solverYaml['snapshot_prefix'] = new_snapshot_prefix
-
-def mangleSolverPrototxt(solverPrototxt,outputDir):
-    print("Mangling solverprototxt {}".format(solverPrototxt))
-    infix = "_generatedByTrainpy"
-    newSolverPrototxtFilename = insertInfixBeforeDecimal(solverPrototxt,infix)
-    solverYaml = prototxtToYaml(solverPrototxt)
-    print("writing new solver_prototxt @ {}".format(newSolverPrototxtFilename))
-    
-    # create snapshot prefix name
-    if cfg.TRAIN.RECREATE_SNAPSHOT_NAME:
-        new_snapshot_prefix = create_snapshot_prefix(cfg.modelInfo)
-        resetSnapshotPrefix(solverYaml,new_snapshot_prefix)
-    
-    # add full path
-    addFullPathToSnapshotPrefix(solverYaml,outputDir)
-    
-    # write the new solver_prototxt
-    writeSolverToFile(newSolverPrototxtFilename,solverYaml)
-    print("added full path to snapshot_prefix")
-    print("snapshot_prefix is [{}]".format(solverYaml['snapshot_prefix']))
-
-    return newSolverPrototxtFilename
-
-def train_net(solver_prototxt, roidb, output_dir,datasetName="",
+def train_net(solver_prototxt, imdb, output_dir,datasetName="",
               pretrained_model=None, solver_state=None, max_iters=400000,
               al_net=None):
     """Train *any* object detection network."""
@@ -387,7 +352,7 @@ def train_net(solver_prototxt, roidb, output_dir,datasetName="",
     #roidb = filter_roidb(roidb)
     print("og solver",solver_prototxt)
     newSolverPrototxt = mangleSolverPrototxt(solver_prototxt,output_dir)
-    sw = SolverWrapper(newSolverPrototxt, roidb, output_dir,
+    sw = SolverWrapper(newSolverPrototxt, imdb, output_dir,
                        pretrained_model=pretrained_model,
                        solver_state=solver_state,
                        al_net=al_net)

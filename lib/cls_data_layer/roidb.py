@@ -1,4 +1,3 @@
-
 """Transform a roidb into a trainable roidb by adding a bunch of metadata."""
 
 import numpy as np
@@ -17,6 +16,7 @@ def prepare_roidb(imdb):
     sizes = [PIL.Image.open(imdb.image_path_at(i)).size
              for i in xrange(imdb.num_images)]
     roidb = imdb.roidb
+    print(len(imdb.image_index))
     for i in xrange(len(imdb.image_index)):
         roidb[i]['image'] = imdb.image_path_at(i)
         roidb[i]['image_id'] = imdb.image_index[i]

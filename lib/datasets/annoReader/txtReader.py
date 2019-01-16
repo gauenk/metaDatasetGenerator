@@ -20,7 +20,7 @@ class txtReader(object):
     def __init__(self, annoPath, classes , datasetName, setID,
                  bboxOffset = 0,useDiff = True, cleanRegex = None,
                  convertToPerson = None, convertIdToCls = None, anno_type='box',
-                 is_image_index_flattened=False):
+                 is_image_index_flattened=False,class_filter=None):
         """
         __init__ function for annoReader [annotationReader]
 
@@ -39,6 +39,7 @@ class txtReader(object):
         if cleanRegex is not None: self._cleanRegex = cleanRegex # used for INRIA
         else:
             self._cleanRegex = r"(?P<cls>[0-9]+) (?P<xmin>[0-9]*\.[0-9]*) (?P<ymin>[0-9]*\.[0-9]*) (?P<xmax>[0-9]*\.[0-9]*) (?P<ymax>[0-9]*\.[0-9]*)"
+        self.class_filter = class_filter
         
     def _create_classToIndex(self,classes):
         return dict(zip(classes, range(self.num_classes)))
@@ -60,10 +61,11 @@ class txtReader(object):
         annos = []
         with open(filename,"r") as f:
             annos = f.readlines()
-            return {'gt_classes': np.array(annos,dtype=np.uint8),
-                    'boxes': [None],
-                    'flipped' : False,
-                    'set' : self._setID}
+        annos = [self.convert_filtered_class_index(anno) for anno in annos]
+        return {'gt_classes': np.array(annos,dtype=np.int16),
+                'boxes': [None],
+                'flipped' : False,
+                'set' : self._setID}
 
     def _load_txt_box_annotation(self, index):
         """
@@ -103,7 +105,7 @@ class txtReader(object):
                 if cls == -1:
                     continue
                 boxes[ix, :] = [x1, y1, x2, y2]
-                gt_classes[ix] = cls
+                gt_classes[ix] = self.convert_filtered_class_index(cls)
                 overlaps[ix, cls] = 1.0
                 seg_areas[ix] = (x2 - x1 + 1) * (y2 - y1 + 1)
                 ix += 1
@@ -201,7 +203,7 @@ class txtReader(object):
                     cls = -1
         else:
             cls = self._classToIndex["person"]
-        return cls
+        return int(cls)
 
     def mangle_cls(self,cls):
 
@@ -246,4 +248,13 @@ class txtReader(object):
             y2 = y2 * 480
         return x1,y1,x2,y2
         
-
+    def convert_filtered_class_index(self,original_class_index):
+        original_class_index = int(original_class_index)
+        if self.class_filter is None or self.class_filter.check is False:
+            return original_class_index
+        class_name = self.class_filter.original_names[original_class_index]
+        if class_name not in self.class_filter.new_names:
+            return -1
+        # if class_name not in self.class_filter.new_names:
+        #     raise ValueError("no such class name {} at index {} in the filtered class list".format(class_name,original_class_index))
+        return self.class_filter.new_names.index(class_name)

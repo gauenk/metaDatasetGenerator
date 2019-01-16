@@ -17,6 +17,9 @@ import cv2,uuid
 import matplotlib.pyplot as plt
 from datasets.data_utils.dataset_augmentation_utils import *
 
+def image_list_to_blobs(ims):
+    return im_list_to_blob(ims)
+
 def im_list_to_blob(ims):
     """Convert a list of images into a network input.
 
@@ -24,8 +27,7 @@ def im_list_to_blob(ims):
     """
     max_shape = np.array([im.shape for im in ims]).max(axis=0)
     num_images = len(ims)
-    blob = np.zeros((num_images, max_shape[0], max_shape[1], 3),
-                    dtype=np.float32)
+    blob = np.zeros((num_images, max_shape[0], max_shape[1], 3),dtype=np.float32)
 
     for i in xrange(num_images):
         im = ims[i]
@@ -38,6 +40,9 @@ def im_list_to_blob(ims):
     blob = blob.transpose(channel_swap)
     return blob
 
+def blob_list_to_images(blobs):
+    return blob_list_im(blobs)
+
 def blob_list_im(blobs):
     """Convert a list of blobs into a images
 
@@ -48,8 +53,7 @@ def blob_list_im(blobs):
     if len(max_shape) == 1:
         sqrt_shape = np.sqrt(max_shape[0]/3)
         max_shape = [0,sqrt_shape,sqrt_shape]
-    imgs = np.zeros((num_blobs, 3, max_shape[1], max_shape[2]),
-                    dtype=np.float32)
+    imgs = np.zeros((num_blobs, 3, max_shape[1], max_shape[2]),dtype=np.float32)
     for i in xrange(num_blobs):
         blob = blobs[i]
         imgs[i, :, 0:max_shape[1], 0:max_shape[2]] = blob.reshape(imgs[i].shape)
@@ -94,8 +98,7 @@ def _get_image_blob_from_roidb(roidb, scale_inds):
         if roidb[i]['flipped']:
             im = im[:, ::-1, :]
         target_size = cfg.TRAIN.SCALES[scale_inds[i]]
-        im, im_scale = prep_im_for_blob(im, cfg.PIXEL_MEANS, target_size,
-                                        cfg.TRAIN.MAX_SIZE)
+        im, im_scale = prep_im_for_blob(im, cfg.PIXEL_MEANS, target_size,cfg.TRAIN.MAX_SIZE)
         im_scales.append(im_scale)
         processed_ims.append(im)
 
@@ -287,6 +290,9 @@ def getRawCroppedImageBlob(roidb,records,scale_inds,getCropped,**kwargs):
 
     return blob, im_scales
     
+def preprocess_image_for_model(im, pixel_means, target_size, max_size):
+    return prep_im_for_blob(im, pixel_means, target_size, max_size)
+
 def prep_im_for_blob(im, pixel_means, target_size, max_size):
     """Mean subtract and scale an image for use in a blob."""
     im = im.astype(np.float32, copy=False)
@@ -298,9 +304,8 @@ def prep_im_for_blob(im, pixel_means, target_size, max_size):
     # Prevent the biggest axis from being more than MAX_SIZE
     if np.round(im_scale * im_size_max) > max_size:
         im_scale = float(max_size) / float(im_size_max)
-    im = cv2.resize(im, None, None, fx=im_scale, fy=im_scale,
-                    interpolation=cv2.INTER_LINEAR)
-
+    im = cv2.resize(im, None, None, fx=im_scale, fy=im_scale,interpolation=cv2.INTER_LINEAR)
+    im /= 255.
     return im, im_scale
 
 def prep_im_for_vae_blob(im, pixel_means, target_size, max_size):
@@ -325,7 +330,8 @@ def save_blob_list_to_file(blob_list,append_str_l,vis=False,size=cfg.CROPPED_IMA
     imgs = blob_list_im(blob_list)
     useAppendStr = append_str_l is not None and len(append_str_l) == imgs.shape[0]
     for idx,img in enumerate(imgs):
-        img[:,:,:] *= 255
+        if img.max() <= 1: # rescaleImageValues
+            img[:,:,:] *= 255
         img[:size,:size,:] += cfg.PIXEL_MEANS
         img = img.astype(np.uint8)
         if useAppendStr:
@@ -337,6 +343,7 @@ def save_blob_list_to_file(blob_list,append_str_l,vis=False,size=cfg.CROPPED_IMA
         else:
             plt.imshow(img[:,:,::-1])
             plt.show()
+    exit()
 
 def createInfoBlob(im_data,im_scales):
     # ensure normalization of image data

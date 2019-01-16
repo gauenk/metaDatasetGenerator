@@ -19,12 +19,11 @@ cfg.DEBUG.utils.misc = False
 cfg.DEBUG.utils.box_utils = False
 cfg.DEBUG.utils.image_utils = False
 
-# ... you get the idea...
-
 # output for recoding the TP and FN of a model
 __C.TP_FN_RECORDS_PATH = "./output/{}/tp_fn_records/".format("faster_rcnn")
 __C.TP_FN_RECORDS_WITH_IMAGESET = True
 
+__C.BASE_FOR_CACHE = [__C.TP_FN_RECORDS_PATH,__C.TP_FN_RECORDS_WITH_IMAGESET]
 
 
 def cfg_from_file(filename):
@@ -87,7 +86,7 @@ def _merge_a_into_b(a, b):
 
 
 def create_snapshot_prefix(modelInfo):
-    train_set_snapshot = modelInfo.train_set.replace('_','-')
+    train_set_snapshot = modelInfo.imdb_str
     name = "{}_{}_{}".format(train_set_snapshot,modelInfo.architecture,modelInfo.optim)
     
     #if cfg.TRAIN.IMAGE_NOISE is not None or cfg.TRAIN.IMAGE_NOISE is not 0:
@@ -109,8 +108,8 @@ def create_snapshot_prefix(modelInfo):
         name += '_noDsAug'
     
     #if cfg.DATASETS.CLASS_FILTER:
-    if modelInfo.classFilter is not False:
-        name += '_yesClassFilter{}'.format(modelInfo.classFilter)
+    if modelInfo.class_filter is not False:
+        name += '_yesClassFilter{}'.format(modelInfo.class_filter)
     else:
         name += '_noClassFilter'
 
@@ -132,7 +131,7 @@ def getFieldFromSolverptotxt(prototxt,field_name):
     else: return None
 
 def solverPrototxtInfoDict(solverPrototxt):
-    regex = r'.*models/(?P<ds_name>[a-zA-Z0-9_]+)/(?P<arch>[a-zA-Z0-9_]+).*solver\.prototxt'
+    regex = r'.*models/(?P<ds_name>[a-zA-Z0-9_]+)/(?P<arch>[a-zA-Z0-9_]+).*solver[a-zA-Z0-9]*\.prototxt'
     _result = re.match(regex,solverPrototxt)
     if _result is None:
         print("no match for solverprototxt regex... quitting")

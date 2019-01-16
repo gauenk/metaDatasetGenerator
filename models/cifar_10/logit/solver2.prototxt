@@ -1,4 +1,4 @@
-train_net: "models/mnist/lenet5/train.prototxt"
+train_net: "models/mnist/logit/train_2cls.prototxt"
 type: "Adam"
 base_lr: 0.001
 momentum: 0.9

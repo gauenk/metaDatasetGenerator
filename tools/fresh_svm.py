@@ -1,6 +1,7 @@
 from sklearn import svm as sk_svm
 from fresh_config import cfg,cfgForCaching
-from fresh_util import compute_accuracy,Cache
+from utils.base import compute_accuracy
+from cache.one_level_cache import Cache
 import numpy as np
 
 def compute_separability(train_data,test_data,clusters):

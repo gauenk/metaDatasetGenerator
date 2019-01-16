@@ -24,20 +24,25 @@ def generate_experiments_across_iterations():
     #train_set_list = ['cifar_10','mnist']
     architecture_list = ['lenet5']
     # train_set_list = ['cifar_10-train-default','mnist-train-default']
-    train_set_list = ['mnist-train-default']
+    train_set_list = ['mnist-train_1k_2cls-default']
     test_set_dict ={
         'cifar_10':['cifar_10-train-default','cifar_10-val-default'],
-        'mnist':['mnist-train-default','mnist-test-default'],
+        'mnist':['mnist-test-default'],
     }
 
     # iterations_list = np.arange(0,1000000+1,25000)[1:]
     iterations_list = [(idx+1)*20000 for idx in range(5)]
+    iters_list_noDsAug = [(idx+1)*100 for idx in range(11)] + [2000,3000,4000]
+    iters_list_yesDsAug10_0 = [1000,5000,10000,30000,40000]
+    iters_list_yesDsAug25_0 = [2500,12500,25000,100000]
+    iter_list_dict = {False:iters_list_noDsAug,'10-0':iters_list_yesDsAug10_0,'25-0':iters_list_yesDsAug25_0}
     # iterations_list = np.arange(0,1000000+1,500000)[1:]
     #prune_list = ['noPrune','yesPrune10','yesPrune100','yesPrune200']
     prune_list = [False]
     image_noise_list = [False]
     optim_list = ['adam']
     ds_aug_list = ['25-0','10-0',False]
+    class_filter_list = [2]
 
     modelInfo_list = []
     expConfig = edict()
@@ -52,20 +57,23 @@ def generate_experiments_across_iterations():
                     for image_noise in image_noise_list:
                         for prune in prune_list:
                             for ds_aug in ds_aug_list:
-                                for iterations in iterations_list:
-                                    expConfig.data.train_imdb = train_set
-                                    expConfig.data.test_imdb = test_set
-                                    modelInfo.iterations = iterations
-                                    modelInfo.train_set = train_set_name
-                                    modelInfo.architecture = architecture
-                                    modelInfo.prune = prune
-                                    modelInfo.image_noise = image_noise
-                                    modelInfo.optim = optim
-                                    modelInfo.dataset_augmentation = ds_aug
-                                    modelInfo.classFilter = False
-                                    modelInfo.name = create_model_name(modelInfo)
-                                    modelInfo.path = create_model_path(modelInfo)
-                                    modelInfo_list.append(deepcopy(expConfig))
+                                iters_list = iter_list_dict[ds_aug]
+                                for class_filter in class_filter_list:
+                                    for iterations in iters_list:
+                                        expConfig.data.train_imdb = train_set
+                                        expConfig.data.test_imdb = test_set
+                                        modelInfo.iterations = iterations
+                                        modelInfo.imdb_str = train_set
+                                        #modelInfo.train_set = train_set_name
+                                        modelInfo.architecture = architecture
+                                        modelInfo.prune = prune
+                                        modelInfo.image_noise = image_noise
+                                        modelInfo.optim = optim
+                                        modelInfo.dataset_augmentation = ds_aug
+                                        modelInfo.class_filter = class_filter
+                                        modelInfo.name = create_model_name(modelInfo)
+                                        modelInfo.path = create_model_path(modelInfo)
+                                        modelInfo_list.append(deepcopy(expConfig))
     return modelInfo_list
 
 

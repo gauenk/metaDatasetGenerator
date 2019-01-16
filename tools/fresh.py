@@ -6,7 +6,8 @@ matplotlib.use('Agg')
 import _init_paths
 
 from fresh_config import cfg,cfgForCaching,get_config_field_update_template,update_config
-from fresh_util import load_data,Cache,print_measure_results,aggregate_results
+from cache.one_level_cache import Cache
+from fresh_util import load_data,print_measure_results,aggregate_results
 from fresh_cluster import cluster_data,compute_clustering_statistics
 from fresh_svm import compute_separability
 from fresh_plot import plot_aggregate_scores_vs_clusters,plot_measure_list,tile_by_comboid
@@ -122,6 +123,12 @@ def compute_kmean_measures_FOR_model_data_combos():
     # load data
     train_data = load_data(train_imdb_name,layerList,modelInfo)
     test_data = load_data(test_imdb_name,layerList,modelInfo)
+
+    number_gates_by_correctness_train = countUniqueActivationGates(train_data)
+    number_gates_by_correctness_test = countUniqueActivationGates(test_data)
+    print(number_gates_by_class_train)
+    print(number_gates_by_class_test)
+
     # train_data = None
     # test_data = None
 

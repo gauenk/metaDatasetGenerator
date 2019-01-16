@@ -1,9 +1,10 @@
-import cv2
+import cv2,copy
 import numpy as np
 import numpy.random as npr
 from easydict import EasyDict as edict
-from utils.blob import prep_im_for_blob,im_list_to_blob
+from utils.blob import preprocess_image_for_model,im_list_to_blob
 from datasets.data_utils.dataset_augmentation_utils import applyDatasetAugmentation
+
 class DataLoader():
 
     def __init__(self,imdb,records,dataset_augmentation):
@@ -17,11 +18,15 @@ class DataLoader():
         self.dataset_augmentation.dataset_percent = dataset_augmentation.N_SAMPLES
         self.dataset_augmentation.size = dataset_augmentation.SIZE
         self.dataset_augmentation.configs = dataset_augmentation.CONFIGS
-        self.num_samples = self.get_dataset_size(len(self.roidb))
+        self.num_samples = self.get_dataset_size(self.roidb_size)
         self.dataset_augmentation.sample_bools = self.get_sample_augmentation_bools()
         self.dataset_augmentation.augmentation_indices = self.get_augmentation_indices()
 
     def __len__(self):
+        return self.num_samples
+    
+    @property
+    def size(self):
         return self.num_samples
 
     def get_dataset_size(self,num_original_samples):
@@ -45,7 +50,7 @@ class DataLoader():
         
     def get_augmentation_indices(self):
         if not self.dataset_augmentation.any_augmented:
-            return None
+            return np.zeros(self.roidb_size,dtype=np.bool)
         index = 0
         augmentation_indices = np.zeros(self.roidb_size,dtype=np.int)
         for sample_index,aug_bool in enumerate(self.dataset_augmentation.sample_bools):
@@ -105,13 +110,11 @@ class DataLoader():
         self.add_image_id_information(sample,roidb_index)
         return sample
 
+    def balance_classes(self):
+        raise NotImplemented("we can not balance classes currently")
     #
-    # Loading sample functions
+    # load sample from sample list with information
     #
-
-    def dataset_generator(self,loadConfig,load_as_blob=False):
-        indicies = np.arange(self.num_samples)
-        return self.minibatch_generator(indicies,loadConfig,load_as_blob)
 
     def sample_minibatch_roidbs(self,indices):
         """
@@ -125,21 +128,6 @@ class DataLoader():
             sample = self.get_sample_with_info(index)
             sampleList.append(sample)
         return sampleList
-
-    def minibatch(self,indices,loadConfig,load_as_blob=False):
-        """
-        note load_as_blob does this *per batch*
-        """
-        imageList,scaleList = [],[]
-        for sample in self.sample_minibatch_roidbs(indices,loadConfig):
-            image,scale = self.load_sample(sample,loadConfig,load_as_blob)
-            imageList.append(image)
-            scaleList.append(scale)
-        if load_as_blob:
-            dataList = im_list_to_blob(imageList)
-        else:
-            dataList = imageList
-        return dataList,scaleList
             
     def sample_minibatch_roidbs_generator(self,indices):
         """
@@ -152,38 +140,104 @@ class DataLoader():
             sample = self.get_sample_with_info(index)
             yield sample
 
-    def minibatch_generator(self,indices,loadConfig,load_as_blob=False):
+    #
+    # loading the sample information into a useable format (e.g. load image to ndarray)
+    #
+
+    def minibatch(self,indices,load_settings,load_as_blob=False,load_image=True):
+        """
+        note load_as_blob does this *per batch*
+        """
+        imageList,scaleList,labelList = [],[],[]
+        # prepare the settings per sample
+        load_settings_for_sample = copy.deepcopy(load_settings)
+        load_settings_for_sample.load_fields = []
+        for sample in self.sample_minibatch_roidbs_generator(indices):
+            image,scale = self.load_sample(sample,load_settings_for_sample,False,load_image) # always false since we want to return it all as *one* blob, not multiple
+            imageList.append(image)
+            scaleList.append(scale)
+            labelList.append(sample['gt_classes'])
+        if load_as_blob:
+            imageList = im_list_to_blob(imageList) # returns blob
+        return self.format_return_values(imageList,labelList,scaleList,load_settings)
+
+    def minibatch_generator(self,indices,loadConfig,load_as_blob=False,load_image=True):
         """
         written with testing in mind;
         note load_as_blob does this *per image*
         """
+        dataset_index = 0
         for sample in self.sample_minibatch_roidbs_generator(indices):
-            image,scale = self.load_sample(sample,loadConfig,load_as_blob)
-            yield image,scale,sample
+            image,scale = self.load_sample(sample,loadConfig,load_as_blob,load_image)
+            yield image,scale,sample,dataset_index
+            dataset_index += 1
+
+    def dataset_generator(self,loadConfig,load_as_blob=False,load_image=True):
+        indicies = np.arange(self.num_samples)
+        return self.minibatch_generator(indicies,loadConfig,load_as_blob,load_image)
 
     #
     # primary loading functions
     #
 
-    def load_sample(self,sample,loadConfig,load_as_blob=False):
+    def load_sample(self,sample,load_settings,load_as_blob=False,load_image=True):
+        if load_image is False:
+            return None,None
         image_path = self.imdb.image_path_at(sample['image_id'])
         img = cv2.imread(image_path)
-        if loadConfig.cropped_to_box_bool:
-            img = cropImageToAnnoRegion(img,sample['boxes'][loadConfig.cropped_to_box_index]) 
+        scales = []
+        if load_settings.cropped_to_box_bool:
+            img = cropImageToAnnoRegion(img,sample['boxes'][load_settings.cropped_to_box_index]) 
         if sample['aug_bool']:
             transforms = self.dataset_augmentation.configs[sample['aug_index']]
             inputTransDict = {'transformations':transforms}
             img = applyDatasetAugmentation(img,inputTransDict)
         if sample['correctness_bool']:
             raise ValueError("unknown handling of records")
-        if loadConfig.load_rois_bool:
+        if load_settings.load_rois_bool:
             raise ValueError("unknown handling of rois")
-        if loadConfig.activation_sample.bool_value:
+        if load_settings.activation_sample.bool_value:
             raise ValueError("unknown handling of activation values")
+        if load_settings.preprocess_image:
+            img, scales = preprocess_image_for_model(img, load_settings.dataset_means,load_settings.target_size,load_settings.max_sample_single_dimension_size)            
         if load_as_blob:
-            blobDict = {}
-            img, scales = prep_im_for_blob(img, loadConfig.dataset_means,loadConfig.target_size,loadConfig.max_sample_single_dimension_size)
             img = im_list_to_blob([img]) # returns blob
-            blobDict['data'] = img
-            return blobDict,scales
-        return img,scales
+        label = sample['gt_classes']
+        return self.format_return_values(img,label,scales,load_settings)
+
+    def format_return_values(self,imgs,labels,scales,load_settings):
+        # return options
+        if len(load_settings.load_fields) == 0:
+            return imgs, scales
+        else:
+            returnDict = {}
+            for load_field in load_settings.load_fields:
+                if 'data' == load_field :
+                    returnDict['data'] = np.array(imgs)
+                elif 'labels' == load_field:
+                    returnDict['labels'] = np.array(labels)
+                elif 'im_info':
+                    returnDict['labels'] = None
+                elif 'records' == load_field:
+                    returnDict['records'] = np.array([])
+            return returnDict,scales
+
+    """
+    dataset_augmentation_bool_list = 
+    - * - - * - - - * - -
+    0 1 0 0 1 0 0 0 1 0 0
+
+    0 1 6 7 8 13
+      2     9
+      3     10
+      4     11
+      5     12
+    
+    new_index_list =
+    [0,1,6,7,8,13]
+    
+    ds_index # -1 is none
+    image_index = 
+    
+    """
+

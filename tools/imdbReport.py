@@ -150,8 +150,8 @@ if __name__ == '__main__':
         np.random.seed(cfg.RNG_SEED)
 
     imdb, roidb = get_roidb(args.imdb_name)
-    numAnnos = imdb.roidb_num_bboxes_at(-1)
-
+    # numAnnos = imdb.roidb_num_bboxes_at(-1)
+    numAnnos = 0
     """
     # HACK
     for idx,sample in enumerate(roidb):
@@ -200,8 +200,7 @@ if __name__ == '__main__':
     input_config = {'dataset_augmentation':{'transformations':mesh}}
 
     # test iteration over data_loader
-    import copy
-    daCfg = copy.deepcopy(cfg.DATASET_AUGMENTATION)
+    daCfg = cfg.DATASET_AUGMENTATION
     # loadConfig = edict()
     # loadConfig.cropped_to_box = 1
     # loadConfig.cropped_to_box_index = 1
@@ -211,12 +210,25 @@ if __name__ == '__main__':
     print(daCfg.SIZE)
     for i in range(10):
         daCfg.N_SAMPLES = 0.1 * (i+1)
-        ds_loader = DataLoader(imdb.roidb,None,daCfg)
+        ds_loader = imdb.create_data_loader(cfg,None,None)
         sample_bools = ds_loader.dataset_augmentation.sample_bools
         actual_fraction = np.sum(sample_bools)/float(len(sample_bools))
         print(round(daCfg.N_SAMPLES,2),len(ds_loader),actual_fraction)
         print(sample_bools)
-        indices = np.arange(ds_loader.num_samples)
+        indices = np.arange(ds_loader.size)
+        count = 0
+        minibatch_samples,minibatch_scales = ds_loader.minibatch(indices,imdb.data_loader_config,load_as_blob=False)
+        print('len',len(minibatch_samples['data']))
+        name_index = 0
+        for index,image in enumerate(minibatch_samples['data']):
+            da_name = index // daCfg.SIZE
+            name_index = index % daCfg.SIZE
+            fn = 'da_image_index_{}_{}.png'.format(da_name,name_index)
+            print("saving filename [{}]".format(fn))
+            cv2.imwrite(fn,image)
+        # for blob,scale in zip(minibatch_samples,minibatch_scales):
+        #     count += 1
+        # print(count,ds_loader.num_samples,len(ds_loader))
         count = 0
         for sample in ds_loader.sample_minibatch_roidbs_generator(indices):
             count += 1

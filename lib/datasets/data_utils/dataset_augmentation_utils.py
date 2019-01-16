@@ -25,6 +25,8 @@ def getRotationInfo(angle,cols,rows):
 
 def rotateImage(img,angle):
     # print('angle',angle)
+    if angle is None:
+        return img,None
     im_shape = img.shape
     rows,cols = img.shape[:2]
     rotationMat, scale = getRotationInfo(angle,cols,rows)
@@ -33,6 +35,8 @@ def rotateImage(img,angle):
     return img,rotateInfo
 
 def translateImage(img,step,direction):
+    if step is None or direction is None:
+        return img,None
     if direction == 'u': x_step,y_step=0,step
     elif direction == 'd': x_step,y_step=0,-step
     elif direction == 'l': x_step,y_step=-step,0
@@ -49,7 +53,8 @@ def translateImage(img,step,direction):
 
 def cropImage(img,step):
     img_shape = img.shape
-    if step == 0: return img
+    if step is None or step == 0:
+        return img
     # print("[cropImage]",step)
     timg = img[step:-step,step:-step,:]
     timg = scaleImage(timg,img_shape[0])
@@ -57,7 +62,7 @@ def cropImage(img,step):
 
 def flipImage(img,flip_bool):
     if flip_bool:
-        img = img[:,-1,:]
+        img = img[:,::-1,:]
     return img
 
 def applyDatasetAugmentation(input_img,config):

@@ -15,7 +15,7 @@ from datasets.ds_utils import xywh_to_xyxy
 class jsonReader(object):
     """annoRead for reading json files."""
 
-    def __init__(self, annoPath, classes , datasetName, setID, imageSet, bboxOffset = 0, useDiff = True, convertToPerson=None, convertIdToCls = None):
+    def __init__(self, annoPath, classes , datasetName, setID, imageSet, bboxOffset = 0, useDiff = True, convertToPerson=None, convertIdToCls = None, class_filter = None):
         """
         __init__ function for annoReader [annotationReader]
 
@@ -30,6 +30,7 @@ class jsonReader(object):
         self.useDiff = useDiff
         self._classToIndex = self._create_classToIndex(classes)
         self._convertIdToCls = convertIdToCls
+        self.class_filter = class_filter
 
     def _create_classToIndex(self,classes):
         return dict(zip(classes, range(self.num_classes)))
@@ -84,7 +85,7 @@ class jsonReader(object):
                 continue
             boxes[ix, :] = xywh_to_xyxy(np.array(obj['bbox'])[np.newaxis,:])
             x1,y1,x2,y2 = boxes[ix, :]
-            gt_classes[ix] = obj['category_id']
+            gt_classes[ix] = self.convert_filtered_class_index(obj['category_id'])
             overlaps[ix, cls] = 1.0
             seg_areas[ix] = (x2 - x1 + 1) * (y2 - y1 + 1)
             ix += 1
@@ -133,3 +134,12 @@ class jsonReader(object):
             y2 = y2 * 480
         return x1,y1,x2,y2
         
+    def convert_filtered_class_index(self,original_class_index):
+        if self.class_filter is None:
+            return original_class_index
+        class_name = self.class_filter.original_names[original_class_index]
+        if class_name not in self.class_filter.new_names:
+            raise ValueError("no such class {} at index {} in the filtered class list".format(class_name,class_index))
+        return self.class_filter.new_names.index(class_name)
+
+

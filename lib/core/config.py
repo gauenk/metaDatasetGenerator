@@ -87,7 +87,7 @@ __C.TRAIN.BATCH_SIZE = 1
 __C.TRAIN.USE_FLIPPED = False
 
 # Iterations between snapshots
-__C.TRAIN.SNAPSHOT_ITERS = 5000
+__C.TRAIN.SNAPSHOT_ITERS = 3000
 
 # solver.prototxt specifies the snapshot path prefix, this adds an optional
 # infix to yield the path: <prefix>[_<infix>]_iters_XYZ.caffemodel
@@ -263,6 +263,11 @@ __C.TEST.AL_CLS.BALANCE_CLASSES = True
 __C.TEST.AL_CLS.LAYERS =  ['conv1','conv2','ip1','cls_score']
 
 
+__C.TEST.INPUTS = edict()
+__C.TEST.INPUTS.IM_INFO = False
+__C.TEST.INPUTS.RESHAPE = True
+
+
 #
 # MISC
 #
@@ -418,7 +423,7 @@ __C.GET_SAVE_ACTIVITY_VECTOR_BLOBS_DIR = GET_SAVE_ACTIVITY_VECTOR_BLOBS_DIR
 __C.SAVE_ACTIVITY_VECTOR_BLOBS = ['conv1','conv2','ip1','cls_score','cls_prob']
 __C.SAVE_ACTIVITY_VECTOR_BLOBS_WITH_KEYS = False
 __C.TP_FN_RECORDS_WITH_KEYS = False
-
+__C.ACTIVATION_VALUES.FOR_CACHE = [cfg.ACTIVATION_VALUES.LAYER_NAMES,cfg.ACTIVATION_VALUES.SAVE_DIR,cfg.ACTIVATION_VALUES.SAVE_OBJ,cfg.SAVE_ACTIVITY_VECTOR_BLOBS,cfg.SAVE_ACTIVITY_VECTOR_BLOBS_WITH_KEYS]
 # Active Learning Settings
 __C.ACTIVE_LEARNING = edict()
 __C.ACTIVE_LEARNING.N_ITERS = 11000
@@ -427,6 +432,7 @@ __C.ACTIVE_LEARNING.SUBSET_SIZE = 500
 __C.ACTIVE_LEARNING.N_COVERS = 300
 __C.ACTIVE_LEARNING.REPORT = False
 __C.ACTIVE_LEARNING.LAYER_NAMES = ['conv1','conv2','ip1','cls_score','cls_prob']
+__C.ACTIVE_LEARNING.FOR_CACHE = [cfg.ACTIVE_LEARNING.N_ITERS,cfg.ACTIVE_LEARNING.VAL_SIZE,cfg.ACTIVE_LEARNING.SUBSET_SIZE,cfg.ACTIVE_LEARNING.N_COVERS,cfg.ACTIVE_LEARNING.LAYER_NAMES]
 
 # Prune Network: the number is the modulous for the frequency of pruning
 cfg.PRUNE_NET = 0 
@@ -536,7 +542,7 @@ def getTestNetConfig(caffemodel,prototxt):
 
 def setModelInfo(solverPrototxt):
     solverInfo = solverPrototxtInfoDict(solverPrototxt)
-    cfg.modelInfo.train_set = solverInfo['ds_name']
+    cfg.modelInfo.imdb_str = cfg.DATASETS.CALLING_IMDB_STR
     cfg.modelInfo.architecture = solverInfo['arch']
     cfg.modelInfo.optim = solverInfo['optim'].lower()
     if cfg.TRAIN.IMAGE_NOISE is None or cfg.TRAIN.IMAGE_NOISE is 0:
@@ -559,9 +565,9 @@ def setModelInfo(solverPrototxt):
     cls_filter_none_bool = cfg.DATASETS.FILTERS.CLASS is None
     cls_filter_false_bool = cfg.DATASETS.FILTERS.CLASS is False
     if cls_filter_none_bool or cls_filter_false_bool or cls_incl_list_0_bool:
-        cfg.modelInfo.classFilter = False
+        cfg.modelInfo.class_filter = False
     else:
-        cfg.modelInfo.classFilter = len(cfg.DATASETS.FILTERS.CLASS_INCLUSION_LIST)
+        cfg.modelInfo.class_filter = len(cfg.DATASETS.FILTERS.CLASS_INCLUSION_LIST)
 
 # functions for filling in a prototxt with other prototxts for training.... should probably swtich to pytorch soon...
 
@@ -690,3 +696,4 @@ def replaceFillmeNetwork(prototxt):
     writeNetFromProto(net,new_prototxt)
 
 
+# TODO: what do we actually need for a data cache?

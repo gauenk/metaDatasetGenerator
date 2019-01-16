@@ -35,3 +35,31 @@ def loadActivationValuesLoadLoop(dirPath,layerList,fn_prefix):
             avDict[layer] = np.load(fn)
     return avDict
             
+def createActivationValuesComboDict(activation_values,comboInfo,numberOfSamples=-1,verbose=False):
+    # init combination dictinaries
+    activationCombos = {}
+    for comboID in comboInfo:
+        activationCombos[comboID] = []
+
+    if numberOfSamples == -1:
+        numberOfSamples = len(imageIndexList)
+
+    # aggregate activation information via combination settings
+    for comboID in comboInfo:
+        layerNames = comboID.split("-")
+        activationCombosList = []
+        # single samples (e.g. one row; we are building the features)
+        for layerName in layerNames:
+            layer_activations = transformNumpyData(activation_values[layerName][:numberOfSamples,:].reshape(numberOfSamples,-1))
+            activationCombosList.append(layer_activations)
+        # add the single sample to the data list
+        activationCombosList = np.hstack(activationCombosList)
+        activationCombos[comboID] = activationCombosList
+
+    # print info
+    for comboID in comboInfo:
+        if cfg.verbose or verbose:
+            print("all [#samples x #ftrs]",comboID,activationCombos[comboID].shape)
+        
+    return activationCombos
+    

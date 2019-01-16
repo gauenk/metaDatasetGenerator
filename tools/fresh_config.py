@@ -7,25 +7,25 @@ from copy import deepcopy
 # ----------------- misc helper functions ------------------
 
 def create_model_path(modelInfo):
-    path = "output/classification/{}/".format(modelInfo.train_set,modelInfo.name)    
+    path = "output/classification/{}/".format(modelInfo.imdb_str.split('-')[0],modelInfo.name)    
     return path
 
 def create_model_name_type_c(modelInfo):
     name = "{}_{}_{}_{}_{}_{}_iter_{}".format(
-        modelInfo.train_set,modelInfo.architecture,modelInfo.optim,
+        modelInfo.imdb_str,modelInfo.architecture,modelInfo.optim,
         modelInfo.image_noise,modelInfo.prune,
         modelInfo.dataset_augmentation,modelInfo.iterations)
     return name
 
 def create_model_name_type_a(modelInfo):
     name = "{}_{}_{}_{}_{}_aug25perc_iter_{}".format(
-        modelInfo.train_set,modelInfo.architecture,modelInfo.optim,
+        modelInfo.imdb_str,modelInfo.architecture,modelInfo.optim,
         modelInfo.image_noise,modelInfo.prune,modelInfo.iterations)
     return name
 
 def create_model_name_type_b(modelInfo):
     name = "{}_{}_{}_{}_aug25perc_iter_{}".format(
-        modelInfo.train_set,modelInfo.architecture,
+        modelInfo.imdb_str,modelInfo.architecture,
         modelInfo.image_noise,modelInfo.prune,modelInfo.iterations)
     return name
 
@@ -66,12 +66,12 @@ cfg.load_bool_activity_vectors = False
 cfg.modelInfo = edict()
 cfg.modelInfo.architecture = "lenet5"
 cfg.modelInfo.iterations = 40000 #100000
-cfg.modelInfo.train_set = 'cifar_10'
+cfg.modelInfo.imdb_str = 'cifar_10_train_default'
 cfg.modelInfo.image_noise = 'yesImageNoise'
 cfg.modelInfo.prune = 'noPrune'
 cfg.modelInfo.optim = 'sgd'
 cfg.modelInfo.dataset_augmentation = 'noDsAug'
-cfg.modelInfo.classFilter = False
+cfg.modelInfo.class_filter = False
 reset_model_name()
 
 cfg.data = edict()

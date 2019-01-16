@@ -9,7 +9,7 @@ import matplotlib
 import matplotlib.pyplot as plt
 
 import _init_paths
-from core.test import test_net
+from core.test_new import test_net
 from core.config import cfg, cfg_from_file, cfg_from_list, set_global_cfg, getTestNetConfig, set_augmentation_by_calling_dataset, set_class_inclusion_list_by_calling_dataset
 from datasets.factory import get_repo_imdb
 import caffe
@@ -52,8 +52,8 @@ def parse_args():
     parser.add_argument('--rotate', dest='rotate',
                         help='how much should we rotate each image?',
                         default=0, type=int)
-    parser.add_argument('--av_nosave', dest='av_nosave',
-                        help="tell us: don't save the activity vectors",
+    parser.add_argument('--av_save', dest='av_save',
+                        help="tells us to save the activity vectors",
                         action='store_true')
     # params for model to which active learning is applied
     parser.add_argument('--al_def', dest='al_def',
@@ -84,7 +84,7 @@ if __name__ == '__main__':
 
     cfg.GPU_ID = args.gpu_id
     if args.rotate != 0: cfg.IMAGE_ROTATE = args.rotate
-    if args.av_nosave is True: cfg.SAVE_ACTIVITY_VECTOR_BLOBS = []
+    if args.av_save is False: cfg.SAVE_ACTIVITY_VECTOR_BLOBS = []
 
     print('Using config:')
     pprint.pprint(cfg)
@@ -96,6 +96,7 @@ if __name__ == '__main__':
     caffe.set_mode_gpu()
     caffe.set_device(args.gpu_id)
     getTestNetConfig(args.caffemodel,args.prototxt)
+    cfg.BATCH_SIZE = 1
     net = caffe.Net(args.prototxt, args.caffemodel, caffe.TEST)
     net.name = os.path.splitext(os.path.basename(args.caffemodel))[0]
 

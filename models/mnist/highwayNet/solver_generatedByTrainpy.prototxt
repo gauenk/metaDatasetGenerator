@@ -1,4 +1,4 @@
-snapshot_prefix: "/home/gauenk/Documents/experiments/metaDatasetGenerator/output/classification/mnist/mnist_highwayNet_adam_noImageNoise_yesPrune0_noDsAug_noClassFilter"
+snapshot_prefix: "/home/gauenk/Documents/experiments/metaDatasetGenerator/output/classification/mnist/mnist_trainval_default_highwayNet_adam_noImageNoise_noPrune_noDsAug_noClassFilter"
 max_iter: 10000
 base_lr: 0.001
 snapshot: 0

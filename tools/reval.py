@@ -11,7 +11,8 @@ import matplotlib.pyplot as plt
 
 import _init_paths
 from fast_rcnn.nms_wrapper import apply_nms
-from core.config import cfg, cfg_from_file, cfg_from_list
+from core.test_utils.agg_model_output import aggregateModelOutput
+from core.config import cfg, cfg_from_file, cfg_from_list, set_global_cfg, set_augmentation_by_calling_dataset, set_class_inclusion_list_by_calling_dataset
 from datasets.factory import get_repo_imdb
 import cPickle
 import os, sys, argparse
@@ -38,6 +39,8 @@ def parse_args():
                         action='store_true')
     parser.add_argument('--rot', dest='rot', help='re-eval with some rotation',
                         default=0, type=int)
+    parser.add_argument('--av_save', dest='av_save', help='save activity vectors?',
+                        action='store_true')
     parser.add_argument('--cfg', dest='cfg_file',
                         help='optional config file', default=None, type=str)
 
@@ -68,10 +71,22 @@ def from_elems(imdb_name, output_dir, args):
     else:
         nms_elems = elems
 
-    print(nms_elems['all_probs'])
     print('Evaluating elements')
+    print(nms_elems.keys())
     imdb.evaluate_detections(nms_elems, output_dir)
 
+def from_elems_new(imdb_name,output_dir,args,max_dets_per_image=100, thresh=1/80., vis=False, al_net=None):
+    ds_loader = imdb.create_data_loader(cfg,[],al_net)
+    print(ds_loader.num_samples)
+    if args.against_gt:
+        elems = build_gt_roidb(imdb,args.rot)
+    else:
+        aggModelOutput = aggregateModelOutput(imdb,ds_loader.num_samples,output_dir,cfg.TASK,thresh,cfg.TEST.OBJ_DET.NMS,max_dets_per_image,vis,cfg)    
+        elems = aggModelOutput.load()
+    print(elems)
+    print('Evaluating elements')
+    imdb.evaluate_detections(elems, output_dir)
+    
 def build_gt_roidb(imdb,rot):
     roidb = imdb.roidb
     roidb = get_training_roidb(imdb) # for width and height
@@ -106,13 +121,26 @@ def build_gt_roidb(imdb,rot):
 
 if __name__ == '__main__':
     args = parse_args()
+
     if args.cfg_file is not None:
         cfg_from_file(args.cfg_file)
-    cfg.DATASET_AUGMENTATION.IMAGE_ROTATE = args.rot
+    set_global_cfg("TEST")
+
+    cfg.GPU_ID = 0
+    if args.av_save is False: cfg.SAVE_ACTIVITY_VECTOR_BLOBS = []
 
     output_dir = os.path.abspath(args.output_dir[0])
     imdb_name = args.imdb_name
-    from_elems(imdb_name, output_dir, args)
+
+    imdb = get_repo_imdb(imdb_name)
+    imdb.competition_mode(args.comp_mode)
+    roidb = imdb.roidb
+    if not cfg.TEST.OBJ_DET.HAS_RPN and cfg.TASK == 'object_detection':
+        imdb.set_proposal_method(cfg.TEST.PROPOSAL_METHOD)
+    set_augmentation_by_calling_dataset() # reset dataset augmentation settings
+    set_class_inclusion_list_by_calling_dataset() # reset class inclusion list settings
+
+    from_elems_new(imdb, output_dir, args)
     
     '''
 argparse.ArgumentParser

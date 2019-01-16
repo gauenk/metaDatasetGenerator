@@ -73,10 +73,13 @@ def create_mesh_from_lists(alist_of_lists,verbose=False):
 def getDatasetAugmentationConfigurationsSubset(exhaustive_augmentation_list,n_percent,random_bool):
     total_number_of_augmentations = len(exhaustive_augmentation_list)
     number_of_augmentations = int(total_number_of_augmentations * n_percent) + 1
-    if random_bool: indices = npr.permutation(total_number_of_augmentations)[:number_of_augmentations]
-    else: indices = np.arange(total_number_of_augmentations)[:number_of_augmentations]
+    if random_bool:
+        npr.seed(cfg.DATASET_AUGMENTATION.RANDOM_SEED)
+        indices = npr.permutation(total_number_of_augmentations)[:number_of_augmentations]
+    else:
+        indices = np.arange(total_number_of_augmentations)[:number_of_augmentations]
     augmentation_list = getDatasetAugmentationConfigurationsFromIndices(exhaustive_augmentation_list,indices)
-    return augmentation_list
+    return augmentation_list,indices
 
 def getDatasetAugmentationConfigurationsFromIndices(exhaustive_augmentation_list,indices):
     augmentation_list = [ exhaustive_augmentation_list[index] for index in indices ]
@@ -97,7 +100,7 @@ def formatDatasetAugmentationForGetRawCroppedImage(input_da_config,da_inds):
 
 def reset_dataset_augmentation_with_mesh(mesh):
     cfg.DATASET_AUGMENTATION.EXHAUSTIVE_CONFIGS = mesh
-    cfg.DATASET_AUGMENTATION.CONFIGS = getDatasetAugmentationConfigurationsSubset(cfg.DATASET_AUGMENTATION.EXHAUSTIVE_CONFIGS,cfg.DATASET_AUGMENTATION.N_PERC,cfg.DATASET_AUGMENTATION.RANDOMIZE_SUBSET)
+    cfg.DATASET_AUGMENTATION.CONFIGS,cfg.DATASET_AUGMENTATION.CONFIG_INDICES = getDatasetAugmentationConfigurationsSubset(cfg.DATASET_AUGMENTATION.EXHAUSTIVE_CONFIGS,cfg.DATASET_AUGMENTATION.N_PERC,cfg.DATASET_AUGMENTATION.RANDOMIZE_SUBSET)
     cfg.DATASET_AUGMENTATION.SIZE = len(cfg.DATASET_AUGMENTATION.CONFIGS)
     
 
@@ -156,16 +159,24 @@ cfg.DATASET_AUGMENTATION.PRESET_ARGS_BY_SET = {
     #     'crop': [i for i in range(1)]
     # },
     'mnist': {
-        'translation': [2],
-        'rotation': [4*i-30 for i in range(15+1)] + [0],
-        'crop': [i+1 for i in range(6)],
+        # 'translation': [2],
+        'rotation': [5*i-45 for i in range(9+1)] + [0],
+        # 'crop': [i+1 for i in range(6)],
+        'translation': [None],
+        # 'rotation': [None],
+        'crop': [None],
         'flip': [False]
     },
     'cifar_10': {
-        'translation': [3],
+        # 'translation': [3],
+        # 'rotation': [(2/3)*i-5 for i in range(15+1)] + [0],
+        # 'crop': [2],
+        # 'flip': [False,True],
+        'translation': [False],
         'rotation': [(2/3)*i-5 for i in range(15+1)] + [0],
-        'crop': [2],
-        'flip': [False,True]
+        'crop': [False],
+        'flip': [False]
+
     },
 }            
 
@@ -173,7 +184,8 @@ cfg.DATASET_AUGMENTATION.PRESET_ARGS_BY_SET = {
 cfg.DATASET_AUGMENTATION.BOOL = True
 cfg.DATASET_AUGMENTATION.N_SAMPLES = 0.25
 cfg.DATASET_AUGMENTATION.RANDOMIZE = False
-cfg.DATASET_AUGMENTATION.RANDOMIZE_SUBSET = True
+cfg.DATASET_AUGMENTATION.RANDOMIZE_SUBSET = False
+cfg.DATASET_AUGMENTATION.RANDOM_SEED = 123
 cfg.DATASET_AUGMENTATION.IMAGE_NOISE=0 #[0,1] for intensity
 cfg.DATASET_AUGMENTATION.IMAGE_TRANSLATE=translation_input_list
 cfg.DATASET_AUGMENTATION.IMAGE_ROTATE=rotation_input_list
@@ -181,7 +193,9 @@ cfg.DATASET_AUGMENTATION.IMAGE_CROP=crop_input_list #[0,1] for cropping; 0 = no 
 cfg.DATASET_AUGMENTATION.IMAGE_FLIP=flip_input_list
 cfg.DATASET_AUGMENTATION.N_PERC = 1.0
 cfg.DATASET_AUGMENTATION.EXHAUSTIVE_CONFIGS = mesh
-cfg.DATASET_AUGMENTATION.CONFIGS = getDatasetAugmentationConfigurationsSubset(cfg.DATASET_AUGMENTATION.EXHAUSTIVE_CONFIGS,cfg.DATASET_AUGMENTATION.N_PERC,cfg.DATASET_AUGMENTATION.RANDOMIZE_SUBSET)
+cfg.DATASET_AUGMENTATION.CONFIGS,cfg.DATASET_AUGMENTATION.CONFIG_INDICES = getDatasetAugmentationConfigurationsSubset(cfg.DATASET_AUGMENTATION.EXHAUSTIVE_CONFIGS,
+                                                                                                                      cfg.DATASET_AUGMENTATION.N_PERC,
+                                                                                                                      cfg.DATASET_AUGMENTATION.RANDOMIZE_SUBSET)
 cfg.DATASET_AUGMENTATION.SIZE = len(cfg.DATASET_AUGMENTATION.CONFIGS)
 cfg.DATASET_AUGMENTATION.VERSION = 'v0.1'
 # cfg.DATASET_AUGMENTATION.EXHAUSTIVE_CONFIGS = []
@@ -189,4 +203,20 @@ cfg.DATASET_AUGMENTATION.VERSION = 'v0.1'
 # cfg.DATASET_AUGMENTATION.SIZE = 0
 
 
-## TODO: add "flipped" as an augmentation
+cfg.DATASET_AUGMENTATION.FOR_CACHE = [ cfg.DATASET_AUGMENTATION.BOOL,
+                                       cfg.DATASET_AUGMENTATION.N_SAMPLES,
+                                       cfg.DATASET_AUGMENTATION.RANDOMIZE,
+                                       cfg.DATASET_AUGMENTATION.RANDOMIZE_SUBSET,
+                                       cfg.DATASET_AUGMENTATION.RANDOM_SEED,
+                                       cfg.DATASET_AUGMENTATION.IMAGE_NOISE,
+                                       cfg.DATASET_AUGMENTATION.IMAGE_TRANSLATE,
+                                       cfg.DATASET_AUGMENTATION.IMAGE_ROTATE,
+                                       cfg.DATASET_AUGMENTATION.IMAGE_CROP,
+                                       cfg.DATASET_AUGMENTATION.IMAGE_FLIP,
+                                       cfg.DATASET_AUGMENTATION.N_PERC,
+                                       cfg.DATASET_AUGMENTATION.CONFIGS,
+                                       cfg.DATASET_AUGMENTATION.CONFIG_INDICES,
+                                       cfg.DATASET_AUGMENTATION.SIZE,
+                                       cfg.DATASET_AUGMENTATION.VERSION]
+
+

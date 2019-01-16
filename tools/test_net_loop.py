@@ -1,11 +1,10 @@
 #!/usr/bin/env python
 from easydict import EasyDict as edict
-from fresh_config import create_model_name,create_model_path
+from fresh_config import create_model_path
 import subprocess,re
 
 import _init_paths
 from core.config import create_snapshot_prefix
-
 
 def reset_model_name(modelInfo):
     modelInfo.name = create_snapshot_prefix(modelInfo)
@@ -14,19 +13,25 @@ def reset_model_name(modelInfo):
     modelInfo.net_dir = create_model_path(modelInfo)
     print(modelInfo.net_dir)
     modelInfo.net_path = modelInfo.net_dir + modelInfo.name + '.caffemodel'
-    modelInfo.def_path = 'models/{}/{}/test_corg.prototxt'.format(modelInfo.train_set,
-                                                             modelInfo.architecture)
+    if modelInfo.class_filter:
+        modelInfo.def_path = 'models/{}/{}/'.format(modelInfo.imdb_str.split('-')[0],modelInfo.architecture)
+    else:
+        modelInfo.def_path = 'models/{}/{}/'.format(modelInfo.imdb_str.split('-')[0],modelInfo.architecture)
+    modelInfo.def_path += 'test_2cls.prototxt'
+    # if modelInfo.dataset_augmentation:
+    #     modelInfo.def_path += 'test_corg.prototxt'
+    # else:
+    #     modelInfo.def_path += 'test2.prototxt'
 
-def set_modelInfo(modelInfo,arch,optim,train_set,noise,prune,da_aug,class_filter,iters):
+def set_modelInfo(modelInfo,arch,optim,train_imdb_str,noise,prune,da_aug,class_filter,iters):
     modelInfo.architecture = arch
-    train_set_name,train_set_split,train_set_config = train_set.split('-')
-    modelInfo.train_set = train_set_name
+    modelInfo.imdb_str = train_imdb_str
     modelInfo.image_noise = noise
     modelInfo.prune = prune
     modelInfo.optim = optim
     modelInfo.iterations = iters
     modelInfo.dataset_augmentation = da_aug
-    modelInfo.classFilter = class_filter
+    modelInfo.class_filter = class_filter
     reset_model_name(modelInfo)
     
     # test_set_list = ['cifar_10-train-default','mnist-train-default',\
@@ -47,12 +52,10 @@ def runCommandProcess(setCommand):
     output = output_b.decode('utf-8')
     return output
 
-def test_all_with_file(modelInfo,architecture_list,optim_list,train_set_list,test_set_list,
-                       image_noise_list,prune_list,da_aug_list,class_filter_list,iters_list,
-                       filename):
+def test_all_with_file(modelInfo,architecture_list,optim_list,train_set_list,test_set_list,image_noise_list,prune_list,da_aug_list,class_filter_list,iters_list,filename):
     if filename is None: print("not saving output to file")
     else:
-        fid = open('filename','a+')
+        fid = open(filename,'a')
         add_test_all_header(fid)
         fid.close()
     test_all(modelInfo,architecture_list,optim_list,train_set_list,test_set_list,image_noise_list,prune_list,da_aug_list,class_filter_list,iters_list,filename=filename)
@@ -63,7 +66,7 @@ def add_test_all_header(fid):
 def add_result_to_file(filename,text,train_set,test_set,arch,optim,noise,prune,aug,class_filter,iters):
     if filename is None: return
     fid = open(filename,'a+')
-    regex = r".*Accuracy: (?P<acc>[0-9.]+).*"
+    regex = r".*overall accuracy: (?P<acc>[0-9.]+).*"
     result = re.findall(regex,text)
     acc = str(result[0])
     #acc = result.groupdict()['acc']
@@ -71,29 +74,31 @@ def add_result_to_file(filename,text,train_set,test_set,arch,optim,noise,prune,a
     fid.close()
 
 def test_all(modelInfo,architecture_list,optim_list,train_set_list,test_set_list,image_noise_list,prune_list,da_aug_list,class_filter_list,iters_list,filename=None):
-    cmd_template = './tools/test_net.py --imdb {} --def {} --net {} --cfg ./experiments/cfgs/cls_{}_aug100.yml --av_nosave'
+
+    iters_list_noDsAug = [(idx+1)*700 for idx in range(40)]
+    iters_list_yesDsAug10_0 = [(idx+1)*1200 for idx in range(37)] # [1000,2000,5000,10000,15000,20000]
+    iters_list_yesDsAug25_0 = [2500,5000,10000,15000,20000]
+    iter_list_dict = {False:iters_list_noDsAug,'10-0':iters_list_yesDsAug10_0,'25-0':iters_list_yesDsAug25_0}
+
+    cmd_template = './tools/test_net.py --imdb {} --def {} --net {} --cfg ./experiments/cfgs/cls_{}_aug100.yml'
+    # cmd_template = './tools/test_net.py --imdb {} --def {} --net {} --cfg ./experiments/cfgs/cls_{}.yml'
     for arch in architecture_list:
         for optim in optim_list:
-            for train_set in train_set_list:
+            for train_imdb_str in train_set_list:
                 for test_set in test_set_list:
                     for noise in image_noise_list:
                         for prune in prune_list:
                             for da_aug in da_aug_list:
                                 for class_filter in class_filter_list:
+                                    iters_list = iter_list_dict[da_aug]
                                     for iters in iters_list:
                                         test_set_name = test_set.split('-')[0]
-                                        set_modelInfo(modelInfo,arch,optim,train_set,noise,prune,da_aug,class_filter,iters)
+                                        set_modelInfo(modelInfo,arch,optim,train_imdb_str,noise,prune,da_aug,class_filter,iters)
                                         cmd = cmd_template.format(test_set,modelInfo.def_path,modelInfo.net_path,test_set_name)
                                         print(cmd)
                                         result = runCommandProcess(cmd)
-                                        add_result_to_file(filename,result,train_set,test_set,arch,optim,noise,prune,da_aug,class_filter,iters)
+                                        add_result_to_file(filename,result,train_imdb_str,test_set,arch,optim,noise,prune,da_aug,class_filter,iters)
                             
-    # architecture_list = ['lenet5','vgg16']
-    # iters_to_test = [(idx+1)*10000 for idx in range(10)]
-    # train_set_list = ['cifar_10','mnist']
-    # image_noise_list = ['noImageNoise']
-    # prune_list = ['noPrune']
-
 
 def test_over_iterations(iters_to_test,rotation,av_nosave,filename=None):
     imgsets = ['cifar_10-train-default','cifar_10-val-default']
@@ -135,53 +140,63 @@ def load_text_file(filename):
     with open(filename,'r+') as f:
         for line in f.readlines():
             data.append(line)
-
-# def read_and_plot(filename):
-#     fid = open(filename,"r")
-    
-
 if __name__ == "__main__":
-
-    # TODO : verify augmentations (N_SAMPLES) works as expected.
 
     # generic experiment
     # --> experiment information <--
-    # test_set_list = ['cifar_10-train-default','mnist-train-default',\
-    #                  'cifar_10-test-default','mnist-test-default']
-    #test_set_list = ['mnist-train-default','mnist-test-default']
-    test_set_list = ['mnist-test-default']
+
     test_set_augmentation = [] #TODO: how to request full augmentation?
     
     # --> model information <--
     #architecture_list = ['lenet5','vgg16']
     # architecture_list = ['lenet5','highwayNet']
-    architecture_list = ['lenet5']
+    # architecture_list = ['lenet5']
+    # architecture_list = ['logit']
+    architecture_list = ['logit','logit_with_affine']
+
+    # architecture_list = ['highwayNet']
     #train_set_list = ['cifar_10-train-default','mnist-train-default']
-    train_set_list = ['mnist-train-default']
+    # train_set_list = ['mnist-train-default']
+    # train_set_list = ['mnist-train-default']
+    # train_set_list = ['mnist-train_1k_2cls-default']
+    train_set_list = ['cifar_10-train-default']
     # image_noise_list = [False,2,10]
     image_noise_list = [False]
     # prune_list = [False,10,200]
     prune_list = [False]
-    # iters_list = [(idx+7)*7500 for idx in range(4)]
-    # iters_list += [(idx+30)*7500 for idx in range(10)]
-    iters_list = [(idx+1)*2*7500 for idx in range(25)]
-    # iters_list = [(idx+1)*10000+50000 for idx in range(50)]
-    # iters_list =  [42000,84000,120000,210000,420000,840000,1002000,1410000]
+
+    # iters_list = [(idx+1)*100 for idx in range(50)]
+    # iters_list = [(idx+1)*2500 for idx in range(50)]
+
     optim_list = ['adam']
-    # da_aug_list = ['1-0','10-0','25-0']
+    # da_aug_list = [False,'10-0','25-0']
+    # da_aug_list = ['25-0']
+    #da_aug_list = [False,'10-0','25-0']
+    #da_aug_list = ['10-0']
     da_aug_list = [False]
+    # class_filter_list = [2]
     class_filter_list = [2]
 
-    modelInfo = edict()
-    modelInfo.architecture = "lenet5"
-    modelInfo.iterations = 40000 #100000
-    modelInfo.train_set = 'cifar_10'
-    modelInfo.image_noise = 'yesImageNoise'
-    modelInfo.prune = 'noPrune'
-    modelInfo.optim = optim_list[0]
-    
-    filename = 'test_all.txt'
+    # test_set_list = ['cifar_10-train-default','mnist-train-default',\
+    #                  'cifar_10-test-default','mnist-test-default']
+    # test_set_list = ['mnist-train-default','mnist-test-default']
+    # test_set_list = ['mnist-val-default']
+    # test_set_list = ['mnist-val-default']
+    test_set_list = ['cifar_10-val-default']
 
+    iters_list = []
+
+    modelInfo = edict()
+    modelInfo.imdb_str = train_set_list[0].replace('-','_')
+    modelInfo.architecture = architecture_list[0]
+    modelInfo.optim = optim_list[0]
+    modelInfo.prune = prune_list[0]
+    modelInfo.image_noise = image_noise_list[0]
+    modelInfo.dataset_augmentation = da_aug_list[0]
+    modelInfo.class_filter = class_filter_list[0]
+    modelInfo.iterations = None
+
+    filename = 'test_all.txt'
     test_all_with_file(modelInfo,architecture_list,optim_list,train_set_list,test_set_list,
                        image_noise_list,prune_list,da_aug_list,class_filter_list,iters_list,
                        filename=filename)

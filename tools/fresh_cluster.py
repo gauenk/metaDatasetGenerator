@@ -1,4 +1,5 @@
 from fresh_config import cfgForCaching
+from cache.one_level_cache import Cache
 from fresh_util import *
 
 from sklearn import cluster as sk_cluster

@@ -31,7 +31,7 @@ class classificationEvaluator(object):
         self._imageSet = imageSetPath.split("/")[-1].split(".")[0] # "...asdf/imageSet.txt"
         self._onlyCls = onlyCls
 
-    def evaluate_detections(self, all_probs, output_dir):
+    def evaluate_detections(self, imdb, ds_loader, all_probs, output_dir):
         # num_outpus = 
         # if self._classes != num_outputs:
         #     raise ValueError("ERROR: the classes and output size don't match!")
@@ -44,7 +44,7 @@ class classificationEvaluator(object):
             self._do_python_eval(output_dir)
         elif cfg.SUBTASK in ["default","al_subset"]:
             self._write_softmax_results_file(all_probs,augmentations)
-            self._do_cls_python_eval(dataset_augmentations=augmentations,output_dir=output_dir)
+            self._do_cls_python_eval_new(imdb,ds_loader,all_probs,output_dir=output_dir)
         else:
             print("ERROR: cfg.SUBTASK = {} is unknown".format(cfg.SUBTASK))
             sys.exit()
@@ -89,6 +89,9 @@ class classificationEvaluator(object):
                             f.write(' {:.3f}'.format(probs[k]))
                         f.write('\n')
 
+    def _do_cls_python_eval_new(self,imdb, ds_loader,all_probs,output_dir='output'):
+        self.cls_eval_all(imdb,ds_loader,all_probs,output_dir)
+        
     def _do_cls_python_eval(self, dataset_augmentations = [], output_dir = 'output',rotations = None):
         annopath = self._annoPath + "/{:s}"
         aps = []
@@ -98,7 +101,7 @@ class classificationEvaluator(object):
         cls = "all"
         detfile = self._get_results_file_template().format(cls)
         suffix = self._get_experiment_suffix_template().format(cls)
-        acc, rec, prec, ovthresh = self.cls_eval(
+        acc, rec, prec, ovthresh = self.cls_eval_by_class(
             detfile, annopath, self._imageSetPath, cls, self._cachedir, suffix, \
             ovthresh=0.5, use_07_metric=use_07_metric, rotations = rotations,
             dataset_augmentations=dataset_augmentations,class_convert=self._class_convert)
@@ -170,7 +173,7 @@ class classificationEvaluator(object):
                 continue
             detfile = self._get_results_file_template().format(cls)
             suffix = self._get_experiment_suffix_template().format(cls)
-            rec, prec, ap, ovthresh = self.cls_eval(
+            rec, prec, ap, ovthresh = self.cls_eval_by_class(
                 detfile, annopath, self._imageSetPath, cls, self._cachedir, suffix, \
                 ovthresh=0.5, use_07_metric=use_07_metric, rotations = rotations,
                 class_convert=self._class_convert)
@@ -234,7 +237,29 @@ class classificationEvaluator(object):
     def _get_experiment_suffix_template(self):
         return 'cls_{:s}'
 
-    def cls_eval(self,detpath,
+    def cls_eval_all(self,imdb,ds_loader,all_probs,output_dir):
+        guess_probs = np.zeros(ds_loader.num_samples)
+        guess_classes = np.argmax(all_probs,axis=0)
+        correct_by_class = np.zeros((2,ds_loader.num_samples),dtype=np.int8)
+        for _,_,sample,index in ds_loader.dataset_generator(imdb.data_loader_config,load_image=False):
+            guess_class_index = guess_classes[index]
+            guess_probs[index] = all_probs[guess_class_index][index]
+            guess_prob = guess_probs[index]
+            gt_class_index = sample['gt_classes'][0]
+            print(gt_class_index,guess_class_index,guess_prob)
+            correct_by_class[0,index] = gt_class_index
+            correct_by_class[1,index] = guess_class_index == gt_class_index
+
+        print("overall accuracy: {}".format(np.mean(correct_by_class[1,:])))
+        for class_index in range(imdb.num_classes):
+            class_name = imdb.classes[class_index]
+            class_indices = np.where(correct_by_class[0,:] == class_index)[0]
+            num_samples_of_class = len(class_indices)
+            class_acc = np.mean(correct_by_class[1,class_indices])
+            print("{}: acc({}) #samples({})".format(class_name,class_acc,num_samples_of_class))
+
+
+    def cls_eval_by_class(self,detpath,
                   annopath,
                   imagesetfile,
                   classname,

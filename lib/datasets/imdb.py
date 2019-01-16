@@ -30,13 +30,9 @@ class imdb(object):
         # Use this dict for storing dataset specific config options
         self.config = {}
 
-    # we add an iterator
-    def __iter__(self):
-        raise NotImplemented("no iterator defined")
+    def __str__(self):
+        raise NotImplemented("no string transform defined")
 
-    def __next__(self):
-        raise NotImplemented("no iterator defined")
-    
     @property
     def name(self):
         return self._name
@@ -99,6 +95,7 @@ class imdb(object):
         if self._roidb is not None:
             return self._roidb
         self._roidb = self.roidb_handler()
+        self.roidb_size = len(self._roidb)
         self.compute_size_along_roidb()
         return self._roidb
 
@@ -151,7 +148,7 @@ class imdb(object):
         self._image_index = self._image_index[:len(self._roidb)]
         self.compute_size_along_roidb()
 
-    def evaluate_detections(self, detection_object, output_dir=None):
+    def evaluate_detections(self, detection_object, output_dir=None, ds_loader=None):
         """
         detection_object is a diction with two keys:
         "all_boxes" and "im_rotates_all"

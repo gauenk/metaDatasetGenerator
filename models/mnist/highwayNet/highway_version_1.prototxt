@@ -50,7 +50,7 @@ layer {
       type: "xavier"
     }
     bias_filler {
-      type: "constant"
+      type: "uniform"
       min: -3
       max: -1
     }

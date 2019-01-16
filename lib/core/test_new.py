@@ -4,7 +4,7 @@ from core.config import cfg, get_output_dir
 from datasets.data_loader import DataLoader
 from core.test_utils.active_learning_report import activeLearningReportAppendActivationValueData
 from core.test_utils.agg_model_output import aggregateModelOutput
-from core.test_utils.agg_activation_values import aggregateActivationValues
+from core.test_utils.agg_activations import aggregateActivations
 from easydict import EasyDict as edict
 
 from fast_rcnn.bbox_transform import clip_boxes, bbox_transform_inv
@@ -26,10 +26,7 @@ import matplotlib.pyplot as plt
 
 cfg._DEBUG.core.test = False
 
-def pre_process_model_inputs(net,modelInputs,image_scales,image_id):
-    cfg.TEST.INPUTS = edict()
-    cfg.TEST.INPUTS.IM_INFO = False
-    cfg.TEST.INPUTS.RESHAPE = True
+def pre_process_model_inputs(net,modelInputs,image_scales,image_id,layer_names_for_activations):
 
     if cfg.TEST.INPUTS.IM_INFO:
         im_info = np.array([[im_blob.shape[2], im_blob.shape[3], image_scales[0]]],dtype=np.float32)
@@ -44,10 +41,10 @@ def pre_process_model_inputs(net,modelInputs,image_scales,image_id):
         rimg = blob_list_im(forward_kwargs["data"])
         fn = "input_image_{}_{}.png".format(cfg.IMAGE_ROTATE,image_id)
         #save_image_with_border(fn,rimg[0],rotation=im_rotates[0])
-    if len(cfg.SAVE_ACTIVITY_VECTOR_BLOBS) > 0:
-        modelInputs['blobs'] = cfg.SAVE_ACTIVITY_VECTOR_BLOBS
+    if len(layer_names_for_activations) > 0:
+        modelInputs['blobs'] = layer_names_for_activations
 
-def post_process_model_outputs(net,modelOutput,image_scales):
+def post_process_model_outputs(net,modelOutput,image_scales,layer_names_for_activations):
 
     if cfg.TEST.OBJ_DET.HAS_RPN and cfg.SSD is False and cfg.TASK == 'object_detection':
         assert len(image_scales) == 1, "Only single-image batch implemented"
@@ -96,18 +93,18 @@ def post_process_model_outputs(net,modelOutput,image_scales):
         scores = scores[inv_index, :]
         pred_boxes = pred_boxes[inv_index, :]
 
-    activity_vectors = {}
-    if len(cfg.SAVE_ACTIVITY_VECTOR_BLOBS) > 0:
-        for blob_name in cfg.SAVE_ACTIVITY_VECTOR_BLOBS:
+    activitions = {}
+    if len(layer_names_for_activations) > 0:
+        for blob_name in layer_names_for_activations:
             # if blob_name not in activity_vectors.keys(): activity_vectors[blob_name] = []
             # above is always true since dict should start empty
             # here we know it is only one image id.
-            activity_vectors[blob_name] = modelOutput[blob_name].astype(np.float32, copy=True)
-    return scores, pred_boxes, activity_vectors
+            activitions[blob_name] = modelOutput[blob_name].astype(np.float32, copy=True)
+    return scores, pred_boxes, activitions
 
 
 
-def im_detect(net, modelInputs, image_scales, image_id=""):
+def im_detect(net, modelInputs, image_scales, layer_names_for_activations, image_id=""):
     """Detect object classes in an image given object proposals.
 
     Arguments:
@@ -119,11 +116,11 @@ def im_detect(net, modelInputs, image_scales, image_id=""):
             background as object category 0)
         boxes (ndarray): R x (4*K) array of predicted bounding boxes
     """
-    pre_process_model_inputs(net,modelInputs,image_scales,image_id)
+    pre_process_model_inputs(net,modelInputs,image_scales,image_id,layer_names_for_activations)
     modelOutputs = net.forward(**modelInputs)
-    scores, pred_boxes, activity_vectors = post_process_model_outputs(net,modelOutputs,image_scales)
+    scores, pred_boxes, activitions = post_process_model_outputs(net,modelOutputs,image_scales,layer_names_for_activations)
 
-    return scores, pred_boxes, activity_vectors
+    return scores, pred_boxes, activitions
 
 def check_config_for_error():
     # handle region proposal network
@@ -145,52 +142,34 @@ def test_net(net, imdb, max_dets_per_image=100, thresh=1/80., vis=False, al_net=
     _t = {'im_detect' : Timer(), 'misc' : Timer()}
     
     # config for loading a sample
-    loadConfig = edict()
-    loadConfig.activation_sample = edict()
-    loadConfig.activation_sample.bool_value = cfg.LOAD_METHOD == 'aim_data_layer' #cfg.TEST.INPUTS.AV_IMAGE
-    loadConfig.activation_sample.net = al_net
-    loadConfig.activation_sample.field = 'image' # 'image' or 'avImage'
-    load_rois_bool = (cfg.TRAIN.OBJ_DET.HAS_RPN is False) and (cfg.TASK == 'object_detection')
-    loadConfig.load_rois_bool = load_rois_bool # cfg.TEST.INPUTS.ROIS
-    loadConfig.target_size = cfg.TRAIN.SCALES[0]
-    loadConfig.cropped_to_box_bool = False
-    loadConfig.cropped_to_box_index = 0
-    loadConfig.dataset_means = cfg.PIXEL_MEANS
-    loadConfig.max_sample_single_dimension_size = cfg.TRAIN.MAX_SIZE
+    ds_loader = imdb.create_data_loader(cfg,correctness_records,al_net)
 
-    ds_loader = DataLoader(imdb,correctness_records,cfg.DATASET_AUGMENTATION)
-    print("num_samples: {}".format(ds_loader.num_samples))
-
-
+    # set mange ds_loader for net 
     alReport = activeLearningReportAppendActivationValueData(net,imdb,cfg.ACTIVE_LEARNING,False)    # TODO: add RECORDS BOOL
     aggModelOutput = aggregateModelOutput(imdb,ds_loader.num_samples,output_dir,cfg.TASK,thresh,cfg.TEST.OBJ_DET.NMS,max_dets_per_image,vis,cfg)
-    aggActivationValues = aggregateActivationValues(cfg.ACTIVATION_VALUES,cfg.GET_SAVE_ACTIVITY_VECTOR_BLOBS_DIR())
+    aggActivations = aggregateActivations(cfg.ACTIVATION_VALUES,cfg.GET_SAVE_ACTIVITY_VECTOR_BLOBS_DIR())
 
     # main loop
-    loop_index = 0
-    for imageBlob,scales,sample in ds_loader.dataset_generator(loadConfig,load_as_blob=True):
+    for imageBlob,scales,sample,index in ds_loader.dataset_generator(imdb.data_loader_config,load_as_blob=True):
 
         _t['im_detect'].tic()
-        scores, boxes, activity_vectors = im_detect(net, imageBlob, scales, sample['image_id'])
+        scores, boxes, activitions = im_detect(net, imageBlob, scales, layer_names_for_activations, sample['image_id'])
         _t['im_detect'].toc()
 
         _t['misc'].tic()
+        model_output = {"scores":scores,"boxes":boxes,"activitions":activitions}
 
-        model_output = {"scores":scores,"boxes":boxes,"activity_vectors":activity_vectors}
-
-        aggActivationValues.aggregate(model_output,sample['image_id'])
-        aggModelOutput.aggregate(model_output,loop_index)
+        aggActivations.aggregate(model_output,sample['image_id'])
+        aggModelOutput.aggregate(model_output,index)
         alReport.record(model_output,sample['image_id'])
 
         _t['misc'].toc()
-        print('im_detect: {:d}/{:d} {:.3f}s {:.3f}s').format(loop_index + 1, ds_loader.num_samples, _t['im_detect'].average_time,_t['misc'].average_time)
-        loop_index += 1
-
+        print('im_detect: {:d}/{:d} {:.3f}s {:.3f}s').format(index + 1, ds_loader.num_samples, _t['im_detect'].average_time,_t['misc'].average_time)
 
     aggActivationValues.save(net.name) # TODO: might be something else...
     aggModelOutput.save(ds_loader.dataset_augmentation.configs)
 
     print('Evaluating detections')
-    imdb.evaluate_detections(aggModelOutput.results, output_dir)
+    imdb.evaluate_detections(aggModelOutput.results, output_dir, ds_loader)
     
 

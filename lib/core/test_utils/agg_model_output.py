@@ -69,6 +69,8 @@ class aggregateModelOutput():
         if self.num_classes == 1:
             self.results[0][sample_index] = float(scores[0])
         else:
+            if len(scores) != len(self.results):
+                print("do you need to use 'corg'? nclasses for (model_output_size,data) = ({},{})".format(len(scores),len(self.results)))
             for class_index in xrange(0, self.num_classes):
                 self.results[class_index][sample_index] = float(scores[class_index])
 

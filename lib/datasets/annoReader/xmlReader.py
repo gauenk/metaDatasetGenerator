@@ -16,7 +16,7 @@ import xml.etree.ElementTree as ET
 class xmlReader(object):
     """Image database."""
 
-    def __init__(self, annoPath, classes , datasetName, setID, bboxOffset = 0, useDiff = True, convertToPerson = None, convertIdToCls = None, is_image_index_flattened = False):
+    def __init__(self, annoPath, classes , datasetName, setID, bboxOffset = 0, useDiff = True, convertToPerson = None, convertIdToCls = None, is_image_index_flattened = False, class_filter = None):
         """
         __init__ function for annoReader [annotationReader]
 
@@ -31,6 +31,7 @@ class xmlReader(object):
         self._classToIndex = self._create_classToIndex(classes)
         self._convertIdToCls = convertIdToCls
         self._is_image_index_flattened = is_image_index_flattened
+        self.class_filter = class_filter
 
     def _create_classToIndex(self,classes):
         return dict(zip(classes, range(self.num_classes)))
@@ -85,7 +86,7 @@ class xmlReader(object):
             # handle scaling caltech; annos were modified for YOLO
             x1,y1,x2,y2 = self._handle_caltech_helps_vs_gauenk(*[x1, y1, x2, y2])
             boxes[ix, :] = [x1, y1, x2, y2]
-            gt_classes[ix] = cls
+            gt_classes[ix] = self.convert_filtered_class_index(cls)
             overlaps[ix, cls] = 1.0
             seg_areas[ix] = (x2 - x1 + 1) * (y2 - y1 + 1)
             ix += 1
@@ -148,7 +149,7 @@ class xmlReader(object):
             # handle scaling caltech; annos were modified for YOLO
             x1,y1,x2,y2 = self._handle_caltech_helps_vs_gauenk(*[x1, y1, x2, y2])
             boxes[0, :] = [x1, y1, x2, y2]
-            gt_classes[0] = cls
+            gt_classes[0] = self.convert_filtered_class_index(cls)
             overlaps[0, cls] = 1.0
             seg_areas[0] = (x2 - x1 + 1) * (y2 - y1 + 1)
             break
@@ -190,3 +191,13 @@ class xmlReader(object):
             y2 = y2 * 480
         return x1,y1,x2,y2
         
+    def convert_filtered_class_index(self,original_class_index):
+        original_class_index = int(original_class_index)
+        if self.class_filter is None or self.class_filter.check is False:
+            return original_class_index
+        class_name = self.class_filter.original_names[original_class_index]
+        if class_name not in self.class_filter.new_names:
+            return -1
+        # if class_name not in self.class_filter.new_names:
+        #     raise ValueError("no such class name {} at index {} in the filtered class list".format(class_name,original_class_index))
+        return self.class_filter.new_names.index(class_name)

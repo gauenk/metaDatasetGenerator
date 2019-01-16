@@ -8,6 +8,7 @@ cfgData = cfg.DATASETS
 cfg.DATASETS.CALLING_DATASET_NAME = ""
 cfg.DATASETS.CALLING_IMAGESET_NAME = ""
 cfg.DATASETS.CALLING_CONFIG = ""
+cfg.DATASETS.CALLING_IMDB_STR = ""
 cfg.DATASETS.EXP_DATASET = ""
 cfg.DATASETS.PATH_ROOT = ""
 cfg.DATASETS.PATH_TO_IMAGES = ""
@@ -39,8 +40,10 @@ cfg.DATASETS.FILTERS.EMPTY_ANNOTATIONS = True
 cfg.DATASETS.FILTERS.CLASS_INCLUSION_LIST = []   # NOTE! THIS FEATURE IS INCOMPLETE!!
 cfg.DATASETS.FILTERS.CLASS_INCLUSION_LIST_BY_DATASET = {
     'mnist': ['3','8'],
-    'cifar_10': ['aeroplane','automobile']
+    'cifar_10': ['airplane','automobile']
 }
+
+cfg.DATASETS.FOR_CACHE = cfg.DATASETS
 
 def set_class_inclusion_list_by_calling_dataset():
     if cfg.DATASETS.CALLING_DATASET_NAME == '': raise ValueError("Dataset must be loaded before this function can be called")

@@ -83,10 +83,6 @@ def parse_args():
     parser.add_argument('--new_path_to_imageset',dest='new_path_to_imageset',
                         help='redirect the path from which the imdb will find the imagesets in',
                         default=None,type=str)
-    # change the name of the saved model
-    parser.add_argument('--snapshot_infix',dest='snapshot_infix',
-                        help='add an infix to the snapshot name',
-                        default=None,type=str)
 
     if len(sys.argv) == 1:
         parser.print_help()
@@ -98,9 +94,9 @@ def parse_args():
 def get_roidb(imdb_name,args):
     imdb = get_repo_imdb(imdb_name,args.new_path_to_imageset,args.cacheStrModifier)
     set_class_inclusion_list_by_calling_dataset() # reset class inclusion list settings
-    print 'Loaded dataset `{:s}` for training'.format(imdb.name)
+    print('Loaded dataset `{:s}` for training'.format(imdb.name))
     imdb.set_proposal_method(cfg.TRAIN.OBJ_DET.PROPOSAL_METHOD)
-    print 'Set proposal method: {:s}'.format(cfg.TRAIN.OBJ_DET.PROPOSAL_METHOD)
+    print('Set proposal method: {:s}'.format(cfg.TRAIN.OBJ_DET.PROPOSAL_METHOD))
     roidb = get_training_roidb(imdb)
     return imdb, roidb
 
@@ -170,8 +166,6 @@ def set_global_variables_from_args(args):
         cfg_from_list(args.set_cfgs)
 
     cfg.GPU_ID = args.gpu_id
-    if args.snapshot_infix is not None:
-        cfg.TRAIN.SNAPSHOT_INFIX = args.snapshot_infix
     set_global_cfg("TRAIN")
 
     if not args.randomize:
@@ -220,7 +214,7 @@ if __name__ == '__main__':
     setModelInfo(args.solver)
     print '{:d} roidb entries'.format(len(roidb))
     print 'Output will be saved to `{:s}`'.format(output_dir)
-    train_net(args.solver, roidb, output_dir,
+    train_net(args.solver, imdb, output_dir,
               datasetName=datasetName,
               solver_state=args.solver_state,
               pretrained_model=args.pretrained_model,

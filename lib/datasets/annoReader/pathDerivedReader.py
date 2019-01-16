@@ -17,7 +17,7 @@ class pdReader(object):
 
     def __init__(self, annoPath, classes , datasetName, setID,useDiff = True,
                  convertToPerson = None, convertIdToCls = None,
-                 is_image_index_flattened=False, splitIndex=1):
+                 is_image_index_flattened=False, splitIndex=1,class_filter=None):
         """
         __init__ function for annoReader [annotationReader]
 
@@ -33,6 +33,7 @@ class pdReader(object):
         self._convertIdToCls = convertIdToCls
         self._is_image_index_flattened = is_image_index_flattened
         self._splitIndex = 1
+        self.class_filter = class_filter
 
     def _create_classToIndex(self,classes):
         return dict(zip(classes, range(self.num_classes)))
@@ -51,7 +52,16 @@ class pdReader(object):
         # ensure cls is a classname
         assert cls_name in self._classes, "class {} is not in available class list".format(cls)
         cls = self._classToIndex[cls]
+        cls = self.convert_filtered_class_index(cls)
         return {'gt_classes': np.array([cls],dtype=np.uint8),
                 'flipped' : False,
                 'set' : self._setID}
+
+    def convert_filtered_class_index(self,original_class_index):
+        if self.class_filter is None:
+            return original_class_index
+        class_name = self.class_filter.original_names[original_class_index]
+        if class_name not in self.class_filter.new_names:
+            raise ValueError("no such class {} at index {} in the filtered class list".format(class_name,class_index))
+        return self.class_filter.new_names.index(class_name)
 

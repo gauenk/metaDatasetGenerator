@@ -135,6 +135,7 @@ layer {
   python_param {
     module: 'corg.layer'
     layer: 'Corg'
-    param_str: "'indicies': !!python/tuple [3,8]\n'nclasses': 3\n'norm': False\n'cls': True"
+    param_str: "'indicies': !!python/tuple [3,8]\n'nclasses': 2\n'norm': False\n'cls': True"
+    # param_str: "'indicies': !!python/tuple [0,1]\n'nclasses': 2\n'norm': False\n'cls': True"
   }
 }
