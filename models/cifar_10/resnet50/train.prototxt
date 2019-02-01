@@ -2321,7 +2321,7 @@ layer {
 
 layer {
 	bottom: "pool4"
-	top: "fc10"
+	top: "cls_score"
 	name: "fc10"
 	type: "InnerProduct"
 	inner_product_param {
@@ -2330,12 +2330,20 @@ layer {
 }
 
 layer {
+	bottom: "res5c"
+	name: "silence_res5c"
+	type: "Silence"
+}
+
+layer {
   name: "loss_cls"
   type: "SoftmaxWithLoss"
-  bottom: "fc10"
+  bottom: "cls_score"
   bottom: "labels"
   propagate_down: 1
   propagate_down: 0
   top: "loss_cls"
   loss_weight: 1
 }
+
+

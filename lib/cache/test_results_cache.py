@@ -1,4 +1,4 @@
-import os,uuid
+import os,uuid,copy
 import os.path as osp
 from easydict import EasyDict as edict
 
@@ -15,52 +15,67 @@ roidbCacheCfg.CACHE_PROMPT.DATASET.SUBSAMPLE_BOOL = True
 
 class TestResultsCache(TwoLevelCache):
 
-    def __init__(self,root_dir,roidb_settings,cfg,ds_config):
-        self.cacheConfig = self.construct_data_cache_config(cfg,ds_config)
-        super(TestResultsCache,self).__init__(root_dir,self.cacheConfig,roidb_settings)
+    def __init__(self,root_dir,cfg,imdb_config,roidb_settings,lookup_id):
+        self.test_cache_config = self.construct_data_cache_config(cfg,imdb_config)
+        super(TestResultsCache,self).__init__(root_dir,self.test_cache_config,roidb_settings,lookup_id,"test_results")
 
-    def construct_data_cache_config(self,cfg,ds_config):
-        cacheDataCfg = edict()
+    def reset_dataset_augmentation(self,datasetAugmentationCfg):
+        temporaryConfig = copy.deepcopy(self.testCacheConfig)
+        self.set_dataset_augmentation(temporaryConfig,datasetAugmentationCfg)
+        self.update_config(temporaryConfig)
 
-        cacheDataCfg.task = cfg.TASK
-        cacheDataCfg.subtask = cfg.SUBTASK
-        cacheDataCfg.modelInfo = cfg.modelInfo
+    def set_dataset_augmentation(self,test_cache_config,datasetAugmentationCfg):
+        test_cache_config.dataset_augmentation = edict() # primary config set 1
+        test_cache_config.dataset_augmentation.bool_value = datasetAugmentationCfg.BOOL
+        #test_cache_config.dataset_augmentation.configs = datasetAugmentationCfg.CONFIGS # says: "what type of augmentations do we have?"
+        test_cache_config.dataset_augmentation.image_translate = datasetAugmentationCfg.IMAGE_TRANSLATE
+        test_cache_config.dataset_augmentation.image_rotate = datasetAugmentationCfg.IMAGE_ROTATE
+        test_cache_config.dataset_augmentation.image_crop = datasetAugmentationCfg.IMAGE_CROP
+        test_cache_config.dataset_augmentation.image_flip = datasetAugmentationCfg.IMAGE_FLIP
+        test_cache_config.dataset_augmentation.percent_augmentations_used = datasetAugmentationCfg.N_PERC # says: "how many of the possible augmentations should we use for each augmented sample?"
+        test_cache_config.dataset_augmentation.percent_samples_augmented = datasetAugmentationCfg.N_SAMPLES # says: "how many samples are we augmenting?"
+        # test_cache_config.dataset_augmentation.bool_by_samples = datasetAugmentationCfg.SAMPLE_BOOL_VECTOR # says: which samples are augmented?
+        test_cache_config.dataset_augmentation.randomize = datasetAugmentationCfg.RANDOMIZE
+        test_cache_config.dataset_augmentation.randomize_subset = datasetAugmentationCfg.RANDOMIZE_SUBSET
+        
 
-        # why should "dataset_augmentation" be in the cache at all? do we save something associated with the dataset augmentation? I don't think I do currently...
-        cacheDataCfg.dataset_augmentation = edict() # primary config set 1
-        cacheDataCfg.dataset_augmentation.bool_value = cfg.DATASET_AUGMENTATION.BOOL
-        #cacheDataCfg.dataset_augmentation.configs = cfg.DATASET_AUGMENTATION.CONFIGS # says: "what type of augmentations do we have?"
-        cacheDataCfg.dataset_augmentation.image_translate = cfg.DATASET_AUGMENTATION.IMAGE_TRANSLATE
-        cacheDataCfg.dataset_augmentation.image_rotate = cfg.DATASET_AUGMENTATION.IMAGE_ROTATE
-        cacheDataCfg.dataset_augmentation.image_crop = cfg.DATASET_AUGMENTATION.IMAGE_CROP
-        cacheDataCfg.dataset_augmentation.percent_augmentations_used = cfg.DATASET_AUGMENTATION.N_PERC # says: "how many of the possible augmentations should we use for each augmented sample?"
+    def construct_data_cache_config(self,cfg,imdb_config):
+        testCacheConfig = edict()
 
-        cacheDataCfg.dataset_augmentation.percent_samples_augmented = cfg.DATASET_AUGMENTATION.N_SAMPLES # says: "how many samples are we augmenting?"
-        # cacheDataCfg.dataset_augmentation.bool_by_samples = cfg.DATASET_AUGMENTATION.SAMPLE_BOOL_VECTOR # says: which samples are augmented?
-        cacheDataCfg.dataset_augmentation.randomize = cfg.DATASET_AUGMENTATION.RANDOMIZE
-        cacheDataCfg.dataset_augmentation.randomize_subset = cfg.DATASET_AUGMENTATION.RANDOMIZE_SUBSET
+        testCacheConfig.id = "default_id"
+        testCacheConfig.task = cfg.TASK
+        testCacheConfig.subtask = cfg.SUBTASK
+        testCacheConfig.modelInfo = cfg.modelInfo
+        testCacheConfig.transform_each_sample = cfg.TRANSFORM_EACH_SAMPLE
+        # we don't want to save the actual config within the modelInfo
+        testCacheConfig.modelInfo.additional_input.info['activations'].cfg = None
 
-        cacheDataCfg.dataset = edict() # primary config set 2
-        cacheDataCfg.dataset.subsample_bool = cfg.DATASETS.SUBSAMPLE_BOOL
-        cacheDataCfg.dataset.annotation_class = cfg.DATASETS.ANNOTATION_CLASS
-        # cacheDataCfg.dataset.size = cfg.DATASETS.SIZE #len(roidb) ## We can't use this because it is set by the unfiltered image_index variable
-        # cacheDataCfg.dataset.classes = cfg.DATASETS.CLASSES #imdb.classes; classes should already be filtered if they need to be ## can't use this it is unfiltered
+        self.set_dataset_augmentation(testCacheConfig,cfg.DATASET_AUGMENTATION)
+        testCacheConfig.dataset = edict() # primary config set 2
+        testCacheConfig.dataset.name = cfg.DATASETS.CALLING_DATASET_NAME
+        testCacheConfig.dataset.imageset = cfg.DATASETS.CALLING_IMAGESET_NAME
+        testCacheConfig.dataset.config = cfg.DATASETS.CALLING_CONFIG
+        testCacheConfig.dataset.subsample_bool = cfg.DATASETS.SUBSAMPLE_BOOL
+        testCacheConfig.dataset.annotation_class = cfg.DATASETS.ANNOTATION_CLASS
+        # testCacheConfig.dataset.size = cfg.DATASETS.SIZE #len(roidb) ## We can't use this because it is set by the unfiltered image_index variable
+        # testCacheConfig.dataset.classes = cfg.DATASETS.CLASSES #imdb.classes; classes should already be filtered if they need to be ## can't use this it is unfiltered
 
-        cacheDataCfg.filters = edict() # primary config set 3
-        cacheDataCfg.filters.classes = cfg.DATASETS.FILTERS.CLASS
-        cacheDataCfg.filters.empty_annotations = cfg.DATASETS.FILTERS.EMPTY_ANNOTATIONS
+        
+        testCacheConfig.filters = edict() # primary config set 3
+        testCacheConfig.filters.classes = cfg.DATASETS.FILTERS.CLASS
+        testCacheConfig.filters.empty_annotations = cfg.DATASETS.FILTERS.EMPTY_ANNOTATIONS
 
-        cacheDataCfg.misc = edict() # primary config set 3
-        cacheDataCfg.misc.use_diff = ds_config['use_diff']
-        cacheDataCfg.misc.rpn_file = ds_config['rpn_file']
-        cacheDataCfg.misc.min_size = ds_config['min_size']
-        cacheDataCfg.misc.flatten_image_index = ds_config['flatten_image_index']
-        cacheDataCfg.misc.setID = ds_config['setID']
+        testCacheConfig.misc = edict() # primary config set 3
+        testCacheConfig.misc.use_diff = imdb_config['use_diff']
+        testCacheConfig.misc.rpn_file = imdb_config['rpn_file']
+        testCacheConfig.misc.min_size = imdb_config['min_size']
+        testCacheConfig.misc.flatten_image_index = imdb_config['flatten_image_index']
+        testCacheConfig.misc.setID = imdb_config['setID']
 
-        return cacheDataCfg
+        return testCacheConfig
         # TODO: put theses somewhere else
-        # ? assert len(roidb) == cacheDataCfg.DATASET.SIZE
-        # ? assert imdb.classes == cacheDataCfg.DATASET.CLASSES
+        # ? assert len(roidb) == testCacheConfig.DATASET.SIZE
+        # ? assert imdb.classes == testCacheConfig.DATASET.CLASSES
 
     def print_dataset_summary_by_uuid(datasetConfigList,uuid_str):
         pass

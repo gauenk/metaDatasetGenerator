@@ -16,7 +16,7 @@ import _init_paths
 from utils.misc import createNoisyBox,vis_dets
 from utils.blob import applyDatasetAugmentationList,getRawImageBlob
 from core.train import get_training_roidb
-from core.config import cfg, cfg_from_file, cfg_from_list, get_output_dir,loadDatasetIndexDict
+from core.config import cfg, cfg_from_file, cfg_from_list, get_output_dir,loadDatasetIndexDict,setModelInfo,set_dataset_augmentation_config,set_class_inclusion_list_by_calling_dataset,check_config_for_error,computeUpdatedConfigInformation
 from core.configDatasetAugmentation import *
 from datasets.factory import get_repo_imdb
 from datasets.ds_utils import load_mixture_set,print_each_size,roidbSampleBox,pyroidbTransform_cropImageToBox,pyroidbTransform_normalizeBox,roidbSampleImageAndBox
@@ -149,7 +149,17 @@ if __name__ == '__main__':
     if not args.randomize:
         np.random.seed(cfg.RNG_SEED)
 
+    solverInfo = {'arch':'arch','optim':'optim','siamese':False}
+
     imdb, roidb = get_roidb(args.imdb_name)
+    set_dataset_augmentation_config() # reset dataset augmentation settings
+    imdb.update_dataset_augmentation(cfg.DATASET_AUGMENTATION)
+    set_class_inclusion_list_by_calling_dataset() # reset class inclusion list settings
+    setModelInfo(None,solverInfo=solverInfo)
+    check_config_for_error()
+    computeUpdatedConfigInformation()
+
+    data_loader = imdb.create_data_loader(cfg,None,None)
     # numAnnos = imdb.roidb_num_bboxes_at(-1)
     numAnnos = 0
     """
@@ -179,7 +189,8 @@ if __name__ == '__main__':
 
     print("Report:\n\n")
     print("number of classes: {}".format(imdb.num_classes))
-    print("number of images: {}".format(len(roidb)))
+    print("number of roidb samples: {}".format(len(roidb)))
+    print("number of total samples: {}".format(len(data_loader)))
     print("number of annotations: {}".format(numAnnos))
     print("size of imdb in memory: {}kB".format(sys.getsizeof(imdb)/1024.))
     print("size of roidb in memory: {}kB".format(len(roidb) * sys.getsizeof(roidb[0])/1024.))
@@ -187,16 +198,22 @@ if __name__ == '__main__':
     for k,v in roidb[0].items():
         print("\t==> {},{}".format(k,type(v)))
         print("\t\t{}".format(v))
+    print("applied dataset augmentation (summary)")
+    print("\timage translate ==> {}".format(cfg.DATASET_AUGMENTATION.IMAGE_TRANSLATE))
+    print("\timage rotate ==> {}".format(cfg.DATASET_AUGMENTATION.IMAGE_ROTATE))
+    print("\timage crop ==> {}".format(cfg.DATASET_AUGMENTATION.IMAGE_CROP))
+    print("\timage flip ==> {}".format(cfg.DATASET_AUGMENTATION.IMAGE_FLIP))
 
+    exit()
     print("showing dataset augmentation")
-
-    translation_input_list = [2]
-    translation_list = createExhaustiveTranslationConfigs(translation_input_list)
-    crop_input_list = [i+1 for i in range(6)]
-    crop_list = createExhaustiveCropConfigs(crop_input_list)
-    rotation_input_list = [4*i-30 for i in range(15+1)] + [0]
-    rotation_list = createExhaustiveRotationConfigs(rotation_input_list)
-    mesh = create_mesh_from_lists([translation_list,rotation_list,crop_list])
+    # translation_input_list = [2]
+    # translation_list = createExhaustiveTranslationConfigs(translation_input_list)
+    # crop_input_list = [i+1 for i in range(6)]
+    # crop_list = createExhaustiveCropConfigs(crop_input_list)
+    # rotation_input_list = [4*i-30 for i in range(15+1)] + [0]
+    # rotation_list = createExhaustiveRotationConfigs(rotation_input_list)
+    # mesh = create_mesh_from_lists([translation_list,rotation_list,crop_list])
+    mesh = cfg.DATASET_AUGMENTATION.EXHAUSTIVE_CONFIGS
     input_config = {'dataset_augmentation':{'transformations':mesh}}
 
     # test iteration over data_loader

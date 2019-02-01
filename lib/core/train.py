@@ -8,7 +8,7 @@
 """Train a Fast R-CNN network."""
 
 import caffe
-from core.config import cfg,prototxtToYaml,create_snapshot_prefix
+from core.config import cfg,create_snapshot_prefix
 import roi_data_layer.roidb as rdl_roidb
 import cls_data_layer.roidb as cls_roidb
 import alcls_data_layer.roidb as alcls_roidb
@@ -26,7 +26,8 @@ import google.protobuf as pb2
 import google.protobuf.text_format
 
 from net_utils.misc import setNetworkMasksToOne
-from net_utils.initialize_net import mangleSolverPrototxt,initializeNetworkWeights,setNetForWarpAffineLayerType
+from net_utils.initialize_net import initializeNetworkWeights,setNetForWarpAffineLayerType
+
 
 class SolverWrapper(object):
     """A simple wrapper around Caffe's solver.
@@ -34,8 +35,7 @@ class SolverWrapper(object):
     use to unnormalize the learned bounding-box regression weights.
     """
 
-    def __init__(self, solver_prototxt, imdb, output_dir,
-                 pretrained_model=None, solver_state=None,al_net=None):
+    def __init__(self, solver_prototxt, imdb, output_dir,pretrained_model=None, solver_state=None,al_net=None,warp_affine_net=None,warp_affine_def=None):
         """Initialize the SolverWrapper."""
         roidb = imdb.roidb
         self.imdb = imdb
@@ -56,11 +56,11 @@ class SolverWrapper(object):
         print(caffe.SGDSolver(solver_prototxt))
         self.solver = caffe.SGDSolver(solver_prototxt)
 
+        
         if solver_state is not None:
             print("Loading solver state from {:s}".format(solver_state))
             self.solver.restore(solver_state)
-        else:
-            initializeNetworkWeights(self.solver.net)
+
 
         if pretrained_model is not None:
             print ('Loading pretrained model '
@@ -71,9 +71,11 @@ class SolverWrapper(object):
         with open(solver_prototxt, 'rt') as f:
             pb2.text_format.Merge(f.read(), self.solver_param)
 
-        # handle special needs for different layer types
-        setNetForWarpAffineLayerType(self.solver.net,solver_prototxt)
 
+
+        # handle special needs for different layer types
+        initializeNetworkWeights(self.solver.net,solver_state,warp_affine_net,warp_affine_def)
+        setNetForWarpAffineLayerType(self.solver.net,solver_prototxt)
 
         # HANDLE THE MASK ISSUES (yikes)
         net = self.solver.net
@@ -83,7 +85,7 @@ class SolverWrapper(object):
         # set data for dataLoader class
         if cfg.TASK == "object_detection":
             self.solver.net.layers[0].set_roidb(roidb)
-        elif cfg.TASK == "classification" or cfg.TASK == "regeneration":
+        elif cfg.TASK == "classification" or cfg.TASK == "regeneration" or cfg.TASK == "regression": # do I ever use regeneration? I think I can delete it.
             if cfg.SUBTASK == "tp_fn":
                 person_records = ds_utils.loadEvaluationRecords("person")
                 # write_keys_to_csv(person_records)
@@ -169,6 +171,7 @@ class SolverWrapper(object):
         model_paths = []
         print("snapshot_prefix = [{}]".format(self.solver_param.snapshot_prefix))
         print("iteration {}/{}".format(self.solver.iter,max_iters))
+
         while self.solver.iter < max_iters:
             # Make one SGD update
             timer.tic()
@@ -180,6 +183,8 @@ class SolverWrapper(object):
                     self.view_sigmoid_output()
                 elif 'Softmax' in self.solver.net.layers[-1].type:
                     self.view_softmax_output()
+                else:
+                    self.view_warp_angle_output()
                 print('speed: {:.3f}s / iter'.format(timer.average_time))
 
             if self.solver.iter % cfg.TRAIN.SNAPSHOT_ITERS == 0 or self.solver.iter == 100:
@@ -236,6 +241,7 @@ class SolverWrapper(object):
         # print(dir(net.layer_dict['cls_score']))
         # sys.exit()
         #print(net.layer_dict.keys())
+
         lp = caffe_pb2.LayerParameter()
         lp.type = "Sigmoid"
         layer = caffe.create_layer(lp)
@@ -249,21 +255,39 @@ class SolverWrapper(object):
         print("data",data,"top[0].data",top[0].data)
         print(net.blobs['labels'].data - top[0].data)
 
-    def view_sigmoid_output(self):
-        net = self.solver.net
+    def apply_sigmoid(self,data):
         lp = caffe_pb2.LayerParameter()
         lp.type = "Sigmoid"
         layer = caffe.create_layer(lp)
-        bottom = [net.blobs['cls_score']]
+        bottom = [caffe.Blob(data.shape)]
+        bottom[0].data[...] = data
         top = [caffe.Blob([])]
-        labels = net.blobs['labels'].data
         layer.SetUp(bottom, top)
         layer.Reshape(bottom, top)
         layer.Forward(bottom, top)
+        sigmoid_data = top[0].data
+        return sigmoid_data
+
+    def view_warp_angle_output(self):
+        net = self.solver.net
+        labels = net.blobs['labels'].data
+        preds = net.blobs['warp_angle'].data
+        if "cls_score" in net.blobs.keys():
+            print("cls_score",net.blobs['cls_score'].data)
+            cls_preds = self.apply_sigmoid(net.blobs['cls_score'].data)
+            print(cls_preds)
+        print(np.c_[preds, labels])
+
+    def view_sigmoid_output(self):
+        net = self.solver.net
+        labels = net.blobs['labels'].data
+        data = net.blobs['cls_score'].data
+        print(data)
+        preds = self.apply_sigmoid(data)
+        print(preds)
         np.set_printoptions(precision=3,suppress=True)
         print("Sigmoid output v.s. Labels: ")
-        print(top[0].data)
-        print(np.c_[top[0].data, labels])
+        print(np.c_[preds, labels])
 
     def view_softmax_output(self):
         net = self.solver.net
@@ -283,8 +307,12 @@ class SolverWrapper(object):
         print(all_class_probs.shape)
         for class_index in range(all_class_probs.shape[1]):
             class_probs_indices = np.where(guess_class == class_index)[0]
-            class_probs = all_class_probs[class_probs_indices,class_index]
-            class_ave_probs.append(np.mean(class_probs))
+            if len(class_probs_indices) == 0:
+                class_probs = all_class_probs[:,class_index]
+                class_ave_probs.append(np.mean(class_probs))
+            else:
+                class_probs = all_class_probs[class_probs_indices,class_index]
+                class_ave_probs.append(np.mean(class_probs))
         if len(class_ave_probs) != self.imdb.num_classes:
             print("Possible error: num_classes for (model,data) = ({},{})".format(len(class_ave_probs),self.imdb.num_classes))
         n_classes = np.max([len(class_ave_probs),self.imdb.num_classes])
@@ -314,7 +342,7 @@ def get_training_roidb(imdb):
     print(cfg.TASK)
     if cfg.TASK == "object_detection":
         rdl_roidb.prepare_roidb(imdb) # gets image sizes.. might be nice
-    elif cfg.TASK == "classification":
+    elif cfg.TASK == "classification" or cfg.TASK == "regression":
         cls_roidb.prepare_roidb(imdb)
     elif cfg.TASK == "regeneration":
         vae_rdl_roidb.prepare_roidb(imdb)
@@ -346,16 +374,17 @@ def filter_roidb(roidb):
 
 def train_net(solver_prototxt, imdb, output_dir,datasetName="",
               pretrained_model=None, solver_state=None, max_iters=400000,
-              al_net=None):
+              al_net=None,warp_affine_net=None,warp_affine_def=None):
     """Train *any* object detection network."""
 
     #roidb = filter_roidb(roidb)
-    print("og solver",solver_prototxt)
-    newSolverPrototxt = mangleSolverPrototxt(solver_prototxt,output_dir)
-    sw = SolverWrapper(newSolverPrototxt, imdb, output_dir,
+    sw = SolverWrapper(solver_prototxt, imdb, output_dir,
                        pretrained_model=pretrained_model,
                        solver_state=solver_state,
-                       al_net=al_net)
+                       al_net=al_net,
+                       warp_affine_net=warp_affine_net,
+                       warp_affine_def=warp_affine_def,
+    )
     print('Solving...')
     model_paths = sw.train_model(max_iters)
     print('done solving')

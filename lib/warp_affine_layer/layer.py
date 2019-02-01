@@ -1,20 +1,17 @@
 """
-   The layer used to use the warpAffine function in cv2.
+   The layer used to use the warpAffine function in opencv
    WarpAffineLayer implements a Caffe Python layer.
 """
 
-import caffe,cv2
+import caffe
 from easydict import EasyDict as edict
 from utils.blob import image_list_to_blobs,blob_list_to_images
-from datasets.data_utils.dataset_augmentation_utils import getRotationInfo,translateImage
-from utils.timer import Timer
+from datasets.data_utils.dataset_augmentation_utils import rotateImage
 from core.config import cfg
-from numpy import transpose as npt
 import numpy as np
-import numpy.random as npr
-import yaml
-
 from caffe.proto import caffe_pb2
+
+from warp_affine_utils import *
 
 class WarpAffineLayer(caffe.Layer):
     """ Layer used to give the warpAffine transformation as a layer"""
@@ -27,12 +24,12 @@ class WarpAffineLayer(caffe.Layer):
         self.train_mode = False
         self.net = None
         self.layer_name = None
-        self.angle_max = 90
+        self.angle_max = 180 # should be 180; maybe set to 90 some old ones need it
         self.angle_star = None
 
         self.search = edict()
-        self.search.step_tolerance = 0.1
-        self.search.loss_tolerance = 0.1
+        self.search.step_tolerance = 0.01
+        self.search.loss_tolerance = 0.01
         self.search.step_number = 20
         self.search.step_size = 10
         self.search.angle_start = -self.angle_max
@@ -55,26 +52,10 @@ class WarpAffineLayer(caffe.Layer):
         top[0].reshape(self.batch_size, 3, cfg.TRAIN.MAX_SIZE,cfg.TRAIN.MAX_SIZE)
         print('[WarpAffineLayer] setup done')
 
-
-    def set_angle(self,angle):
-        self.angle = angle
-
-    def set_net(self,og_net,net,layer_name):
-        self.set_net_bool = True
-        self.og_net = og_net
-        self.net = net
-        self.layer_name = layer_name
-        for index,layer_name in enumerate(self.net._layer_names):
-            if layer_name == self.layer_name:
-                break
-        self.start_index = index
-        self.num_layers = len(self.net._layer_names)
-
     def compute_output_images(self,input_images,angles,cols,rows):
         output_images = []
         for angle,image in zip(angles,input_images):
-            rotationMat, scale = getRotationInfo(angle,cols,rows)
-            output_image = cv2.warpAffine(image,rotationMat,(cols,rows),scale)
+            output_image,_ = rotateImage(image,angle)
             output_images.append(output_image)
         return output_images
 
@@ -92,7 +73,8 @@ class WarpAffineLayer(caffe.Layer):
         
         # extract angles
         if self.angle is None:
-            angle = bottom[0].data
+            #print(bottom[0].data)
+            angle = bottom[0].data * self.angle_max
         else:
             angle = self.angle
 
@@ -115,10 +97,56 @@ class WarpAffineLayer(caffe.Layer):
         # process for backward layer...
         if self.set_net_bool is True and self.train_mode is True:
             self.angle_star = self.findAngleStar()
-
+            #print("l",angle[:10],self.angle_star[:10],"r")
         top[0].data[...] = output_blobs.astype(np.float32, copy=False)
         self.set_angle(None)
         
+            
+    def backward(self, top, propagate_down, bottom):
+        """ 
+        (1) Sample different M's to find the best one and (2) pass gradient to angles
+        """
+
+        #
+        # extract relevant variables
+        #
+
+        # extract input angles
+        original_angles_tanh = bottom[0].data
+        original_top_gradient = top[0].diff
+        original_angles = original_angles_tanh * self.angle_max
+
+        #
+        # compute the gradients with sampled rotated images
+        #
+
+        #self.angle_star = self.findAngleStar()
+        #print("bl",original_angles, self.angle_star[:,np.newaxis],"br")
+        angles_gradient = ( original_angles - self.angle_star[:,np.newaxis] ) / self.angle_max
+
+        # set the diff
+        bottom[0].diff[...] = angles_gradient.astype(np.float32, copy=False)
+
+    def reshape(self, bottom, top):
+        """Reshaping happens during the call to forward."""
+        top[0].reshape(self.batch_size, 3, cfg.TRAIN.MAX_SIZE,cfg.TRAIN.MAX_SIZE)
+
+
+    def set_angle(self,angle):
+        self.angle = angle
+
+    def set_net(self,og_net,net,layer_name):
+        self.set_net_bool = True
+        self.og_net = og_net
+        self.net = net
+        self.layer_name = layer_name
+        for index,layer_name in enumerate(self.net._layer_names):
+            if layer_name == self.layer_name:
+                break
+        self.start_index = index
+        self.num_layers = len(self.net._layer_names)
+
+
     def findAngleStar(self):
         self.refine_angle_search = True
         self.search_step = 10
@@ -251,33 +279,3 @@ class WarpAffineLayer(caffe.Layer):
             print(np.c_[angle_sample[:,np.newaxis],losses_sample])
             print("-"*10)
         print("^"*50)
-            
-    def backward(self, top, propagate_down, bottom):
-        """ 
-        (1) Sample different M's to find the best one and (2) pass gradient to angles
-        """
-
-        #
-        # extract relevant variables
-        #
-
-        # extract input angles
-        original_angles_tanh = bottom[0].data
-        original_top_gradient = top[0].diff
-        original_angles = original_angles_tanh * self.angle_max
-
-        #
-        # compute the gradients with sampled rotated images
-        #
-
-        #self.angle_star = self.findAngleStar()
-        angles_gradient = original_angles - self.angle_star[:,np.newaxis]
-
-        # set the diff
-        bottom[0].diff[...] = angles_gradient.astype(np.float32, copy=False)
-
-    def reshape(self, bottom, top):
-        """Reshaping happens during the call to forward."""
-        top[0].reshape(self.batch_size, 3, cfg.TRAIN.MAX_SIZE,cfg.TRAIN.MAX_SIZE)
-
-

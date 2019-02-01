@@ -13,6 +13,7 @@ from core.config import cfg, cfg_from_file, cfg_from_list
 from datasets.repo_imdb import RepoImdb
 from datasets.ds_obj import DatasetObject
 from datasets.coco import coco
+#from internal_ds_utils import get_repo_imdb,list_imdbs
 
 __sets.append("pascal_voc_2012")
 __sets.append("pascal_voc_2007")
@@ -27,6 +28,14 @@ __sets.append("coco")
 __sets.append("sun")
 __sets.append("mnist")
 __sets.append("cifar_10")
+
+def loadImdbFromConfig(cfg):
+    datasetName =cfg.DATASETS.CALLING_DATASET_NAME
+    imageSet = cfg.DATASETS.CALLING_IMAGESET_NAME
+    configName = cfg.DATASETS.CALLING_CONFIG
+    imdb_str = '{}-{}-{}'.format(datasetName,imageSet,configName)
+    imdb = get_repo_imdb(imdb_str)
+    return imdb
 
 def get_repo_imdb(name,path_to_imageSets=None,cacheStrModifier=None):
     """Get an imdb (image database) by name."""
@@ -45,7 +54,6 @@ def get_repo_imdb(name,path_to_imageSets=None,cacheStrModifier=None):
             # else:
             #     return RepoImdb(di[0],di[1],di[2])
     raise KeyError('Unknown dataset: {}'.format(name))
-
 
 def list_imdbs():
     """List all registered imdbs."""

@@ -5,12 +5,12 @@
 """Test an object detection network on an image database."""
 
 import matplotlib
-# matplotlib.use('Agg')
+matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 
 import _init_paths
 from core.test_new import test_net
-from core.config import cfg, cfg_from_file, cfg_from_list, set_global_cfg, getTestNetConfig, set_augmentation_by_calling_dataset, set_class_inclusion_list_by_calling_dataset
+from core.config import cfg, cfg_from_file, cfg_from_list, set_global_cfg, getTestNetConfig, set_dataset_augmentation_config, set_class_inclusion_list_by_calling_dataset,setModelInfo,check_config_for_error,saveExperimentConfig,computeUpdatedConfigInformation
 from datasets.factory import get_repo_imdb
 import caffe
 import argparse
@@ -62,7 +62,27 @@ def parse_args():
     parser.add_argument('--al_net', dest='al_net',
                         help='model weights to which active learning is applied',
                         default=None, type=str)
-
+    parser.add_argument('--warp_affine_pretrain', dest='warp_affine_pretrain',
+                        help='did we train the warp affine with a pretrained model?',
+                        default=None, type=str)
+    parser.add_argument('--name_override', dest='name_override',
+                        help='overwrite the current model name with this string instead.',
+                        default=None, type=str)
+    parser.add_argument('--new_cache', dest='new_cache',
+                        help="tells us to re-write the old cache",
+                        action='store_true')
+    parser.add_argument('--create_angle_dataset', dest='create_angle_dataset',
+                        help="should we create an angle dataset numpy file?",
+                        action='store_true')
+    parser.add_argument('--siamese', dest='siamese',
+                        help="is the testing model type a siamese model?",
+                        action='store_true')
+    parser.add_argument('--arch', dest='arch',type=str,
+                        help="specify the model architecture")
+    parser.add_argument('--optim', dest='optim',type=str,
+                        help="specify the model optim alg")
+    parser.add_argument('--export_cfg', dest='export_cfg',action='store_true',
+                        help="export the config to file.")
     if len(sys.argv) == 1:
         parser.print_help()
         sys.exit(1)
@@ -84,7 +104,17 @@ if __name__ == '__main__':
 
     cfg.GPU_ID = args.gpu_id
     if args.rotate != 0: cfg.IMAGE_ROTATE = args.rotate
-    if args.av_save is False: cfg.SAVE_ACTIVITY_VECTOR_BLOBS = []
+    if args.av_save is False:
+        cfg.ACTIVATIONS.SAVE_BOOL = False
+        # cfg.ACTIVATIONS.LAYER_NAMES = []
+        cfg.SAVE_ACTIVITY_VECTOR_BLOBS = []
+    else:
+        cfg.ACTIVATIONS.SAVE_BOOL = True
+
+    if args.warp_affine_pretrain is True:
+        cfg.WARP_AFFINE_PRETRAIN = True
+    if args.create_angle_dataset is True:
+        cfg.TEST.CREATE_ANGLE_DATASET = True        
 
     print('Using config:')
     pprint.pprint(cfg)
@@ -93,12 +123,17 @@ if __name__ == '__main__':
         print('Waiting for {} to exist...'.format(args.caffemodel))
         time.sleep(10)
 
+
     caffe.set_mode_gpu()
     caffe.set_device(args.gpu_id)
     getTestNetConfig(args.caffemodel,args.prototxt)
     cfg.BATCH_SIZE = 1
     net = caffe.Net(args.prototxt, args.caffemodel, caffe.TEST)
     net.name = os.path.splitext(os.path.basename(args.caffemodel))[0]
+    if args.name_override:
+        cfg.modelInfo.name = args.name_override
+    else:
+        cfg.modelInfo.name = net.name
 
     # print("-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-")
     # for name,layer in net.layer_dict.items():
@@ -112,7 +147,8 @@ if __name__ == '__main__':
     imdb.competition_mode(args.comp_mode)
     if not cfg.TEST.OBJ_DET.HAS_RPN and cfg.TASK == 'object_detection':
         imdb.set_proposal_method(cfg.TEST.PROPOSAL_METHOD)
-    set_augmentation_by_calling_dataset() # reset dataset augmentation settings
+    set_dataset_augmentation_config() # reset dataset augmentation settings
+    imdb.update_dataset_augmentation(cfg.DATASET_AUGMENTATION)
     set_class_inclusion_list_by_calling_dataset() # reset class inclusion list settings
 
     al_net = None
@@ -120,7 +156,22 @@ if __name__ == '__main__':
         al_net = caffe.Net(args.al_def,caffe.TEST, weights=args.al_net)
         al_net.name = "al_"+os.path.splitext(os.path.basename(args.al_def))[0]
 
-    test_net(net, imdb, max_dets_per_image=args.max_dets_per_image, vis=args.vis, al_net=al_net)
+    solverInfo = {'arch':'arch','optim':'optim','siamese':args.siamese}
+    if args.arch:
+        solverInfo['arch'] = args.arch
+    if args.optim:
+        solverInfo['optim'] = args.optim
+
+    setModelInfo(None,solverInfo=solverInfo)
+    check_config_for_error()
+    net_layer_names = [name for name in net._layer_names]
+    if 'warp_angle' in net_layer_names and cfg.TASK != "regression":
+        cfg.ACTIVATIONS.SAVE_BOOL = True
+        cfg.ACTIVATIONS.LAYER_NAMES = ['warp_angle']
+    computeUpdatedConfigInformation()
+    if args.export_cfg:
+        saveExperimentConfig()
+    test_net(net, imdb, max_dets_per_image=args.max_dets_per_image, vis=args.vis, al_net=al_net, new_cache=args.new_cache)
     
 '''
 argparse.ArgumentParser

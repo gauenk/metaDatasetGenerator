@@ -8,7 +8,7 @@ import matplotlib.pyplot as plt
 
 import _init_paths
 from core.train import get_training_roidb, train_net
-from core.config import cfg, cfg_from_file, cfg_from_list, get_output_dir, set_global_cfg, set_augmentation_by_calling_dataset, set_class_inclusion_list_by_calling_dataset
+from core.config import cfg, cfg_from_file, cfg_from_list, get_output_dir, set_global_cfg, set_dataset_augmentation_config, set_class_inclusion_list_by_calling_dataset
 from datasets.factory import get_repo_imdb
 from datasets.ds_utils import load_mixture_set,print_each_size
 import datasets.imdb

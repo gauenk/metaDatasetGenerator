@@ -25,7 +25,7 @@ def getRotationInfo(angle,cols,rows):
 
 def rotateImage(img,angle):
     # print('angle',angle)
-    if angle is None:
+    if angle is False:
         return img,None
     im_shape = img.shape
     rows,cols = img.shape[:2]
@@ -35,7 +35,7 @@ def rotateImage(img,angle):
     return img,rotateInfo
 
 def translateImage(img,step,direction):
-    if step is None or direction is None:
+    if step is False or direction is False:
         return img,None
     if direction == 'u': x_step,y_step=0,step
     elif direction == 'd': x_step,y_step=0,-step
@@ -53,7 +53,7 @@ def translateImage(img,step,direction):
 
 def cropImage(img,step):
     img_shape = img.shape
-    if step is None or step == 0:
+    if step is False or step == 0:
         return img
     # print("[cropImage]",step)
     timg = img[step:-step,step:-step,:]

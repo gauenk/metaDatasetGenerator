@@ -6,11 +6,14 @@ from core.configBase import *
 def createExhaustiveTranslationConfigs(translation_input_list):
     translation_list = []
     for trans in translation_input_list:
-        trans_dict = [{'step':trans} for _ in range(4)]
-        trans_dict[0]['direction'] = 'u'
-        trans_dict[1]['direction'] = 'd'
-        trans_dict[2]['direction'] = 'l'
-        trans_dict[3]['direction'] = 'r'
+        if trans is None or trans is False:
+            trans_dict = [{'step':False,'direction':False}]
+        else:
+            trans_dict = [{'step':trans} for _ in range(4)]
+            trans_dict[0]['direction'] = 'u'
+            trans_dict[1]['direction'] = 'd'
+            trans_dict[2]['direction'] = 'l'
+            trans_dict[3]['direction'] = 'r'
         translation_list.extend(trans_dict)
     return translation_list
 
@@ -121,10 +124,36 @@ def reset_dataset_augmentation(new_list,transformation_type):
                                    ])
     reset_dataset_augmentation_with_mesh(mesh)
 
+def set_dataset_augmentation_config():
+    if not cfg.DATASET_AUGMENTATION.BOOL:
+        return
+    bool_0 = (cfg.DATASET_AUGMENTATION.USE_DEFAULTS and cfg.DATASET_AUGMENTATION.SET_BY_CALLING_DATASET)
+    if bool_0:
+        print("[configDatasetAugmentation.py] dataset augmentation conditions are in conflict. please resolve them manually")
+        print("bool_0",bool_0)
+        exit()
+    if cfg.DATASET_AUGMENTATION.SET_BY_CALLING_DATASET:
+        set_augmentation_by_calling_dataset()
+    elif cfg.DATASET_AUGMENTATION.USE_DEFAULTS:
+        return
+    else:
+        print("[configDatasetAugmentation.py] dataset augmentation conditions are all False. please resolve them manually")
+        exit()
+
 def set_augmentation_by_calling_dataset():
+    if cfg.DATASET_AUGMENTATION.USE_DEFAULTS or (cfg.DATASET_AUGMENTATION.SET_BY_CALLING_DATASET is False):
+        print("the [USE_DEFAULTS] flag True. Using only default augmentation values.")
+        return
     if cfg.DATASETS.CALLING_DATASET_NAME == '':
         raise ValueError("Dataset must be loaded before this function can be called")
+    if cfg.DATASETS.CALLING_DATASET_NAME not in cfg.DATASET_AUGMENTATION.PRESET_ARGS_BY_SET.keys():
+        print("dataset not found. using defaults.")
+        return
     configs = cfg.DATASET_AUGMENTATION.PRESET_ARGS_BY_SET[cfg.DATASETS.CALLING_DATASET_NAME]
+    cfg.DATASET_AUGMENTATION.IMAGE_TRANSLATE=configs['translation']
+    cfg.DATASET_AUGMENTATION.IMAGE_ROTATE=configs['rotation']
+    cfg.DATASET_AUGMENTATION.IMAGE_CROP=configs['crop']
+    cfg.DATASET_AUGMENTATION.IMAGE_FLIP=configs['flip']
     translation_list = createExhaustiveTranslationConfigs(configs['translation'])
     rotation_list = createExhaustiveRotationConfigs(configs['rotation'])
     crop_list = createExhaustiveCropConfigs(configs['crop'])
@@ -132,14 +161,17 @@ def set_augmentation_by_calling_dataset():
     mesh = create_mesh_from_lists([flip_list,translation_list,rotation_list,crop_list])
     reset_dataset_augmentation_with_mesh(mesh)
 
-translation_input_list = [2]
-translation_list = createExhaustiveTranslationConfigs(translation_input_list)
-rotation_input_list = [4*i-30 for i in range(15+1)] + [0]
-rotation_list = createExhaustiveRotationConfigs(rotation_input_list)
-crop_input_list = [i+1 for i in range(6)]
-crop_list = createExhaustiveCropConfigs(crop_input_list)
 flip_input_list = [True,False]
 flip_list = createExhaustiveFlipConfigs(flip_input_list)
+translation_input_list = [2]
+translation_input_list = [False]
+translation_list = createExhaustiveTranslationConfigs(translation_input_list)
+rotation_input_list = [4*i-30 for i in range(15+1)] + [0]
+rotation_input_list = [False]
+rotation_list = createExhaustiveRotationConfigs(rotation_input_list)
+#crop_input_list = [i+1 for i in range(6)]
+crop_input_list = [False]
+crop_list = createExhaustiveCropConfigs(crop_input_list)
 mesh = create_mesh_from_lists([flip_list,translation_list,rotation_list,crop_list])
 
 # dataset augmentation
@@ -160,20 +192,22 @@ cfg.DATASET_AUGMENTATION.PRESET_ARGS_BY_SET = {
     # },
     'mnist': {
         # 'translation': [2],
-        'rotation': [5*i-45 for i in range(9+1)] + [0],
+        # 'rotation': [5*i-45 for i in range(9+1)] + [0],
+        'rotation': [-45+15*i for i in range(7)] + [-5,5],
         # 'crop': [i+1 for i in range(6)],
-        'translation': [None],
+        'translation': [False],
         # 'rotation': [None],
-        'crop': [None],
+        'crop': [False],
         'flip': [False]
     },
     'cifar_10': {
         # 'translation': [3],
-        # 'rotation': [(2/3)*i-5 for i in range(15+1)] + [0],
+        # 'rotation': [(2/3.)*i-5 for i in range(15+1)] + [0],
         # 'crop': [2],
         # 'flip': [False,True],
         'translation': [False],
-        'rotation': [(2/3)*i-5 for i in range(15+1)] + [0],
+        # 'rotation': [(2/3.)*i-5 for i in range(15+1)] + [0],
+        'rotation': [0+10*i for i in range(36+1)],
         'crop': [False],
         'flip': [False]
 
@@ -198,25 +232,9 @@ cfg.DATASET_AUGMENTATION.CONFIGS,cfg.DATASET_AUGMENTATION.CONFIG_INDICES = getDa
                                                                                                                       cfg.DATASET_AUGMENTATION.RANDOMIZE_SUBSET)
 cfg.DATASET_AUGMENTATION.SIZE = len(cfg.DATASET_AUGMENTATION.CONFIGS)
 cfg.DATASET_AUGMENTATION.VERSION = 'v0.1'
+cfg.DATASET_AUGMENTATION.USE_DEFAULTS = False
+cfg.DATASET_AUGMENTATION.SET_BY_CALLING_DATASET = True
 # cfg.DATASET_AUGMENTATION.EXHAUSTIVE_CONFIGS = []
 # cfg.DATASET_AUGMENTATION.CONFIGS = []
 # cfg.DATASET_AUGMENTATION.SIZE = 0
-
-
-cfg.DATASET_AUGMENTATION.FOR_CACHE = [ cfg.DATASET_AUGMENTATION.BOOL,
-                                       cfg.DATASET_AUGMENTATION.N_SAMPLES,
-                                       cfg.DATASET_AUGMENTATION.RANDOMIZE,
-                                       cfg.DATASET_AUGMENTATION.RANDOMIZE_SUBSET,
-                                       cfg.DATASET_AUGMENTATION.RANDOM_SEED,
-                                       cfg.DATASET_AUGMENTATION.IMAGE_NOISE,
-                                       cfg.DATASET_AUGMENTATION.IMAGE_TRANSLATE,
-                                       cfg.DATASET_AUGMENTATION.IMAGE_ROTATE,
-                                       cfg.DATASET_AUGMENTATION.IMAGE_CROP,
-                                       cfg.DATASET_AUGMENTATION.IMAGE_FLIP,
-                                       cfg.DATASET_AUGMENTATION.N_PERC,
-                                       cfg.DATASET_AUGMENTATION.CONFIGS,
-                                       cfg.DATASET_AUGMENTATION.CONFIG_INDICES,
-                                       cfg.DATASET_AUGMENTATION.SIZE,
-                                       cfg.DATASET_AUGMENTATION.VERSION]
-
 

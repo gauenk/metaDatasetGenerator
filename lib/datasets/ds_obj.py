@@ -12,9 +12,10 @@ import numpy as np
 from datasets.imdb import imdb
 import scipy.sparse
 from numpy import random as npr
-from core.config import cfg,cfgData,cfgData_from_file
+from core.config import cfg,cfgData,cfgData_from_file,get_output_dir
 from easydict import EasyDict as edict
 from utils.base import *
+from datasets.evaluators.regression import regressionEvaluator
 from datasets.evaluators.classification import classificationEvaluator
 from datasets.evaluators.bboxEvaluator import bboxEvaluator
 from datasets.imageReader.pathReader import pathReader
@@ -28,15 +29,16 @@ from cache.roidb_cache import RoidbCache
 
 
 class DatasetObject(imdb):
-    """Image database."""
+    """Infrastructure of pipes to the dataset locations."""
 
     def __init__(self, datasetName, imageSet, configName, path_to_imageSets=None,cacheStrModifier=None,load_roidb=True):
         imdb.__init__(self, datasetName)
         cfg.DATASETS.CALLING_DATASET_NAME = datasetName
         cfg.DATASETS.CALLING_IMAGESET_NAME = imageSet
         cfg.DATASETS.CALLING_CONFIG = configName
-        self.imdb_str = '{}-{}-{}'.format(datasetName,imageSet,configName)
-        cfg.DATASETS.CALLING_IMDB_STR = self.imdb_str
+        cfg.DATASETS.CALLING_IMDB_STR = '{}_{}_{}'.format(datasetName,imageSet,configName)
+        self.imdb_str = '{}_{}_{}'.format(datasetName,imageSet,configName)
+        self._imdb_str = '{}-{}-{}'.format(datasetName,imageSet,configName)
         self.roidb_loaded = False
         self.data_loader = False
         self._cacheStrModifier = cacheStrModifier
@@ -54,7 +56,8 @@ class DatasetObject(imdb):
         self.is_image_index_flattened = False
         cfg.DATASETS.IS_IMAGE_INDEX_FLATTENED = False
         self._parseDatasetFile()
-        self.roidb_cache = RoidbCache(self.cache_path,self.imdb_str,cfg,self.config,None)
+        self.roidb_cache_fieldname = 'object'
+        self.roidb_cache = RoidbCache(self.cache_path,self._imdb_str,cfg,self.config,None,'dataset_object',self.roidb_cache_fieldname)
         if load_roidb:
             self.gt_roidb()
 
@@ -154,6 +157,8 @@ class DatasetObject(imdb):
         _classes = self._load_classes(classFilename)
         if cfg.DATASETS.ANNOTATION_CLASS == 'object_detection':
             assert _classes[0] == "__background__","Background class must be first index"
+        elif _classes[0] == "__background__":
+            del _classes[0]
         self._classes = _classes
         self._original_classes = self._classes        
 
@@ -166,15 +171,21 @@ class DatasetObject(imdb):
         load_rois_bool = (cfg.TRAIN.OBJ_DET.HAS_RPN is False) and (cfg.TASK == 'object_detection')
         loadConfig.load_rois_bool = load_rois_bool # cfg.TEST.INPUTS.ROIS
         loadConfig.target_size = cfg.TRAIN.SCALES[0]
+        loadConfig.target_size_siamese = cfg.TRAIN.SCALES
         loadConfig.cropped_to_box_bool = False
         loadConfig.cropped_to_box_index = 0
         loadConfig.dataset_means = cfg.PIXEL_MEANS
         loadConfig.max_sample_single_dimension_size = cfg.TRAIN.MAX_SIZE
         loadConfig.load_fields = ['data']
         loadConfig.preprocess_image = True
-
+        # transform_sample_label_by_augmentation = (cfg.SUBTASK == 'angles')
+        #loadConfig.replace_labels_after_augmentation_file = cfg.REPLACE_LABELS_AFTER_AUGMENTATION_FILE
+        loadConfig.additional_input = cfg.modelInfo.additional_input
+        loadConfig.sample_type = "regularOldImage"
+        loadConfig.siamese = False
         self.data_loader_config = loadConfig
-        ds_loader = DataLoader(self,correctness_records,cfg.DATASET_AUGMENTATION)
+        ds_loader = DataLoader(self,correctness_records,cfg.DATASET_AUGMENTATION,cfg.TRANSFORM_EACH_SAMPLE,self.roidb_cache)
+        ds_loader.set_dataset_loader_config(loadConfig)
         self.data_loader = ds_loader
         return ds_loader
 
@@ -243,12 +254,10 @@ class DatasetObject(imdb):
                              cachedir, self._imageSetPath,
                              self._image_index,annoPath,
                              self.load_annotation)
-        elif cfg.DATASETS.ANNOTATION_CLASS == 'classification':
-            return classificationEvaluator(self._datasetName,self.classes,
-                             self._compID, self._salt,
-                             cachedir, self._imageSetPath,
-                             self._image_index,annoPath,
-                             self.load_annotation)
+        elif cfg.TASK == 'classification':
+            return classificationEvaluator()
+        elif cfg.TASK == 'regression':
+            return regressionEvaluator()
         else:
             print("\n\n\nNo Evaluator Included\n\n\n")
             return None
@@ -270,8 +279,6 @@ class DatasetObject(imdb):
         self._image_index = newImageIndex
         if self.imgReader:
             self.imgReader._image_index = newImageIndex
-        if self.evaluator:
-            self.evaluator.image_index = newImageIndex
         if self.data_loader:
             self.image_index = newImageIndex
         
@@ -279,7 +286,6 @@ class DatasetObject(imdb):
         self.is_image_index_flattened = state
         cfg.DATASETS.IS_IMAGE_INDEX_FLATTENED = state
         if self.annoReader: self.annoReader._is_image_index_flattened = state
-        if self.evaluator: self.evaluator._is_image_index_flattened = state
         if self.imgReader: self.imgReader._is_image_index_flattened = state
         
     def _update_path_to_imagesets(self,new_path_to_imagesets):
@@ -306,25 +312,26 @@ class DatasetObject(imdb):
             print("Likely Error with ImageIndex. len(image_index) = 0")
             print("image_set_file: {}".format(image_set_file))
             sys.exit()
-        if cfg.DATASETS.ANNOTATION_CLASS == "classification" and self.config['flatten_image_index']:
-            print("\n\n\n\nPossible Error: ANNOTATION_CLASS is 'classification' while 'flatten_image_index' is True\n\n\n\n\n")
+        # if cfg.DATASETS.ANNOTATION_CLASS == "classification" and self.config['flatten_image_index']:
+        #     print("\n\n\n\nPossible Error: ANNOTATION_CLASS is 'classification' while 'flatten_image_index' is True\n\n\n\n\n")
 
     
     def apply_flatten_image_index(self,image_index):
         newImageIndex = []
         for idx,image_id in enumerate(image_index):
-            image_count = self.count_bboxes_at(idx)
+            image_count = self.count_bboxes_at(idx,image_id)
             id_list = [ image_id + "_{}".format(jdx) for jdx in range(image_count) ]
             newImageIndex.extend(id_list)
         image_index = newImageIndex
         self._update_is_image_index_flattened(True)
         return image_index
 
-    def count_bboxes_at(self,i):
+    def count_bboxes_at(self,i,index=None):
         """
         Return the number of bounding boxes for image i in the image sequence.
         """
-        index = self._image_index[i]
+        if index is None:
+            index = self._image_index[i]
         return len(self.annoReader.load_annotation(index)['boxes'])
 
     def _load_classes(self, classFilename):
@@ -332,7 +339,15 @@ class DatasetObject(imdb):
             classes = [line.rstrip() for line in f]
         return classes
 
-    def evaluate_detections(self, detection_object, output_dir=None, ds_loader=None):
+    def update_dataset_augmentation(self,dataset_augmentation):
+        if self.data_loader:
+            self.data_loader.update_dataset_augmentation(dataset_augmentation)
+
+    def evaluation_results(self, ds_loader, agg_model_output, output_dir):
+        self.evaluator.set_evaluation_parameters(self, ds_loader, agg_model_output, output_dir)
+        return self.evaluator.evaluation_results
+        
+    def evaluate_model_inference(self, ds_loader, agg_model_output, output_dir,**kwargs):
         """
         detection_object is a diction with two keys:
         "all_boxes" and "im_rotates_all"
@@ -349,8 +364,10 @@ class DatasetObject(imdb):
         with the predicted polygon.
         """
         if ds_loader is None:
+            print("[ds_obj]: ds_loader was None. we are creating one for evaluation.")
             ds_loader = self.create_data_loader(cfg,None,None)
-        self.evaluator.evaluate_detections(self,ds_loader,detection_object,output_dir)
+        self.evaluator.set_evaluation_parameters(self, ds_loader, agg_model_output, output_dir, **kwargs)
+        self.evaluator.evaluate_detections()
         if self.config['cleanup']:
             for cls in self._classes:
                 if cls == '__background__':
@@ -379,28 +396,32 @@ class DatasetObject(imdb):
         self.class_filter.check = cfg.DATASETS.FILTERS.CLASS
         self.class_filter.original_names = self._classes
         self.annoReader.class_filter = self.class_filter
-        set_name = self.imdb_str.split('-')[0]
-        self.class_filter.new_names = cfg.DATASETS.FILTERS.CLASS_INCLUSION_LIST_BY_DATASET[set_name]
-
+        set_name = self._imdb_str.split('-')[0]
+        if cfg.DATASETS.FILTERS.CLASS:
+            self.class_filter.new_names = cfg.DATASETS.FILTERS.CLASS_INCLUSION_LIST_BY_DATASET[set_name]
+        else:
+            self.class_filter.new_names = False
+    
+        
         if self.filters.class_bool:
             self.class_filter = edict()
             self.class_filter.check = True
             self.class_filter.original_names = self._classes
-            set_name = self.imdb_str.split('-')[0]
+            set_name = self._imdb_str.split('-')[0]
             self.class_filter.new_names = cfg.DATASETS.FILTERS.CLASS_INCLUSION_LIST_BY_DATASET[set_name]
 
         self.filters.empty_annotations = cfg.DATASETS.FILTERS.EMPTY_ANNOTATIONS
         self.config.subsample_bool = cfg.DATASETS.SUBSAMPLE_BOOL
         self.config.subsample_size = cfg.DATASETS.SUBSAMPLE_SIZE
 
-        loaded_payload = self.roidb_cache.load()
+        loaded_payload = self.roidb_cache.load(self.roidb_cache_fieldname)
         self.roidb_loaded = False
         if loaded_payload is None:
             gt_roidb = [self.load_annotation(index) for index in self._image_index]
             gt_roidb, image_index = self.apply_roidb_filters(gt_roidb,self._image_index)
             payload = [gt_roidb, image_index]
             self.roidb_loaded = True
-            self.roidb_cache.save(payload)
+            self.roidb_cache.save(self.roidb_cache_fieldname,payload)
         else:
             self.roidb_loaded = True
             gt_roidb, image_index = loaded_payload
@@ -471,7 +492,7 @@ class DatasetObject(imdb):
            for image in self.roidb[1:]:
                newSize = self._roidbSize[-1] + len(image['gt_classes'])
                self._roidbSize.append(newSize)
-        elif cfg.DATASETS.ANNOTATION_CLASS == "classification":
+        elif cfg.DATASETS.ANNOTATION_CLASS == "classification" or cfg.DATASETS.ANNOTATION_CLASS == "regression":
             self._roidbSize = np.arange(len(self._image_index)) + 1
         else:
             print("ERROR: the cfg.DATASETS.ANNOTATION_CLASS is not recognized.")

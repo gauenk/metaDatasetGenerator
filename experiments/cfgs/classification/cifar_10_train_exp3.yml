@@ -1,0 +1,40 @@
+EXP_DIR: classification
+TASK: "classification"
+SUBTASK: "default"
+WRITE_RESULTS: False
+CLS_PROBS: "cls_prob"
+PRUNE_NET: 0
+CROPPED_IMAGE_SIZE: 32
+REPLACE_LABELS_AFTER_AUGMENTATION_FILE: None
+DATASETS:
+   MODEL: lenet5
+   FILTERS:
+      CLASS: True
+DATASET_AUGMENTATION:
+   BOOL: True
+   N_SAMPLES: 1.0
+   SET_BY_CALLING_DATASET: True
+TRANSFORM_EACH_SAMPLE:
+   DATA:
+      BOOL: False
+      TYPE: "rotate"
+   LABEL:
+      BOOL: False
+      TYPE: "file"
+TRAIN:
+   MAX_ITERS: 28120
+   SNAPSHOT_ITERS: 703
+   BATCH_SIZE: 10
+   CLS:
+      BATCH_SIZE: 10
+   MAX_SIZE: 32
+   IMAGE_NOISE: False
+   SCALES: !!python/list [32,]
+TEST:
+   BATCH_SIZE: 1
+   SCALES: !!python/list [32,]
+   MAX_SIZE: 32
+   CREATE_ANGLE_DATASET: True
+   CLASSIFICATION:
+      TASK: "tp_fn"
+      PROPOSAL_METHOD: gt

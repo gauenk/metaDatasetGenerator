@@ -1,0 +1,33 @@
+EXP_DIR: regression
+TASK: "regression"
+SUBTASK: "default"
+WRITE_RESULTS: False
+CLS_PROBS: "cls_prob"
+PRUNE_NET: 0
+CROPPED_IMAGE_SIZE: 32
+REPLACE_LABELS_AFTER_AUGMENTATION_FILE: "angle_dataset_cifar_10_val_5k_default_cifar_10_train_default_lenet5_sgd_noImageNoise_noPrune_noDsAug_yesClassFilter2_iter_10500.npy"
+DATASETS:
+   ANNOTATION_CLASS: "regression"
+   MODEL: lenet5
+   FILTERS:
+      CLASS: True
+DATASET_AUGMENTATION:
+   BOOL: True
+   N_SAMPLES: 1.0
+TRAIN:
+   MAX_ITERS: 28120
+   SNAPSHOT_ITERS: 703
+   BATCH_SIZE: 10
+   CLS:
+      BATCH_SIZE: 10
+   MAX_SIZE: 32
+   IMAGE_NOISE: False
+   SCALES: !!python/list [32,]
+TEST:
+   BATCH_SIZE: 1
+   SCALES: !!python/list [32,]
+   MAX_SIZE: 32
+   CREATE_ANGLE_DATASET: True
+   CLASSIFICATION:
+      TASK: "tp_fn"
+      PROPOSAL_METHOD: gt

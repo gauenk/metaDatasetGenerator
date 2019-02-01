@@ -1,0 +1,29 @@
+EXP_DIR: classification
+TASK: "classification"
+SUBTASK: "default"
+WRITE_RESULTS: False
+CLS_PROBS: "cls_prob"
+PRUNE_NET: 0 #200
+CROPPED_IMAGE_SIZE: 28
+DATASETS:
+   MODEL: lenet5
+   FILTERS:
+      CLASS: True
+DATASET_AUGMENTATION:
+   BOOL: True
+   N_SAMPLES: 0.25
+TRAIN:
+   SNAPSHOT_ITERS: 2500
+   BATCH_SIZE: 10
+   CLS:
+      BATCH_SIZE: 10
+   MAX_SIZE: 28
+   IMAGE_NOISE: False
+   SCALES: !!python/list [28,]
+TEST:
+   BATCH_SIZE: 1
+   SCALES: !!python/list [28,]
+   MAX_SIZE: 28
+   CLASSIFICATION:
+      TASK: "tp_fn"
+      PROPOSAL_METHOD: gt

@@ -1,13 +1,13 @@
 power: 0.75
-snapshot_prefix: "/home/gauenk/Documents/experiments/metaDatasetGenerator/output/classification/cifar_10/cifar_10_lenet5_yesImageNoise_noPrune"
+snapshot_prefix: "/home/gauenk/Documents/experiments/metaDatasetGenerator/output/classification/cifar_10/cifar_10_train_default_lenet5_sgd_noImageNoise_noPrune_yesDsAug10-0_yesClassFilter2"
 max_iter: 100000
 base_lr: 0.01
 snapshot: 0
 momentum: 0.9
 solver_mode: GPU
-train_net: "models/mnist/lenet5/train.prototxt"
+train_net: "models/cifar_10/lenet5/train.prototxt"
 lr_policy: "inv"
 weight_decay: 0.0005
-display: 1
+display: 100
 gamma: 0.0001
 iter_size: 1

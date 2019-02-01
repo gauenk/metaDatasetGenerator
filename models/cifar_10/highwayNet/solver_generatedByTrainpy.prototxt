@@ -1,5 +1,5 @@
 power: 0.75
-snapshot_prefix: "/home/gauenk/Documents/experiments/metaDatasetGenerator/output/classification/cifar_10/cifar-10_highwayNet_sgd_noImageNoise_noPrune_noDsAug_noClassFilter"
+snapshot_prefix: "/home/gauenk/Documents/experiments/metaDatasetGenerator/output/classification/pascal_voc/pascal_voc_train_cls_highwayNet_sgd_noImageNoise_noPrune_noDsAug_noClassFilter"
 max_iter: 10000
 base_lr: 0.01
 snapshot: 0

@@ -19,7 +19,19 @@ def writePickle(fn,data):
     with open(fn,'wb') as f:
         cPickle.dump(data,f,cPickle.HIGHEST_PROTOCOL)
 
-def scaleImage(im_orig,target_size):
+def readNdarray(fn):
+    print("[readNdarray]: {} *zoom zoom*".format(fn))
+    if not osp.exists(fn):
+        print("[readNdarray]: no existing file named: {}".format(fn))
+        return None
+    ndarray = np.load(fn)
+    return ndarray
+
+def writeNdarray(fn,data):
+    print("[writeNdarray]: {} *cha-chunk*".format(fn))
+    np.save(fn,data)
+
+def scaleImageScalar(im_orig,target_size):
     x_size,y_size = im_orig.shape[0:2]
     if x_size == 0 or y_size == 0:
         print("WARNING: image's size 0 for an axis")
@@ -27,6 +39,20 @@ def scaleImage(im_orig,target_size):
     im = cv2.resize(im_orig, (target_size,target_size), interpolation=cv2.INTER_CUBIC)
     return im
 
+def scaleImageTuple(im_orig,target_size):
+    x_size,y_size = im_orig.shape[0:2]
+    if x_size == 0 or y_size == 0:
+        print("WARNING: image's size 0 for an axis")
+        return im_orig
+    im = cv2.resize(im_orig, (target_size[0],target_size[1]), interpolation=cv2.INTER_CUBIC)
+    return im
+
+def scaleImage(im_orig,target_size):
+    if hasattr(target_size, '__len__'):
+        return scaleImageTuple(im_orig,target_size)
+    else:
+        return scaleImageScalar(im_orig,target_size)
+        
 def check_list_equal_any(list_a,input_b):
     if type(input_b) is list:
         return check_list_and_list_equal_any(list_a,input_b)
@@ -111,3 +137,16 @@ def list_of_floats_to_string(list_of_floats):
 
 def compute_accuracy(truth,guess):
     return np.mean(truth == guess)
+
+def check_number_of_used_augmentation_fields(evaluation,fieldnames):
+    augmentations_in_use = {}
+    for index,fieldname in enumerate(fieldnames):
+        if 'dataset_augmentation' in fieldname:
+            inuse = len(np.unique(evaluation[:,index])) > 1
+            augmentations_in_use[fieldname] = inuse
+    number_augs_in_use = sum([inuse for aug_field,inuse in augmentations_in_use.items()])
+    print("there are {} augmentation(s) in use".format(number_augs_in_use))
+    print("the augmentation fields in use are:")
+    print(augmentations_in_use)
+    return number_augs_in_use
+

@@ -291,6 +291,15 @@ def getRawCroppedImageBlob(roidb,records,scale_inds,getCropped,**kwargs):
     return blob, im_scales
     
 def preprocess_image_for_model(im, pixel_means, target_size, max_size):
+    if type(im) is list:
+        blobs = []
+        scales = []
+        for index,img in enumerate(im):
+            blob,scale = prep_im_for_blob(img, pixel_means, target_size[index], max_size)
+            blobs.append(blob)
+            scales.append(scale)
+        return blobs,scales
+            
     return prep_im_for_blob(im, pixel_means, target_size, max_size)
 
 def prep_im_for_blob(im, pixel_means, target_size, max_size):
@@ -325,7 +334,7 @@ def prep_im_for_vae_blob(im, pixel_means, target_size, max_size):
 
     return im, im_scale
 
-def save_blob_list_to_file(blob_list,append_str_l,vis=False,size=cfg.CROPPED_IMAGE_SIZE):
+def save_blob_list_to_file(blob_list,append_str_l,vis=False,size=cfg.CROPPED_IMAGE_SIZE,infix=None):
     print("[./utils/blob.py: save_blob_list_to_file]: saving images")
     imgs = blob_list_im(blob_list)
     useAppendStr = append_str_l is not None and len(append_str_l) == imgs.shape[0]
@@ -334,16 +343,19 @@ def save_blob_list_to_file(blob_list,append_str_l,vis=False,size=cfg.CROPPED_IMA
             img[:,:,:] *= 255
         img[:size,:size,:] += cfg.PIXEL_MEANS
         img = img.astype(np.uint8)
+        fn = "save_blob_list_image"
+        if infix:
+            fn += "_{}".format(infix)
         if useAppendStr:
-            fn = "save_blob_list_image_{}_{}.png".format(idx,append_str_l[idx])
+            fn += "{}_{}.png".format(idx,append_str_l[idx])
         else:
-            fn = "save_blob_list_image_{}.png".format(idx)
+            fn = "{}.png".format(idx)
+
         if vis is False:
             cv2.imwrite(fn,img)
         else:
             plt.imshow(img[:,:,::-1])
             plt.show()
-    exit()
 
 def createInfoBlob(im_data,im_scales):
     # ensure normalization of image data
@@ -359,7 +371,15 @@ def addImageNoise(im_info):
     img += npr.randn(img.size).reshape(img.shape)/255.
     im_info['data'] = img
 
-        
+
+def siameseImagesToBlobs(imageList):
+    imageList_0 = [img[0] for img in imageList]
+    imageList_1 = [img[1] for img in imageList]
+    imageList_0 = im_list_to_blob(imageList_0) # returns blob
+    imageList_1 = im_list_to_blob(imageList_1) # returns blob
+    imageList = [imageList_0, imageList_1]
+    return imageList
+
 
 
 

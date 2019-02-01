@@ -2,351 +2,260 @@
 This evalutates classification methods
 """
 
-import os,sys
-import os.path as osp
-import PIL
 import numpy as np
-import scipy.sparse
+from easydict import EasyDict as edict
 from core.config import cfg,cfgData
 from easydict import EasyDict as edict
-from cls_utils import *
 
+from cls_utils import metrics_by_class,metrics_by_augmentation,print_evaluations,write_evaluation_to_csv,plot_rotation_by_class,plot_rotation_with_layers_angle
+from utils.misc import computeEntropyOfNumpyArray
+from cache.test_results_cache import TestResultsCache
+from utils.create_angle_dataset_utils import create_angle_dataset_from_classification_eval
 
 class classificationEvaluator(object):
     """Image database."""
 
-    def __init__(self, datasetName, classes, compID, salt, cacheDir,
-                 imageSetPath, imageIndex, annoPath,load_annotation,
-                 onlyCls=None):
-        self._datasetName = datasetName
-        self._class_convert = [classes.index(cls) for cls in classes]
-        self._classes = classes
-        self._comp_id = compID
-        self._salt = salt
-        self._cachedir = cacheDir
-        self.image_index = imageIndex
-        self._annoPath = annoPath
-        self._load_annotation = load_annotation
-        self._imageSetPath = imageSetPath
-        self._imageSet = imageSetPath.split("/")[-1].split(".")[0] # "...asdf/imageSet.txt"
-        self._onlyCls = onlyCls
-
-    def evaluate_detections(self, imdb, ds_loader, all_probs, output_dir):
-        # num_outpus = 
-        # if self._classes != num_outputs:
-        #     raise ValueError("ERROR: the classes and output size don't match!")
-        augmentations = []
-        print("# of classes: {}".format(len(all_probs)))
-        print("# of samples to eval: {}".format(len(all_probs[0])))
-        self._pathResults = output_dir
-        if cfg.SUBTASK == "tp_fn":
-            self._write_results_file(all_probs)
-            self._do_python_eval(output_dir)
-        elif cfg.SUBTASK in ["default","al_subset"]:
-            self._write_softmax_results_file(all_probs,augmentations)
-            self._do_cls_python_eval_new(imdb,ds_loader,all_probs,output_dir=output_dir)
-        else:
-            print("ERROR: cfg.SUBTASK = {} is unknown".format(cfg.SUBTASK))
-            sys.exit()
-
-    def _write_softmax_results_file(self, all_probs,augmentations):
-        filename = self._get_results_file_template().format("all")
-        print(filename)
-        max_indices = np.argmax(all_probs,axis=0)
-        max_values = np.max(all_probs,axis=0)
-        with open(filename, 'wt') as f:
-            if len(augmentations) == 0:
-                for image_index,max_index,max_value in zip(self.image_index,max_indices,max_values):
-                    f.write('{:s} {:d} {:.3f}\n'.format(image_index,max_index,max_value))
-            else:
-                n_augmentations = len(augmentations[0])
-                n_samples = n_augmentations * len(self.image_index)
-                for index,max_index,max_value in zip(range(n_samples),max_indices,max_values):
-                    sample_index = index // n_augmentations
-                    aug_index = index % n_augmentations
-                    image_index = self.image_index[sample_index]
-                    f.write('{:s} {:d} {:d} {:.3f}\n'.format(image_index,aug_index,max_index,max_value))
-
-    def _write_results_file(self, all_probs):
-        for cls_ind, cls in enumerate(self._classes):
-            count = 0
-            skip_count = 0
-            det_count = 0
-            if cls == '__background__':
-                continue
-            print('Writing {} {} results file'.format(cls,self._datasetName))
-            filename = self._get_results_file_template().format(cls)
-            print(filename)
-            with open(filename, 'wt') as f:
-                for im_ind, index in enumerate(self.image_index):
-                    if cfg._DEBUG.datasets.evaluators.bboxEvaluator: print(im_ind,index)
-                    probs = all_probs[cls_ind][im_ind]
-                    f.write('{:s}'.format(index))
-                    if type(probs) is float or type(probs) is int:
-                        f.write(' {:.3f}\n'.format(probs))
-                    else:
-                        for k in xrange(probs.shape[0]):
-                            f.write(' {:.3f}'.format(probs[k]))
-                        f.write('\n')
-
-    def _do_cls_python_eval_new(self,imdb, ds_loader,all_probs,output_dir='output'):
-        self.cls_eval_all(imdb,ds_loader,all_probs,output_dir)
-        
-    def _do_cls_python_eval(self, dataset_augmentations = [], output_dir = 'output',rotations = None):
-        annopath = self._annoPath + "/{:s}"
-        aps = []
-        # The PASCAL VOC metric changed in 2010
-        use_07_metric = False
-        print('VOC07 metric? ' + ('Yes' if use_07_metric else 'No'))
-        cls = "all"
-        detfile = self._get_results_file_template().format(cls)
-        suffix = self._get_experiment_suffix_template().format(cls)
-        acc, rec, prec, ovthresh = self.cls_eval_by_class(
-            detfile, annopath, self._imageSetPath, cls, self._cachedir, suffix, \
-            ovthresh=0.5, use_07_metric=use_07_metric, rotations = rotations,
-            dataset_augmentations=dataset_augmentations,class_convert=self._class_convert)
-        print("\n\n\n\n\n")
-        print("IDK what to do from here")
-        print("\n\n\n\n\n")
-        sys.exit()
-        infix = "faster-rcnn"
-        if cfgData.MODEL:
-            infix = cfgData.MODEL
-        if cfg.IMAGE_ROTATE != -1:
-            infix += "_{}".format(cfg.IMAGE_ROTATE)
-        results_filename = "./results_{}_{}_{}.txt".format(infix,self._datasetName, self._salt)
-        results_fd = open(results_filename,"w")
-        for kdx in range(len(ovthresh)):
-            #print('{0:.3f}@{1:.2f}'.format(ap[kdx],ovthresh[kdx]))
-            print('Mean AP = {:.4f} @ {:.2f}'.format(np.mean(aps[:,kdx]),ovthresh[kdx]))
-        print('~~~~~~~~')
-        print('Results:')
-        count_ = 1
-        sys.stdout.write('{0:>15} (#):'.format("class AP"))
-        results_fd.write('{0:>15} (#):'.format("class AP"))
-        for thsh in ovthresh:
-            sys.stdout.write("\t{:>5}{:.3f}".format("@",thsh))
-            results_fd.write("\t{:>5}{:.3f}".format("@",thsh))
-        sys.stdout.write("\n")
-        results_fd.write("\n")
-        for ap in aps:
-            sys.stdout.write('{:>15} ({}):'.format(self._classes[count_],count_))
-            results_fd.write('{:>15} ({}):'.format(self._classes[count_],count_))
-            for kdx in range(len(ovthresh)):
-                sys.stdout.write('\t{0:>10.5f}'.format(ap[kdx],ovthresh[kdx]))
-                results_fd.write('\t{0:>10.5f}'.format(ap[kdx],ovthresh[kdx]))
-            sys.stdout.write('\n')
-            results_fd.write('\n')
-            count_ +=1
-        sys.stdout.write('{:>15}:'.format("mAP"))
-        results_fd.write('{:>15}:'.format("mAP"))
-        for kdx in range(len(ovthresh)):
-            sys.stdout.write('\t{:10.5f}'.format(np.mean(aps[:,kdx])))
-            results_fd.write('\t{:10.5f}'.format(np.mean(aps[:,kdx])))
-            #print('{0:.3f}@{1:.2f}'.format(ap[kdx],ovthresh[kdx]))
-            #print('mAP @ {:.2f}: {:.5f} '.format(ovthresh[kdx],np.mean(aps[:,kdx])))
-        sys.stdout.write('\n')
-        results_fd.write('\n')
-        print('~~~~~~~~')
-        print('')
-        print('--------------------------------------------------------------')
-        print('Results computed with the **unofficial** Python eval code.')
-        print('--------------------------------------------------------------')
-        print('')
-        results_fd.close()
-        print(results_filename)
-        # remove the results since I don't know how to "not write" with the results_fd variable.
-        if not cfg.WRITE_RESULTS: os.remove(results_filename)
-        
-    def _do_python_eval(self, output_dir = 'output',rotations = None):
-        annopath = self._annoPath + "/{:s}"
-        aps = []
-        # The PASCAL VOC metric changed in 2010
-        use_07_metric = False
-        print('VOC07 metric? ' + ('Yes' if use_07_metric else 'No'))
-        if not osp.isdir(output_dir):
-            os.mkdir(output_dir)
-        for i, cls in enumerate(self._classes):
-            if cls == '__background__':
-                continue
-            if self._onlyCls is not None and cls != self._onlyCls:
-                continue
-            detfile = self._get_results_file_template().format(cls)
-            suffix = self._get_experiment_suffix_template().format(cls)
-            rec, prec, ap, ovthresh = self.cls_eval_by_class(
-                detfile, annopath, self._imageSetPath, cls, self._cachedir, suffix, \
-                ovthresh=0.5, use_07_metric=use_07_metric, rotations = rotations,
-                class_convert=self._class_convert)
-            aps += [ap]
-        aps = np.array(aps)
-        infix = "faster-rcnn"
-        if cfgData.MODEL:
-            infix = cfgData.MODEL
-        if cfg.IMAGE_ROTATE != -1:
-            infix += "_{}".format(cfg.IMAGE_ROTATE)
-        results_filename = "./results_{}_{}_{}.txt".format(infix,self._datasetName, self._salt)
-        results_fd = open(results_filename,"w")
-        for kdx in range(len(ovthresh)):
-            #print('{0:.3f}@{1:.2f}'.format(ap[kdx],ovthresh[kdx]))
-            print('Mean AP = {:.4f} @ {:.2f}'.format(np.mean(aps[:,kdx]),ovthresh[kdx]))
-        print('~~~~~~~~')
-        print('Results:')
-        count_ = 1
-        sys.stdout.write('{0:>15} (#):'.format("class AP"))
-        results_fd.write('{0:>15} (#):'.format("class AP"))
-        for thsh in ovthresh:
-            sys.stdout.write("\t{:>5}{:.3f}".format("@",thsh))
-            results_fd.write("\t{:>5}{:.3f}".format("@",thsh))
-        sys.stdout.write("\n")
-        results_fd.write("\n")
-        for ap in aps:
-            sys.stdout.write('{:>15} ({}):'.format(self._classes[count_],count_))
-            results_fd.write('{:>15} ({}):'.format(self._classes[count_],count_))
-            for kdx in range(len(ovthresh)):
-                sys.stdout.write('\t{0:>10.5f}'.format(ap[kdx],ovthresh[kdx]))
-                results_fd.write('\t{0:>10.5f}'.format(ap[kdx],ovthresh[kdx]))
-            sys.stdout.write('\n')
-            results_fd.write('\n')
-            count_ +=1
-        sys.stdout.write('{:>15}:'.format("mAP"))
-        results_fd.write('{:>15}:'.format("mAP"))
-        for kdx in range(len(ovthresh)):
-            sys.stdout.write('\t{:10.5f}'.format(np.mean(aps[:,kdx])))
-            results_fd.write('\t{:10.5f}'.format(np.mean(aps[:,kdx])))
-            #print('{0:.3f}@{1:.2f}'.format(ap[kdx],ovthresh[kdx]))
-            #print('mAP @ {:.2f}: {:.5f} '.format(ovthresh[kdx],np.mean(aps[:,kdx])))
-        sys.stdout.write('\n')
-        results_fd.write('\n')
-        print('~~~~~~~~')
-        print('')
-        print('--------------------------------------------------------------')
-        print('Results computed with the **unofficial** Python eval code.')
-        print('--------------------------------------------------------------')
-        print('')
-        results_fd.close()
-
-        # remove the results since I don't know how to "not write" with the results_fd variable.
-        if not cfg.WRITE_RESULTS: os.remove(results_filename)
-
-    def _get_results_file_template(self):
-        # example: VOCdevkit/results/VOC2007/Main/<comp_id>_det_test_aeroplane.txt
-        filename = self._comp_id + "_" + self._get_experiment_suffix_template() + ".txt"
-        path = osp.join(self._pathResults,filename)
-        return path
-
-    def _get_experiment_suffix_template(self):
-        return 'cls_{:s}'
-
-    def cls_eval_all(self,imdb,ds_loader,all_probs,output_dir):
-        guess_probs = np.zeros(ds_loader.num_samples)
-        guess_classes = np.argmax(all_probs,axis=0)
-        correct_by_class = np.zeros((2,ds_loader.num_samples),dtype=np.int8)
-        for _,_,sample,index in ds_loader.dataset_generator(imdb.data_loader_config,load_image=False):
-            guess_class_index = guess_classes[index]
-            guess_probs[index] = all_probs[guess_class_index][index]
-            guess_prob = guess_probs[index]
-            gt_class_index = sample['gt_classes'][0]
-            print(gt_class_index,guess_class_index,guess_prob)
-            correct_by_class[0,index] = gt_class_index
-            correct_by_class[1,index] = guess_class_index == gt_class_index
-
-        print("overall accuracy: {}".format(np.mean(correct_by_class[1,:])))
-        for class_index in range(imdb.num_classes):
-            class_name = imdb.classes[class_index]
-            class_indices = np.where(correct_by_class[0,:] == class_index)[0]
-            num_samples_of_class = len(class_indices)
-            class_acc = np.mean(correct_by_class[1,class_indices])
-            print("{}: acc({}) #samples({})".format(class_name,class_acc,num_samples_of_class))
+    def __init__(self):
+        self.imdb = None
+        self.ds_loader = None
+        self.output_dir = None
+        self.save_cache = None
+        self.agg_model_output = None
 
 
-    def cls_eval_by_class(self,detpath,
-                  annopath,
-                  imagesetfile,
-                  classname,
-                  cachedir,
-                  suffix,
-                  dataset_augmentations = [],
-                  ovthresh=0.5,
-                  use_07_metric=False,
-                  rotations = None,
-                  class_convert = []):
-        """rec, prec, ap = bbox_eval(detpath,
-                                    annopath,
-                                    imagesetfile,
-                                    classname,
-                                    [ovthresh],
-                                    [use_07_metric])
-        Top level function that does the BBOX evaluation.
-        detpath: Path to detections
-            detpath.format(classname) should produce the detection results file.
-        annopath: Path to annotations
-            annopath.format(imagename) should be the xml annotations file.
-        imagesetfile: Text file containing the list of images, one image per line.
-        classname: Category name (duh)
-        cachedir: Directory for caching the annotations
-        [ovthresh]: Overlap threshold (default = 0.5)
-        [use_07_metric]: Whether to use BBOX07's 11 point AP computation
-            (default False)
+    def set_evaluation_parameters(self, imdb, ds_loader, agg_model_output, output_dir, **kwargs):
+        self.imdb = imdb
+        self.ds_loader = ds_loader
+        self.agg_model_output = agg_model_output
+        self.output_dir = output_dir
+        self.save_cache = TestResultsCache(output_dir,cfg,imdb.config,None,'evaluate_classification')
+        evaluation_results = None #self.save_cache.load()
+        self.evaluation_results = evaluation_results
+        self.other_information = {}
+        if kwargs is not None:
+            for key,value in kwargs.items():
+                self.other_information[key] = value
+
+    def evaluate_detections(self):
+        print("# of classes: {}".format(self.imdb.num_classes))
+        print("# of samples to eval: {}".format(self.ds_loader.num_samples))
+
+        if self.evaluation_results is None:
+            evaluation_results = self.format_model_outputs()
+            self.save_cache.save(evaluation_results)
+            self.evaluation_results = evaluation_results
+        self.create_report(self.evaluation_results)
+
+    def format_model_outputs(self):
+        version = "v1"
+        if version == "v1":
+            return self.format_model_outputs_version1()
+        elif version == "v2":
+            return self.format_model_outputs_version2()
+
+    def format_model_outputs_version1(self):
+        # extract relevant variables
+        imdb = self.imdb
+        ds_loader = self.ds_loader
+        agg_model_output = self.agg_model_output
+        output_dir = self.output_dir
+        model_outputs = agg_model_output.results
+        guessed_classes = np.argmax(model_outputs,axis=0)
+        data_augmentations = ds_loader.dataset_augmentation.configs
+
+        # [primiary results] 1st: class, 2nd: dataset augmentation, (3rd to last): guessing class index, (2nd to last): confidence, (last): correct bool
         """
-        # assumes detections are in detpath.format(classname)
-        # assumes annotations are in annopath.format(imagename)
-        # assumes imagesetfile is a text file with each line an image name
-        # cachedir caches the annotations in a pickle file
+        [results ordering]:
+        0.) confidence
+        1.) guessed class
+        2.) groundtruth class
+        3.) correct_bool
+        4-9.) dataset augmentation
+        """
+        field_names_in_order = ['confidence','guessed_class','gt_class','correct','dataset_augmentation_flip','dataset_augmentation_translate_step',
+                                'dataset_augmentation_translate_direction','dataset_augmentation_rotate_angle','dataset_augmentation_crop_step']
+        number_of_fields = len(field_names_in_order)
+        info_by_field = np.zeros((ds_loader.num_samples,number_of_fields),dtype=np.float32)
 
-        # first load gt
-        imagenames, annos = load_groundTruth(classname,cachedir,imagesetfile,annopath,
-                                             self._load_annotation,self._classes)
+        # main eval loop
+        for _,_,sample,index in ds_loader.dataset_generator(imdb.data_loader_config,load_image=False):
+            gt_class_index = sample['gt_classes'][0]
+            guessed_class_index = guessed_classes[index]
+            confidence = model_outputs[guessed_class_index][index]
+            correct_bool = guessed_class_index == gt_class_index
+            info_by_field[index,0] = confidence
+            info_by_field[index,1] = guessed_class_index
+            info_by_field[index,2] = gt_class_index
+            info_by_field[index,3] = correct_bool
+            # dataset augmentations
+            if sample['aug_index'] == -1:
+                info_by_field[index,4:] = 0
+            else:
+                augmentation = data_augmentations[sample['aug_index']]
+                info_by_field[index,4] = int(augmentation[0]['flip'])
+                info_by_field[index,5] = int(augmentation[1]['step'])
+                info_by_field[index,6] = int(augmentation[1]['direction'])
+                info_by_field[index,7] = float(augmentation[2]['angle'])
+                info_by_field[index,8] = float(augmentation[3]['step'])
 
-        # extract gt objects for this class
-        imagenames, gt_class_probs, npos, nneg = extractClassGroundTruth(imagenames,annos,classname)
-        print("npos: {}".format(npos))
-        print("nneg: {}".format(nneg))
+            print(gt_class_index,guessed_class_index,confidence)
+
+        analysis = {'info_by_field':info_by_field,'field_names_in_order':field_names_in_order}
+        return analysis
         
-        gt_image_ids = imagenames
-        # read dets from model
-        image_ids, model_probs = loadModelCls(detpath,classname,dataset_augmentations)
+    def format_model_outputs_version2(self):
+        # extract relevant variables
+        imdb = self.imdb
+        classes = imdb.classes
+        ds_loader = self.ds_loader
+        agg_model_output = self.agg_model_output
+        output_dir = self.output_dir
+        model_outputs = np.array(agg_model_output.results)
+        guessed_classes = np.argmax(model_outputs,axis=0)
+        data_augmentations = ds_loader.dataset_augmentation.configs
 
-        # number of detections (nd) from the model
-        nd = len(image_ids)
-        print("# of detections",nd)
+        # [primiary results] 1st: class, 2nd: dataset augmentation, (3rd to last): guessing class index, (2nd to last): confidence, (last): correct bool
+        """
+        [results ordering]:
+        0.) ordered confidence (descending by value)
+        1.) guessed class (descending by confidence value)
+        2.) groundtruth class
+        3.) correct_bool
+        4-9.) dataset augmentation
+        """
+        field_names_in_order_skip_to_2 = ['gt_class','correct','dataset_augmentation_flip','dataset_augmentation_translate_step',
+                                          'dataset_augmentation_translate_direction','dataset_augmentation_rotate_angle','dataset_augmentation_crop_step']
+        number_of_fields = len(field_names_in_order) + 2 * len(classes)
+        info_by_field = np.zeros((ds_loader.num_samples,number_of_fields),dtype=np.float32)
 
-        ovthresh = [0.5,0.75,0.95]
-        tp, tn, fp, fn = compute_metrics(ovthresh,image_ids,model_probs,gt_class_probs,len(self._classes),class_convert)
-        # print(np.sum(tp))
-        n_tp = np.sum(tp,axis=0)
-        n_tn = np.sum(tn,axis=0)
-        n_fp = np.sum(fp,axis=0)
-        n_fn = np.sum(fn,axis=0)
-        tpr = n_tp / (n_tp + n_fn)
-        tnr = n_tn / (n_tn + n_fp)
-        ppv = n_tp / (n_tp + n_fp)
-        npv = n_tn / (n_tn + n_fn)
-        fpr = n_fp / (n_fp + n_tn)
-        fnr = n_fn / (n_fn + n_tp)
-        print("n_tp",n_tp)
-        print("n_tn",n_tn)
-        print("n_fp",n_fp)
-        print("n_fn",n_fn)
-        print("----------------------------------------------")
-        print("tpr",tpr)
-        print("tnr",tnr)
-        print("----------------------------------------------")
-        print("ppv",ppv)
-        print("npv",npv)
-        print("----------------------------------------------")
-        print("fpr",fpr)
-        print("fnr",fnr)
-        print("----------------------------------------------")
+        # main eval loop
+        print(model_outputs.shape)
+        exit()
+        for _,_,sample,index in ds_loader.dataset_generator(imdb.data_loader_config,load_image=False):
+            gt_class_index = sample['gt_classes'][0]
+            confidence_across_classes = model_outputs[:,index]
+            # guessed_classes = np.argsort(confidence_across_classes)
+            # confidence = confidence_across_classes[guessed_classes,index]
+            guessed_class_index = guessed_classes[index]
+            correct_bool = guessed_class_index == gt_class_index
+            info_by_field[index,0] = confidence
+            info_by_field[index,1] = guessed_class_index
+            info_by_field[index,2] = gt_class_index
+            info_by_field[index,3] = correct_bool
+            # dataset augmentations
+            if sample['aug_index'] == -1:
+                info_by_field[index,4:] = 0
+            else:
+                augmentation = data_augmentations[sample['aug_index']]
+                info_by_field[index,4] = int(augmentation[0]['flip'])
+                info_by_field[index,5] = int(augmentation[1]['step'])
+                info_by_field[index,6] = int(augmentation[1]['direction'])
+                info_by_field[index,7] = float(augmentation[2]['angle'])
+                info_by_field[index,8] = float(augmentation[3]['step'])
 
-        if cfg._DEBUG.datasets.evaluators.bboxEvaluator: print(rec,prec)
-        print("TODO: what do return?")
-        return tp,tn,fp,fn
+            print(gt_class_index,guessed_class_index,confidence)
+
+        analysis = {'info_by_field':info_by_field,'field_names_in_order':field_names_in_order}
+        return analysis
+
+    def get_array_by_fieldname(ndarray,fieldnames,field_name):
+        field_index = fieldnames.index(field_name)
+        return ndarray[:,field_index]
+
+    def create_report(self,analysis_results):
+        # extract relevant variables
+        imdb = self.imdb
+        ds_loader = self.ds_loader
+        agg_model_output = self.agg_model_output
+        output_dir = self.output_dir
+        info_by_field = analysis_results['info_by_field']
+        field_names_in_order = analysis_results['field_names_in_order']
+        augmentations = ds_loader.dataset_augmentation.configs
+
+        # print overall accuracy
+        accuracy = np.mean(info_by_field[:,3])
+        entropy = computeEntropyOfNumpyArray(info_by_field[:,0])
+        print("overall (accuracy: {}) (entropy: {})".format(accuracy,entropy))
+
+        evaluation = edict()
+        evaluation.data = edict()
+        evaluation.data.accuracy = accuracy
+        evaluation.data.entropy = entropy
+
+        evaluation.classes = edict()
+        metrics_by_class(info_by_field,evaluation.classes,imdb.classes,augmentations)
+
+        # evaluation.augmentation = edict()
+        # metrics_by_augmentation(info_by_field,evaluation.augmentation,augmentations)
+
+        
+        csv_information = edict()
+        csv_information.augmentation_info = edict()
+        csv_information.augmentation_info.data_order = ['accuracy','entropy']
+        csv_information.augmentation_info.configs = augmentations
+
+        augmentation_names =  ['flip','translate','rotate','crop',]
+        csv_information.augmentation_info.config_order = augmentation_names
+        print(csv_information.augmentation_info.config_order)
+        for name,value in zip(augmentation_names,augmentations[0]):
+            print(name,value)
+            csv_information.augmentation_info[name] = edict()
+            csv_information.augmentation_info[name].config_order = value.keys()
+        print(csv_information)
+
+        net_name = agg_model_output.save_cache.test_cache_config.modelInfo.name
+        write_evaluation_to_csv(evaluation,csv_information)
+        angles = sorted(cfg.DATASET_AUGMENTATION.IMAGE_ROTATE)
+        plot_rotation_by_class(info_by_field,imdb.classes,angles,net_name)
+        print(self.other_information['activations'].agg_obj.keys())
+        if 'activations' in self.other_information.keys():
+            aggActivations = self.other_information['activations']
+            if 'warp_angle' in aggActivations.agg_obj.keys():
+                plot_rotation_with_layers_angle(info_by_field,aggActivations,angles,imdb.classes)
+        #print_evaluations(evaluation)
+
+        if cfg.TEST.CREATE_ANGLE_DATASET:
+            savename = "angle_dataset_" + imdb.imdb_str + "_" + agg_model_output.save_cache.test_cache_config.modelInfo.name
+            optim_angles = create_angle_dataset_from_classification_eval(info_by_field,field_names_in_order,savename)
+            print(optim_angles[:10])
+        exit()
 
 
+        # print("-"*50)
+        # print("---> results by class <---")
+        # class_field_index = field_names_in_order.index("class")
+        # self.print_results_by_class(imdb,info_by_field,class_field_index)
+        # print("-"*50)
 
+        # print("-"*50)
+        # print("---> results by dataset augmentation <---")
+        # aug_field_index = field_names_in_order.index('dataset_augmentation')
+        # self.print_results_by_augmentation(imdb,ds_loader,info_by_field,aug_field_index,class_field_index,print_by_class=False)
+        # print("-"*50)
 
+        # print("-"*50)
+        # print("---> results by dataset augmentation by class <---")
+        # aug_field_index = field_names_in_order.index('dataset_augmentation')
+        # self.print_results_by_augmentation(imdb,ds_loader,info_by_field,aug_field_index,class_field_index,print_by_class=True)
+        # print("-"*50)
+        
+    def print_results_by_augmentation(self,imdb,ds_loader,info_by_field,aug_field_index,class_field_index,print_by_class=False):
+        for aug_index in range(-1,ds_loader.dataset_augmentation.size):
+            if aug_index == -1:
+                aug_info = "no augmentation"
+            else:
+                aug_info = ds_loader.dataset_augmentation.configs[aug_index]
+            aug_indices = np.where(info_by_field[aug_field_index,:] == aug_index)[0]
+            num_samples_of_aug = len(aug_indices)
+            if num_samples_of_aug > 0:
+                aug_acc = np.mean(info_by_field[-1,aug_indices])
+            else:
+                aug_acc = '-'
+            if print_by_class is False:
+                print("{}: acc({}) #samples({})".format(aug_info,aug_acc,num_samples_of_aug))
+            else:
+                print("--> [overall] {}: acc({}) #samples({}) <--".format(aug_info,aug_acc,num_samples_of_aug))
+                info_by_field_by_class = info_by_field[:,aug_indices]
+                self.print_results_by_class(imdb,info_by_field_by_class,class_field_index)
 
-
-
-
-
+        

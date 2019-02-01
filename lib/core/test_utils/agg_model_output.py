@@ -16,49 +16,66 @@ class aggregateModelOutput():
         self.results = None
         self.det_file = None
         self.save_key = None
-        self.init_results_obj(imdb,output_dir) # sets above variables
-        self.classes = imdb.classes
         self.num_classes = imdb.num_classes
+        self.init_results_obj(output_dir) # sets above variables
+        self.classes = imdb.classes
         self.max_dets_per_image = max_dets_per_image
-        root_dir = output_dir
-        self.save_cache = TestResultsCache(output_dir,None,cfg,imdb.config)
+        self.save_cache = TestResultsCache(output_dir,cfg,imdb.config,None,'agg_model_output')
 
-    def init_results_obj(self,imdb,output_dir):
+    def init_results_obj(self,output_dir):
         if self.task == 'object_detection':
             all_boxes = [[[] for _ in xrange(self.num_samples)]
-                         for _ in xrange(imdb.num_classes)]
+                         for _ in xrange(self.num_classes)]
             self.results = all_boxes
             self.det_file = os.path.join(output_dir, 'probs.pkl')
             self.save_key = 'all_boxes'
         elif self.task == 'classification':
             all_probs = [[-1 for _ in xrange(self.num_samples)]
-                         for _ in xrange(imdb.num_classes)]
+                         for _ in xrange(self.num_classes)]
             self.results = all_probs
             self.det_file = os.path.join(output_dir, 'probs.pkl')
             self.save_key = 'all_probs'
+        elif self.task == 'regression':
+            all_estimates = [None for _ in xrange(self.num_samples)]
+            self.results = all_estimates
+            self.det_file = os.path.join(output_dir, 'regression.pkl')
+            self.save_key = 'all_probs'
         else:
             raise ValueError("unknown task [agg_model_output.py]: {}".format(self.task))
+
+    def clear(self):
+        if self.task == 'object_detection':
+            all_boxes = [[[] for _ in xrange(self.num_samples)]
+                         for _ in xrange(self.num_classes)]
+            self.results = all_boxes
+        elif self.task == 'classification':
+            all_probs = [[-1 for _ in xrange(self.num_samples)]
+                         for _ in xrange(self.num_classes)]
+            self.results = all_probs
+        elif self.task == 'regression':
+            all_estimates = [[] for _ in xrange(self.num_samples)]
+            self.results = all_estimates
+        else:
+            raise ValueError("unknown task [agg_model_output.py]: {}".format(self.task))            
 
     def aggregate(self,model_output,sample_index):
         if self.task == 'object_detection':
             self.aggregateDetections(model_output,sample_index)
         elif self.task == 'classification':
             self.aggregateClassification(model_output['scores'],sample_index)
+        elif self.task == 'regression':
+            self.aggregateRegression(model_output['scores'],sample_index)
         else:
             raise ValueError("unknown task [agg_model_output.py]: {}".format(self.task))
 
     def load(self):
-        return self.save_cache.load()
+        results = self.save_cache.load()
+        if results is not None:
+            self.results = results
+        return results
 
-    def save(self,transformation_list):
-        print(len(self.results))
+    def save(self):
         self.save_cache.save(self.results)
-        # save_dict = {}
-        # self.save_cache
-        # save_dict[self.save_key] = self.results
-        # save_dict['transformations'] = transformation_list
-        # with open(self.det_file, 'wb') as f:
-        #     cPickle.dump(save_dict, f, cPickle.HIGHEST_PROTOCOL)
 
     def aggregateClassification(self,scores,sample_index):
         # handle special case
@@ -96,6 +113,9 @@ class aggregateModelOutput():
                 for class_index in xrange(1, self.num_classes):
                     keep = np.where(self.results[class_index][sample_index][:, -1] >= image_thresh)[0]
                     self.results[class_index][sample_index] = self.results[class_index][sample_index][keep, :]
+
+    def aggregateRegression(self,regression_values,sample_index):
+        self.results[sample_index] = regression_values[0][0]
 
     def visualizeCheck(self,vis_override):
         if vis_override is True:

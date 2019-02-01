@@ -16,7 +16,7 @@ Most tools in $ROOT/tools take a --cfg option to specify an override file.
     - See experiments/cfgs/*.yml for example YAML config override files
 """
 
-import os,pickle
+import os,pickle,uuid
 import os.path as osp
 import numpy as np
 from easydict import EasyDict as edict
@@ -48,6 +48,7 @@ __C.TEST_NET.DEF_PATH = ""
 
 
 cfg.modelInfo = edict()
+cfg.MODEL_NAME_APPEND_STRING = None
 
 #
 # Global Input Options
@@ -55,6 +56,10 @@ cfg.modelInfo = edict()
 
 __C.INPUT_DATA = edict()
 __C.INPUT_DATA.BIJECTION = None
+
+__C.WARP_AFFINE = edict()
+__C.WARP_AFFINE.BOOL = True
+__C.WARP_AFFINE.PRETRAIN = False
 
 #
 # Training options
@@ -197,6 +202,8 @@ __C.TRAIN.AL_CLS.BALANCE_CLASSES = True
 #__C.TRAIN.AL_CLS.LAYERS = ['conv5_1','conv4_3']
 __C.TRAIN.AL_CLS.LAYERS = ['conv1','conv2','ip1','cls_score']
 
+__C.REPLACE_LABELS_AFTER_AUGMENTATION_FILE = None
+
 
 #
 # Testing options
@@ -266,6 +273,8 @@ __C.TEST.AL_CLS.LAYERS =  ['conv1','conv2','ip1','cls_score']
 __C.TEST.INPUTS = edict()
 __C.TEST.INPUTS.IM_INFO = False
 __C.TEST.INPUTS.RESHAPE = True
+
+__C.TEST.CREATE_ANGLE_DATASET = False
 
 
 #
@@ -354,7 +363,7 @@ __C.OBJ_DET.BBOX_VERBOSE = True
 __C.MIXED_DATASET_SIZES = [50,1000,5000]
 
 # The size of the input for images cropped to their annotations
-__C.CROPPED_IMAGE_SIZE = 227
+__C.CROPPED_IMAGE_SIZE = 32
 
 # The size of the input for raw images
 __C.RAW_IMAGE_SIZE = 300
@@ -365,6 +374,10 @@ __C.AL_IMAGE_SIZE = 28
 # The size of the input for activations
 __C.AV_IMAGE_SIZE = 400
 __C.AV_COLOR_CHANNEL = 4
+
+# actual image size for input data
+cfg.IMAGE_SIZE = [cfg.CROPPED_IMAGE_SIZE,cfg.CROPPED_IMAGE_SIZE]
+cfg.SIAMESE_IMAGE_SIZE = cfg.IMAGE_SIZE
 
 # the size of the 
 __C.CONFIG_DATASET_INDEX_DICTIONARY_PATH = "default_dataset_index.yml"
@@ -406,24 +419,44 @@ __C.CLS_PROBS = "cls_prob"
 # how to loadImage during testing
 __C.LOAD_METHOD = None
 
-def GET_SAVE_ACTIVITY_VECTOR_BLOBS_DIR():
-    dirn = "./output/activity_vectors/{}/{}-{}-{}/".format(__C.EXP_DIR.replace("/",""),cfg.DATASETS.CALLING_DATASET_NAME,cfg.DATASETS.CALLING_IMAGESET_NAME,cfg.DATASETS.CALLING_CONFIG)
+def saveExperimentConfig():
+    import yaml
+    uuid_str = str(uuid.uuid4())
+    filename = "./output/experiment_cfgs/{}.yml".format(uuid_str)
+    with open(filename, 'w') as f:
+        yaml_str = yaml.dump(cfg)
+        f.write(yaml_str)
+    print("saved experiment config to {}".format(filename))
+
+def GET_SAVE_ACTIVITY_VECTOR_BLOBS_DIR(exp_dir=None):
+    if exp_dir is None:
+        dirn = "./output/activations/{}/{}-{}-{}/".format(__C.EXP_DIR.replace("/",""),cfg.DATASETS.CALLING_DATASET_NAME,cfg.DATASETS.CALLING_IMAGESET_NAME,cfg.DATASETS.CALLING_CONFIG)
+    else:
+        dirn = "./output/activations/{}/{}-{}-{}/".format(exp_dir,cfg.DATASETS.CALLING_DATASET_NAME,cfg.DATASETS.CALLING_IMAGESET_NAME,cfg.DATASETS.CALLING_CONFIG)
     if not osp.exists(dirn):
         os.makedirs(dirn)
     return dirn
 
 # used for saving activity vectors
-__C.ACTIVATION_VALUES = edict()
-__C.ACTIVATION_VALUES.SAVE_BOOL = False
-__C.ACTIVATION_VALUES.LAYER_NAMES = ['conv1','conv2','ip1','cls_score','cls_prob']
-__C.ACTIVATION_VALUES.SAVE_DIR = GET_SAVE_ACTIVITY_VECTOR_BLOBS_DIR
-__C.ACTIVATION_VALUES.SAVE_OBJ = 'order' # 'image_id','order'
-__C.GET_SAVE_ACTIVITY_VECTOR_BLOBS_DIR = GET_SAVE_ACTIVITY_VECTOR_BLOBS_DIR
-# __C.SAVE_ACTIVITY_VECTOR_BLOBS = [] # the list of blobs to save
-__C.SAVE_ACTIVITY_VECTOR_BLOBS = ['conv1','conv2','ip1','cls_score','cls_prob']
-__C.SAVE_ACTIVITY_VECTOR_BLOBS_WITH_KEYS = False
+__C.ACTIVATIONS = edict()
+__C.ACTIVATIONS.SAVE_BOOL = False
+#__C.ACTIVATIONS.LAYER_NAMES = ['conv1','conv2','ip1','cls_score','cls_prob']
+#__C.ACTIVATIONS.LAYER_NAMES = ['warp_angle']
+__C.ACTIVATIONS.LAYER_NAMES = []
+__C.ACTIVATIONS.GET_SAVE_DIR = GET_SAVE_ACTIVITY_VECTOR_BLOBS_DIR
+__C.ACTIVATIONS.SAVE_OBJ = 'order' # 'image_id','order'
+#__C.ACTIVATIONS.INPUT_SIZE = [84,84,3] # not need to only have 3 channels, but we can for now
+__C.ACTIVATIONS.CACHE_ID = None #for agg_activation cache; each layer gets its own id
+__C.CACHE.DATA.ACTIVATION = None
+
+
+# __C.GET_SAVE_ACTIVITY_VECTOR_BLOBS_DIR = GET_SAVE_ACTIVITY_VECTOR_BLOBS_DIR
+# # __C.SAVE_ACTIVITY_VECTOR_BLOBS = [] # the list of blobs to save
+# __C.SAVE_ACTIVITY_VECTOR_BLOBS = __C.ACTIVATION_VALUES.LAYER_NAMES #['conv1','conv2','ip1','cls_score','cls_prob']
+# __C.SAVE_ACTIVITY_VECTOR_BLOBS_WITH_KEYS = False
+
 __C.TP_FN_RECORDS_WITH_KEYS = False
-__C.ACTIVATION_VALUES.FOR_CACHE = [cfg.ACTIVATION_VALUES.LAYER_NAMES,cfg.ACTIVATION_VALUES.SAVE_DIR,cfg.ACTIVATION_VALUES.SAVE_OBJ,cfg.SAVE_ACTIVITY_VECTOR_BLOBS,cfg.SAVE_ACTIVITY_VECTOR_BLOBS_WITH_KEYS]
+#__C.ACTIVATION_VALUES.FOR_CACHE = [cfg.ACTIVATION_VALUES.LAYER_NAMES,cfg.ACTIVATION_VALUES.SAVE_DIR,cfg.ACTIVATION_VALUES.SAVE_OBJ,cfg.SAVE_ACTIVITY_VECTOR_BLOBS,cfg.SAVE_ACTIVITY_VECTOR_BLOBS_WITH_KEYS]
 # Active Learning Settings
 __C.ACTIVE_LEARNING = edict()
 __C.ACTIVE_LEARNING.N_ITERS = 11000
@@ -442,6 +475,50 @@ __C.TRAIN.IMAGE_NOISE = False
 __C.TEST.IMAGE_NOISE = False
 __C.IMAGE_NOISE = False
 
+__C.TRAIN.MAX_ITERS = None
+
+#
+# applying a single random rotation to each input sample...
+#
+
+# NOTE: the scope of this being a global setting has troubling implications .... it should be more local to the DataLoader Object...
+
+cfg.TRANSFORM_EACH_SAMPLE = edict()
+
+cfg.TRANSFORM_EACH_SAMPLE.DATA = edict()
+cfg.TRANSFORM_EACH_SAMPLE.DATA.BOOL = False
+cfg.TRANSFORM_EACH_SAMPLE.DATA.RAND = True
+cfg.TRANSFORM_EACH_SAMPLE.DATA.TYPE = "rotate"
+cfg.TRANSFORM_EACH_SAMPLE.DATA.TYPE_PARAMS = {"rotate":{'angle_min':0.,'angle_max':360.}}
+
+cfg.TRANSFORM_EACH_SAMPLE.LABEL = edict()
+cfg.TRANSFORM_EACH_SAMPLE.LABEL.BOOL = False
+cfg.TRANSFORM_EACH_SAMPLE.LABEL.RAND = True
+cfg.TRANSFORM_EACH_SAMPLE.LABEL.TYPE = "angle" # "file"
+cfg.TRANSFORM_EACH_SAMPLE.LABEL.TYPE_PARAMS = {"angle":2,
+                                               "file_replace":{'filename':None,'labels':None,'index_type':'roidb_index'},
+                                               }
+
+#
+# Addition input from the original sample
+#
+
+cfg.ADDITIONAL_INPUT = edict()
+cfg.ADDITIONAL_INPUT.BOOL = False
+cfg.ADDITIONAL_INPUT.EXP_CFG_FILE = ""
+cfg.ADDITIONAL_INPUT.TYPE = None #'activations' #'image'
+cfg.ADDITIONAL_INPUT.ACTIVATIONS = edict()
+cfg.ADDITIONAL_INPUT.ACTIVATIONS.LAYER_NAMES = ['conv1','conv2','ip1','cls_score','cls_prob']
+cfg.ADDITIONAL_INPUT.ACTIVATIONS.INPUT_SIZE = [84,84,3]
+cfg.ADDITIONAL_INPUT.ACTIVATIONS.GET_SAVE_DIR = GET_SAVE_ACTIVITY_VECTOR_BLOBS_DIR
+cfg.ADDITIONAL_INPUT.ACTIVATIONS.SAVE_OBJ = 'order'
+cfg.ADDITIONAL_INPUT.ACTIVATIONS.SAVE_BOOL = False
+cfg.ADDITIONAL_INPUT.INFO = {'image':
+                             {'axis':1},
+                             'activations':
+                             {"size_by_layer":{},
+                              'net_name':""}
+                             }
 
 # __C.TRAIN.DATASET_AUGMENTATION = edict()
 # __C.TRAIN.DATASET_AUGMENTATION.SIZE = 64 # TODO: set dynamically later
@@ -540,11 +617,26 @@ def getTestNetConfig(caffemodel,prototxt):
     cfg.TEST_NET.NET_PATH = osp.splitext(caffemodel.split('/')[-1])[0]
     cfg.TEST_NET.DEF_PATH = osp.splitext(prototxt.split('/')[-1])[0]
 
-def setModelInfo(solverPrototxt):
-    solverInfo = solverPrototxtInfoDict(solverPrototxt)
+def setModelInfo(solverPrototxt,solverInfo=None):
+    if solverInfo is None:
+        solverInfo = solverPrototxtInfoDict(solverPrototxt)
+    setModelInfoFromSolverInfo(solverInfo)
+
+def setModelInfoFromSolverInfo(solverInfo):
     cfg.modelInfo.imdb_str = cfg.DATASETS.CALLING_IMDB_STR
     cfg.modelInfo.architecture = solverInfo['arch']
     cfg.modelInfo.optim = solverInfo['optim'].lower()
+
+    if 'infix_str' in solverInfo.keys():
+        cfg.modelInfo.infix_str = solverInfo['infix_str']
+    else:
+        cfg.modelInfo.infix_str = False
+
+    if 'siamese' in solverInfo.keys():
+        cfg.modelInfo.siamese = solverInfo['siamese']
+    else:
+        cfg.modelInfo.siamese = False        
+
     if cfg.TRAIN.IMAGE_NOISE is None or cfg.TRAIN.IMAGE_NOISE is 0:
         cfg.modelInfo.image_noise = False
     else:
@@ -569,7 +661,53 @@ def setModelInfo(solverPrototxt):
     else:
         cfg.modelInfo.class_filter = len(cfg.DATASETS.FILTERS.CLASS_INCLUSION_LIST)
 
+    if cfg.WARP_AFFINE.BOOL is True and cfg.WARP_AFFINE.PRETRAIN is True:
+        cfg.modelInfo.warp_affine_pretrain = True
+        cfg.modelInfo.warp_affine_pretrain_net_name = cfg.WARP_AFFINE.PRETRAIN_NAME
+    else:
+        cfg.modelInfo.warp_affine_pretrain = False
+
+    if cfg.TEST_NET.NET_PATH is not None:
+        cfg.modelInfo.loaded_model = os.path.basename(cfg.TEST_NET.NET_PATH)
+
+
+    cfg.modelInfo.additional_input = edict()
+    cfg.modelInfo.additional_input.bool = False
+    setAdditionInput(cfg.modelInfo)
+    # if cfg.ADDITIONAL_INPUT.BOOL:
+    #     # input sample with:
+    #     # (i) activations; (ii) another image
+
+
+    create_snapshot_prefix(cfg.modelInfo)
+
 # functions for filling in a prototxt with other prototxts for training.... should probably swtich to pytorch soon...
+
+def check_config_for_error():
+    # handle region proposal network
+    if cfg.TEST.OBJ_DET.HAS_RPN is False and cfg.TASK == 'object_detection':
+        raise ValueError("We can't handle rpn correctly. See [box_proposals] in original faster-rcnn code.")
+
+def setAdditionInput(modelInfo):
+
+    #TODO send in agg activation value model and ensure the data_loader gets that info.
+    # if cfg.ADDITIONAL_INPUT.BOOL and cfg.ADDITIONAL_INPUT.TYPE == "activation":
+    #     if cfg.ADDITIONAL_INPUT.ACTIVATION_MODEL is None or \
+    #        cfg.ADDITIONAL_INPUT.ACTIVATION_IMDB is None:
+    #         print("ERROR: we need a model to load activations from")
+
+    modelInfo.additional_input.bool = cfg.ADDITIONAL_INPUT.BOOL
+    modelInfo.additional_input.type = cfg.ADDITIONAL_INPUT.TYPE
+    modelInfo.additional_input.info = cfg.ADDITIONAL_INPUT.INFO
+    if modelInfo.additional_input.type == 'activations':
+        settings = modelInfo.additional_input.info['activations']
+        settings.agg = None
+        settings.cfg = readYamlToEdict(cfg.ADDITIONAL_INPUT.EXP_CFG_FILE)
+        settings.activations_cfg = cfg.ADDITIONAL_INPUT.ACTIVATIONS
+        settings['size_by_layer'] = {layerName:np.arange(50176) for layerName in settings.activations_cfg.LAYER_NAMES}
+        if len(settings.activations_cfg.LAYER_NAMES) == 0:
+            print("[config] addition_input type uses activations but none loaded. quitting.")
+            exit()
 
 def mangleFillmePrototxtTemplateFilename(prototxt_path):
     path = os.path.dirname(prototxt_path)
@@ -695,5 +833,14 @@ def replaceFillmeNetwork(prototxt):
     new_prototxt = mangleFillmePrototxtTemplateFilename(prototxt)
     writeNetFromProto(net,new_prototxt)
 
+def computeUpdatedConfigInformation():
+    # compute the input image size
+    cfg.IMAGE_SIZE = [cfg.CROPPED_IMAGE_SIZE,cfg.CROPPED_IMAGE_SIZE]
+    if cfg.ADDITIONAL_INPUT.BOOL:
+        if cfg.ADDITIONAL_INPUT.TYPE == 'image' and cfg.modelInfo.siamese is False:
+            axis = cfg.ADDITIONAL_INPUT.INFO['image']['axis']
+            #cfg.IMAGE_SIZE[axis] *= 2
+        if cfg.ADDITIONAL_INPUT.TYPE == 'activations' and cfg.modelInfo.siamese is True:
+            cfg.SIAMESE_IMAGE_SIZE = cfg.ADDITIONAL_INPUT.ACTIVATIONS.INPUT_SIZE
 
 # TODO: what do we actually need for a data cache?

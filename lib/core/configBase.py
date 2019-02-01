@@ -1,6 +1,8 @@
 import os,re,yaml
 import os.path as osp
+import numpy as np
 from easydict import EasyDict as edict
+
 
 
 __C = edict()
@@ -18,6 +20,10 @@ cfg.DEBUG.utils = edict()
 cfg.DEBUG.utils.misc = False
 cfg.DEBUG.utils.box_utils = False
 cfg.DEBUG.utils.image_utils = False
+
+# for caching: first list types of cache
+__C.CACHE = edict()
+__C.CACHE.DATA = edict()
 
 # output for recoding the TP and FN of a model
 __C.TP_FN_RECORDS_PATH = "./output/{}/tp_fn_records/".format("faster_rcnn")
@@ -84,6 +90,11 @@ def _merge_a_into_b(a, b):
 
 # misc functions... not sure where they should live
 
+def readYamlToEdict(yaml_file):
+    import yaml
+    with open(yaml_file, 'r') as f:
+        yaml_cfg = edict(yaml.load(f))
+    return yaml_cfg
 
 def create_snapshot_prefix(modelInfo):
     train_set_snapshot = modelInfo.imdb_str
@@ -113,22 +124,45 @@ def create_snapshot_prefix(modelInfo):
     else:
         name += '_noClassFilter'
 
+    if cfg.modelInfo.warp_affine_pretrain is True:
+        name += '_warpAffinePretrain_{}'.format(cfg.modelInfo.warp_affine_pretrain_net_name)
+
+    if cfg.modelInfo.additional_input.bool is True:
+        name += '_addInfo{}'.format(cfg.modelInfo.additional_input.type)
+
+    if cfg.modelInfo.infix_str is not False:
+        name += '_{}'.format(cfg.modelInfo.infix_str)
+
+    modelInfo.name = name
     return name
 
-def prototxtToYaml(prototxt):
+def solverPrototxtToYaml(prototxt):
     import yaml
     from easydict import EasyDict as edict
-    print(prototxt)
     with open(prototxt, 'r') as f:
         yaml_cfg = edict(yaml.load(f))
     return yaml_cfg 
 
-def getFieldFromSolverptotxt(prototxt,field_name):
-    solverYaml = prototxtToYaml(prototxt)
+def getFieldFromSolverprototxt(prototxt,field_name):
+    solverYaml = solverPrototxtToYaml(prototxt)
     if field_name in solverYaml:
         return solverYaml[field_name]
     elif field_name is 'type': return 'sgd'
     else: return None
+
+def getFieldFromModelprototxt(prototxt,layer_name,param_type,*field_info):
+    net = buildNetFromPrototxt(prototxt)
+    for layer in net.layer:
+        print(getattr(layer,"propagate_down"))
+        if layer.name == layer_name:
+            current = getattr(layer,param_type)
+            for field in field_info:
+                if type(current) is not unicode:
+                    current = getattr(current,field)
+                else:
+                    current = yaml.load(current)[field]
+            return current
+        
 
 def solverPrototxtInfoDict(solverPrototxt):
     regex = r'.*models/(?P<ds_name>[a-zA-Z0-9_]+)/(?P<arch>[a-zA-Z0-9_]+).*solver[a-zA-Z0-9]*\.prototxt'
@@ -137,8 +171,22 @@ def solverPrototxtInfoDict(solverPrototxt):
         print("no match for solverprototxt regex... quitting")
         exit()
     result = _result.groupdict()
-    result['optim'] = getFieldFromSolverptotxt(solverPrototxt,'type')
+    result['optim'] = getFieldFromSolverprototxt(solverPrototxt,'type')
+    result['infix_str'] = getFieldFromSolverprototxt(solverPrototxt,'snapshot_prefix')
+    if 'kent' in result['infix_str']:
+        result['infix_str'] = False
+    if result['infix_str'] == "":
+        result['infix_str'] = False        
+    trainPrototxt = getFieldFromSolverprototxt(solverPrototxt,'train_net')
+    try:
+        siamese_bool = getFieldFromModelprototxt(trainPrototxt,'input-data','python_param','param_str','siamese')
+    except:
+        siamese_bool = False
+    result['siamese'] = siamese_bool
     return result
+
+def testPrototxtInfoDict(testPrototxt,testCaffemodel):
+    pass
 
 def buildNetFromPrototxt(prototxt):
     from caffe.proto import caffe_pb2
@@ -199,12 +247,20 @@ def checkListEqualityWithOrder(list_a,list_b):
 #                 return True
 #     return False
 
+def all_true_in_list(boolList):
+    for boolValue in boolList:
+        if boolValue is False:
+            return False
+    return True
+    
 def any_true_in_list(boolList):
-    anyTrue = False
     for boolValue in boolList:
         if boolValue is True:
-            anyTrue = True
-    anyTrue = boolList
+            return True
+    return False
+            
+def checkNdarrayEqualityWithOrder(ndarray_a,ndarray_b):
+    return np.all(ndarray_a == ndarray_b)
 
 def checkListEqualityWithOrderIgnored(list_a,list_b):
     # all the elements in list_a are somewhere in list_b
@@ -231,10 +287,10 @@ def checkListEqualityWithOrderIgnored(list_a,list_b):
                 else:
                     boolList.append(False)
             elif item_a != item_b:
-                boolList.append(True)
+                boolList.append(False)
             else:
                 boolList.append(True)
-        if any_true_in_list(boolList):
+        if not any_true_in_list(boolList):
             return False
     return True
 
@@ -250,14 +306,22 @@ def checkEdictEquality(validConfig,proposedConfig):
         proposedValue = proposedConfig[key]
         if type(validValue) is list:
             isValid = checkListEqualityWithOrderIgnored(validValue,proposedValue)
-            if not isValid:
+            if isValid is False:
                 return False
             continue
         if type(validValue) is edict or type(validValue) is dict:
             isValid = checkEdictEquality(validValue,proposedValue)
-            if not isValid:
+            if isValid is False:
                 return False
             continue
+        if type(validValue) is np.ndarray:
+            if type(proposedValue) is np.ndarray:
+                isValid = checkNdarrayEqualityWithOrder(validValue,proposedValue)
+                if isValid is False:
+                    return False
+                continue
+            else:
+                return False
         if proposedValue != validValue:
             return False
     return True

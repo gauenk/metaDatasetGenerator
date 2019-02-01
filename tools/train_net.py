@@ -2,15 +2,18 @@
 
 """Train an Img2Vec network on a "region of interest" database."""
 
+
+    
 import matplotlib
 matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 
 import _init_paths
 from core.train import get_training_roidb, train_net
-from core.config import cfg, cfg_from_file, cfg_from_list, get_output_dir, set_global_cfg, set_augmentation_by_calling_dataset, set_class_inclusion_list_by_calling_dataset, setModelInfo
+from core.config import cfg, cfg_from_file, cfg_from_list, get_output_dir, set_global_cfg, set_dataset_augmentation_config, set_class_inclusion_list_by_calling_dataset, setModelInfo,computeUpdatedConfigInformation,saveExperimentConfig
 from datasets.factory import get_repo_imdb
 from datasets.ds_utils import load_mixture_set,print_each_size
+from core.net_utils.initialize_net import mangleSolverPrototxt
 import datasets.imdb
 import caffe
 import argparse
@@ -31,9 +34,15 @@ def parse_args():
                         default=None, type=str)
     parser.add_argument('--iters', dest='max_iters',
                         help='number of iterations to train',
-                        default=10000000, type=int)
+                        default=None, type=int)
     parser.add_argument('--weights', dest='pretrained_model',
                         help='initialize with pretrained model weights',
+                        default=None, type=str)
+    parser.add_argument('--warp_affine_net', dest='warp_affine_net',
+                        help='initialize the warp affine model with model weights',
+                        default=None, type=str)
+    parser.add_argument('--warp_affine_def', dest='warp_affine_def',
+                        help='initialize the warp affine model with model definition',
                         default=None, type=str)
     parser.add_argument('--cfg', dest='cfg_file',
                         help='optional config file',
@@ -83,7 +92,10 @@ def parse_args():
     parser.add_argument('--new_path_to_imageset',dest='new_path_to_imageset',
                         help='redirect the path from which the imdb will find the imagesets in',
                         default=None,type=str)
-
+    parser.add_argument('--export_cfg', dest='export_cfg',action='store_true',
+                        help="export the config to file.")
+    parser.add_argument('--append_snapshot_string', dest='append_snapshot_string',default=None,type=str,
+                        help="insert a string at end of snapshot name")
     if len(sys.argv) == 1:
         parser.print_help()
         sys.exit(1)
@@ -159,6 +171,12 @@ def get_mixed_dataset(args):
 def set_global_variables_from_args(args):
     if args.solver_state == "None": args.solver_state = None
     if args.pretrained_model == "None": args.pretrained_model = None
+    if args.warp_affine_def is not None and args.warp_affine_net is not None:
+        cfg.WARP_AFFINE.PRETRAIN = True
+        cfg.WARP_AFFINE.PRETRAIN_NAME = os.path.basename(args.warp_affine_net)
+    else:
+        cfg.WARP_AFFINE.PRETRAIN = False
+
     if args.cfg_file is not None:
         print("SET CFG FILE")
         cfg_from_file(args.cfg_file)
@@ -173,6 +191,16 @@ def set_global_variables_from_args(args):
         np.random.seed(cfg.RNG_SEED)
         caffe.set_random_seed(cfg.RNG_SEED)
 
+def get_snapshot_postfix_name(config_postfix,cmd_postfix):
+    postfix_string = None
+    if config_postfix is not None and cmd_postfix is not None:
+        print("[train_net] Two postfix options. Must set them manually. Qutting.")
+        exit()
+    if config_postfix is not None:
+        postfix_string = config_postfix
+    if cmd_postfix is not None:
+        postfix_string = cmd_postfix
+    return postfix_string
 
 if __name__ == '__main__':
     args = parse_args()
@@ -197,7 +225,7 @@ if __name__ == '__main__':
         print("Uknown dataset type: {}".format(args.dataset_type))
         sys.exit()
 
-    set_augmentation_by_calling_dataset() # reset dataset augmentation settings
+    set_dataset_augmentation_config() # reset dataset augmentation settings
 
     # activation network for active learning
     al_net = None
@@ -209,31 +237,31 @@ if __name__ == '__main__':
     datasetName = ""
     if useDatasetName:
         datasetName = imdb.name
-
     
+    if args.max_iters is None and cfg.TRAIN.MAX_ITERS is None:
+        args.max_iters = 10000000
+    elif args.max_iters is None and cfg.TRAIN.MAX_ITERS is not None:
+        args.max_iters = cfg.TRAIN.MAX_ITERS
+    elif args.max_iters is not None:
+        cfg.TRAIN.MAX_ITERS = args.max_iters
+        
     setModelInfo(args.solver)
     print '{:d} roidb entries'.format(len(roidb))
     print 'Output will be saved to `{:s}`'.format(output_dir)
-    train_net(args.solver, imdb, output_dir,
+    solver_prototxt = args.solver
+    postfix_string = get_snapshot_postfix_name(cfg.MODEL_NAME_APPEND_STRING,args.append_snapshot_string)
+    newSolverPrototxt = mangleSolverPrototxt(solver_prototxt,output_dir,cfg.modelInfo,recreate_snapshot_name=True,append_string=postfix_string)
+    print("og solver",solver_prototxt)
+    computeUpdatedConfigInformation()
+    if args.export_cfg:
+        saveExperimentConfig()
+
+    train_net(newSolverPrototxt, imdb, output_dir,
               datasetName=datasetName,
               solver_state=args.solver_state,
               pretrained_model=args.pretrained_model,
               max_iters=args.max_iters,
-              al_net=al_net)
+              al_net=al_net,
+              warp_affine_net=args.warp_affine_net,
+              warp_affine_def=args.warp_affine_def)
     
-'''
-argparse.ArgumentParser
-Input: (description='Train a Fast R-CNN network'), Output: parser
-
-get_repo_imdb
-input: (imdb_name), output: imdb
-
-get_training_roidb
-input: (imdb), output: roidb
-
-get_roidb
-input: (args.imdb_name), output: imdb, roidb 
-
-get_output_dir
-input: (imdb), output: output_dir
-'''

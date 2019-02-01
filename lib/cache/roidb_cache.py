@@ -15,30 +15,16 @@ roidbCacheCfg.CACHE_PROMPT.DATASET.SUBSAMPLE_BOOL = True
 
 class RoidbCache(TwoLevelCache):
 
-    def __init__(self,cache_path,imdb_str,cfg,ds_config,roidb_settings):
+    def __init__(self,cache_path,imdb_str,cfg,ds_config,roidb_settings,lookup_id,fieldname):
         root_dir = osp.join(cache_path,imdb_str)
         self.cacheConfig = self.construct_data_cache_config(cfg,ds_config)
-        super(RoidbCache,self).__init__(root_dir,self.cacheConfig,roidb_settings)
+        super(RoidbCache,self).__init__(root_dir,self.cacheConfig,roidb_settings,lookup_id,fieldname)
 
     def construct_data_cache_config(self,cfg,ds_config):
         cacheDataCfg = edict()
 
         cacheDataCfg.task = cfg.TASK
         cacheDataCfg.subtask = cfg.SUBTASK
-
-        # why should "dataset_augmentation" be in the cache at all? do we save something associated with the dataset augmentation? I don't think I do currently...
-        cacheDataCfg.dataset_augmentation = edict() # primary config set 1
-        cacheDataCfg.dataset_augmentation.bool_value = cfg.DATASET_AUGMENTATION.BOOL
-        #cacheDataCfg.dataset_augmentation.configs = cfg.DATASET_AUGMENTATION.CONFIGS # says: "what type of augmentations do we have?"
-        cacheDataCfg.dataset_augmentation.image_translate = cfg.DATASET_AUGMENTATION.IMAGE_TRANSLATE
-        cacheDataCfg.dataset_augmentation.image_rotate = cfg.DATASET_AUGMENTATION.IMAGE_ROTATE
-        cacheDataCfg.dataset_augmentation.image_crop = cfg.DATASET_AUGMENTATION.IMAGE_CROP
-        cacheDataCfg.dataset_augmentation.percent_augmentations_used = cfg.DATASET_AUGMENTATION.N_PERC # says: "how many of the possible augmentations should we use for each augmented sample?"
-
-        cacheDataCfg.dataset_augmentation.percent_samples_augmented = cfg.DATASET_AUGMENTATION.N_SAMPLES # says: "how many samples are we augmenting?"
-        # cacheDataCfg.dataset_augmentation.bool_by_samples = cfg.DATASET_AUGMENTATION.SAMPLE_BOOL_VECTOR # says: which samples are augmented?
-        cacheDataCfg.dataset_augmentation.randomize = cfg.DATASET_AUGMENTATION.RANDOMIZE
-        cacheDataCfg.dataset_augmentation.randomize_subset = cfg.DATASET_AUGMENTATION.RANDOMIZE_SUBSET
 
         cacheDataCfg.dataset = edict() # primary config set 2
         cacheDataCfg.dataset.subsample_bool = cfg.DATASETS.SUBSAMPLE_BOOL
@@ -62,6 +48,14 @@ class RoidbCache(TwoLevelCache):
         # ? assert len(roidb) == cacheDataCfg.DATASET.SIZE
         # ? assert imdb.classes == cacheDataCfg.DATASET.CLASSES
 
+    def save(self,fieldname,*args,**kwargs):
+        self.lookup_cache.fieldname = fieldname
+        super(RoidbCache,self).save(*args,**kwargs)
+
+    def load(self,fieldname,*args,**kwargs):
+        self.lookup_cache.fieldname = fieldname
+        return super(RoidbCache,self).load(*args,**kwargs)
+        
     def print_dataset_summary_by_uuid(datasetConfigList,uuid_str):
         pass
     

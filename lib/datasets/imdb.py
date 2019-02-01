@@ -148,7 +148,8 @@ class imdb(object):
         self._image_index = self._image_index[:len(self._roidb)]
         self.compute_size_along_roidb()
 
-    def evaluate_detections(self, detection_object, output_dir=None, ds_loader=None):
+    def evaluate_model_inference(self, ds_loader, agg_model_output, output_dir,**kwargs):
+        #def evaluate_detections(self, detection_object, output_dir=None, ds_loader=None, aggModelOutput=None):
         """
         detection_object is a diction with two keys:
         "all_boxes" and "im_rotates_all"

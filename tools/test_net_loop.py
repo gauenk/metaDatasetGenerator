@@ -1,7 +1,8 @@
 #!/usr/bin/env python
+from tools_utils import runCommandProcess
 from easydict import EasyDict as edict
 from fresh_config import create_model_path
-import subprocess,re
+import re
 
 import _init_paths
 from core.config import create_snapshot_prefix
@@ -45,13 +46,6 @@ def set_modelInfo(modelInfo,arch,optim,train_imdb_str,noise,prune,da_aug,class_f
     # image_noise_list = ['noImageNoise']
     # prune_list = ['noPrune']
 
-def runCommandProcess(setCommand):
-    modelProc = subprocess.Popen(setCommand.split(' '),stdout=subprocess.PIPE)
-    output_b,isSuccess = modelProc.communicate()
-    assert isSuccess is None, "ERROR; command failed."
-    output = output_b.decode('utf-8')
-    return output
-
 def test_all_with_file(modelInfo,architecture_list,optim_list,train_set_list,test_set_list,image_noise_list,prune_list,da_aug_list,class_filter_list,iters_list,filename):
     if filename is None: print("not saving output to file")
     else:
@@ -65,10 +59,10 @@ def add_test_all_header(fid):
     
 def add_result_to_file(filename,text,train_set,test_set,arch,optim,noise,prune,aug,class_filter,iters):
     if filename is None: return
-    fid = open(filename,'a+')
     regex = r".*overall accuracy: (?P<acc>[0-9.]+).*"
     result = re.findall(regex,text)
     acc = str(result[0])
+    fid = open(filename,'a+')
     #acc = result.groupdict()['acc']
     fid.write("{},{},{},{},{},{},{},{},{},{}\n".format(acc,train_set,test_set,arch,optim,noise,prune,aug,class_filter,iters))
     fid.close()

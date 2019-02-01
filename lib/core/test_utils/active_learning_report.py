@@ -1,6 +1,6 @@
 from utils.misc import computeEntropyOfNumpyArray
 
-class activeLearningReportAppendActivationValueData():
+class activeLearningReportAppendActivationData():
 
     """
     records activity values from a list of preselected layers to augment the original active learning report
@@ -30,7 +30,7 @@ class activeLearningReportAppendActivationValueData():
             headerStr += "{}_{},".format(cls_probs_prefix,str(idx))
         headerStr += "cls_prob_entropy"
         av_prefix = "av"
-        for av_blobName in cfg.SAVE_ACTIVITY_VECTOR_BLOBS:
+        for av_blobName in cfg.ACTIVATIONS.LAYER_NAMES:
             headerStr += "{}_{},".format(av_prefix,av_blobName)
         headerStr += "%errorReduction\n"
         fidAlReport.write(headerStr)
@@ -63,7 +63,7 @@ class activeLearningReportAppendActivationValueData():
 
     def record(self,model_output,image_id):
         scores = model_output['scores']
-        activity_vectors = model_output['activity_vectors']
+        activations = model_output['activations']
         if self.recordBool is False: return
         # recordActivityVectorTransformsForAlReport
         fidAlReport = open(self.alReportFilename,'a+')
@@ -75,9 +75,9 @@ class activeLearningReportAppendActivationValueData():
         imageStr += "{:.5f},".format(scoreEntropy)
         for layerName in self.layerNameList:
             # not correct at all...
-            # the "idx" and the correct index for "activity_vectors" is not the same since "SAVE_ACTIVITY..." is not necessarly equivalent to the net's activity values
+            # the "idx" and the correct index for "activations" is not the same since "SAVE_ACTIVITY..." is not necessarly equivalent to the net's activity values
             activity_vector_index = self.get_layer_index_from_name(layerName)
-            layerValue = self.transformActivationValuesByLayerName(layerName,activity_vectors[idx])
+            layerValue = self.transformActivationValuesByLayerName(layerName,activations[idx])
             imageStr += "{:.5f},".format(layerValue)
         imageStr += "{:.5f}\n".format(self.alResultsFromPreviousExperiment[image_index]['ave'])
         fidAlReport.write(imageStr)

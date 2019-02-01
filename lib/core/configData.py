@@ -47,7 +47,9 @@ cfg.DATASETS.FOR_CACHE = cfg.DATASETS
 
 def set_class_inclusion_list_by_calling_dataset():
     if cfg.DATASETS.CALLING_DATASET_NAME == '': raise ValueError("Dataset must be loaded before this function can be called")
-    cfg.DATASETS.FILTERS.CLASS_INCLUSION_LIST = cfg.DATASETS.FILTERS.CLASS_INCLUSION_LIST_BY_DATASET[cfg.DATASETS.CALLING_DATASET_NAME]
+    cfg.DATASETS.FILTERS.CLASS_INCLUSION_LIST = []
+    if cfg.DATASETS.CALLING_DATASET_NAME in cfg.DATASETS.FILTERS.CLASS_INCLUSION_LIST_BY_DATASET.keys():
+        cfg.DATASETS.FILTERS.CLASS_INCLUSION_LIST = cfg.DATASETS.FILTERS.CLASS_INCLUSION_LIST_BY_DATASET[cfg.DATASETS.CALLING_DATASET_NAME]
 
 def cfgData_from_file(filename):
     """Load a config file and merge it into the default options."""
