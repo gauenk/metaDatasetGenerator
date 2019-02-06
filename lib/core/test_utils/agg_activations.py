@@ -47,6 +47,9 @@ class aggregateActivations():
         for layer_name in self.layer_names:
             self.agg_obj[layer_name] = np.array(self.agg_obj[layer_name])
 
+    def clear(self):
+        self.agg_obj = self._init_new_agg_obj()
+
     def load(self,layers_to_load):
         ## LOADING THE ACTIVATIONS FROM A DIFFERENT EXPERIMENT IS CHALLENGING?
         # MAYBE "EXPORT" THE CONFIG FROM AN EXPERIMENT TO LOAD OTHER INFORMATION IN THE FUTURE?

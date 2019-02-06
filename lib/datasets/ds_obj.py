@@ -15,6 +15,7 @@ from numpy import random as npr
 from core.config import cfg,cfgData,cfgData_from_file,get_output_dir
 from easydict import EasyDict as edict
 from utils.base import *
+from datasets.evaluators.generation import generationEvaluator
 from datasets.evaluators.regression import regressionEvaluator
 from datasets.evaluators.classification import classificationEvaluator
 from datasets.evaluators.bboxEvaluator import bboxEvaluator
@@ -166,7 +167,7 @@ class DatasetObject(imdb):
         loadConfig = edict()
         loadConfig.activation_sample = edict()
         loadConfig.activation_sample.bool_value = cfg.LOAD_METHOD == 'aim_data_layer' #cfg.TEST.INPUTS.AV_IMAGE
-        loadConfig.activation_sample.net = al_net
+        loadConfig.activation_sample.net = al_net # maybe should be filename in future; easier for experiments/cfg file
         loadConfig.activation_sample.field = 'image' # 'image' or 'avImage'
         load_rois_bool = (cfg.TRAIN.OBJ_DET.HAS_RPN is False) and (cfg.TASK == 'object_detection')
         loadConfig.load_rois_bool = load_rois_bool # cfg.TEST.INPUTS.ROIS
@@ -183,6 +184,7 @@ class DatasetObject(imdb):
         loadConfig.additional_input = cfg.modelInfo.additional_input
         loadConfig.sample_type = "regularOldImage"
         loadConfig.siamese = False
+        loadConfig.color_bool = cfg.COLOR_CHANNEL == 3
         self.data_loader_config = loadConfig
         ds_loader = DataLoader(self,correctness_records,cfg.DATASET_AUGMENTATION,cfg.TRANSFORM_EACH_SAMPLE,self.roidb_cache)
         ds_loader.set_dataset_loader_config(loadConfig)
@@ -258,6 +260,8 @@ class DatasetObject(imdb):
             return classificationEvaluator()
         elif cfg.TASK == 'regression':
             return regressionEvaluator()
+        elif cfg.TASK == 'generation':
+            return generationEvaluator()            
         else:
             print("\n\n\nNo Evaluator Included\n\n\n")
             return None

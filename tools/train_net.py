@@ -255,6 +255,8 @@ if __name__ == '__main__':
     computeUpdatedConfigInformation()
     if args.export_cfg:
         saveExperimentConfig()
+        print("exported cfg file. now quitting.")
+        exit()
 
     train_net(newSolverPrototxt, imdb, output_dir,
               datasetName=datasetName,

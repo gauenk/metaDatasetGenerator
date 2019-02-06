@@ -5,7 +5,6 @@ WRITE_RESULTS: False
 CLS_PROBS: "cls_prob"
 PRUNE_NET: 0
 CROPPED_IMAGE_SIZE: 32
-REPLACE_LABELS_AFTER_AUGMENTATION_FILE: "angle_dataset_cifar_10_train_default_cifar_10_train_default_lenet5_sgd_noImageNoise_noPrune_noDsAug_yesClassFilter2_iter_10500.npy"
 DATASETS:
    ANNOTATION_CLASS: "regression"
    MODEL: lenet5
@@ -14,6 +13,16 @@ DATASETS:
 DATASET_AUGMENTATION:
    BOOL: True
    N_SAMPLES: 1.0
+TRANSFORM_EACH_SAMPLE:
+   DATA_LIST: 
+   - BOOL: False
+     RAND: True
+     TYPE: "rotate"
+     PARAMS: !!python/dict {'angle_min':0.,'angle_max':360.}
+   LABEL_LIST:
+   - BOOL: True
+     TYPE: "file_replace"
+     PARAMS: !!python/dict {'filename':"angle_dataset_cifar_10_train_default_cifar_10_train_default_lenet5_sgd_noImageNoise_noPrune_noDsAug_yesClassFilter2_iter_10500.npy",'labels':None,'index_type':'roidb_index'}
 TRAIN:
    MAX_ITERS: 28120
    SNAPSHOT_ITERS: 703

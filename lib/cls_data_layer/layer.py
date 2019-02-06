@@ -56,35 +56,43 @@ class ClsDataLayer(caffe.Layer):
 
         self.name = "ClsDataLayer"
 
+        
         layer_params = yaml.load(self.param_str)
 
         self._num_classes = layer_params['num_classes']
         self._siamese = False
         if 'siamese' in layer_params.keys():
             self._siamese = layer_params['siamese']
-        print(layer_params.keys())
+
+        self._generation = False
+        if 'generation' in layer_params.keys():
+            self._generation = layer_params['generation']
         self._name_to_top_map = {}
 
         idx = 0
 
         if self._siamese:
-            top[idx].reshape(cfg.TRAIN.BATCH_SIZE, 3,cfg.IMAGE_SIZE[0],cfg.IMAGE_SIZE[1])
+            top[idx].reshape(cfg.TRAIN.BATCH_SIZE, cfg.COLOR_CHANNEL,cfg.IMAGE_SIZE[0],cfg.IMAGE_SIZE[1])
             print("reshaped data_0")
             self._name_to_top_map['data_0'] = idx
 
             idx += 1
-            top[idx].reshape(cfg.TRAIN.BATCH_SIZE, 3,cfg.SIAMESE_IMAGE_SIZE[0],cfg.SIAMESE_IMAGE_SIZE[1])
+            top[idx].reshape(cfg.TRAIN.BATCH_SIZE, cfg.COLOR_CHANNEL,cfg.SIAMESE_IMAGE_SIZE[0],cfg.SIAMESE_IMAGE_SIZE[1])
             print("reshaped data_1")
             self._name_to_top_map['data_1'] = idx
         else:
-            top[idx].reshape(cfg.TRAIN.BATCH_SIZE, 3,cfg.IMAGE_SIZE[0],cfg.IMAGE_SIZE[1])
+            top[idx].reshape(cfg.TRAIN.BATCH_SIZE, cfg.COLOR_CHANNEL,cfg.IMAGE_SIZE[0],cfg.IMAGE_SIZE[1])
             print("reshaped data")
             self._name_to_top_map['data'] = idx
 
         idx += 1
-        top[idx].reshape(cfg.TRAIN.BATCH_SIZE)
-        print("reshaped labels")
-        self._name_to_top_map['labels'] = idx
+        if self._generation:
+            pass
+            # top[idx].reshape(cfg.TRAIN.BATCH_SIZE,cfg.COLOR_CHANNEL,cfg.IMAGE_SIZE[0],cfg.IMAGE_SIZE[1])
+        else:
+            top[idx].reshape(cfg.TRAIN.BATCH_SIZE)
+            print("reshaped labels")
+            self._name_to_top_map['labels'] = idx
 
 
         print 'ClsDataLayer: name_to_top:', self._name_to_top_map
@@ -119,7 +127,7 @@ class ClsDataLayer(caffe.Layer):
         else:
             from utils.blob import save_blob_list_to_file
             data = blobs['data']
-            labels = np.squeeze(blobs['labels'])
+            labels = data # np.squeeze(blobs['labels'])
             labels_str = ["{}_{}".format(label,i) for i,label in enumerate(labels)]
             print("data.shape",data.shape)
             print("labels.shape",labels.shape)

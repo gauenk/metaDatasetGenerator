@@ -10,8 +10,12 @@ import matplotlib.pyplot as plt
 
 import _init_paths
 from core.test_new import test_net
-from core.config import cfg, cfg_from_file, cfg_from_list, set_global_cfg, getTestNetConfig, set_dataset_augmentation_config, set_class_inclusion_list_by_calling_dataset,setModelInfo,check_config_for_error,saveExperimentConfig,computeUpdatedConfigInformation
+from utils.base import writeNdarray
+from core.config import cfg, cfg_from_file, cfg_from_list, set_global_cfg, getTestNetConfig, set_dataset_augmentation_config, set_class_inclusion_list_by_calling_dataset,setModelInfo,check_config_for_error,saveExperimentConfig,computeUpdatedConfigInformation,get_output_dir
+from utils.create_angle_dataset_utils import optimal_angles_for_net_and_imdb,plot_input_angles_versus_optimal_angles,plot_optimal_angles_histogram
 from datasets.factory import get_repo_imdb
+from cache.test_results_cache import TestResultsCache
+import numpy as np
 import caffe
 import argparse
 import pprint
@@ -71,9 +75,6 @@ def parse_args():
     parser.add_argument('--new_cache', dest='new_cache',
                         help="tells us to re-write the old cache",
                         action='store_true')
-    parser.add_argument('--create_angle_dataset', dest='create_angle_dataset',
-                        help="should we create an angle dataset numpy file?",
-                        action='store_true')
     parser.add_argument('--siamese', dest='siamese',
                         help="is the testing model type a siamese model?",
                         action='store_true')
@@ -83,6 +84,8 @@ def parse_args():
                         help="specify the model optim alg")
     parser.add_argument('--export_cfg', dest='export_cfg',action='store_true',
                         help="export the config to file.")
+    parser.add_argument('--append_save_string', dest='append_save_string',default=None,type=str,
+                        help="insert a string at end of dataset name")
     if len(sys.argv) == 1:
         parser.print_help()
         sys.exit(1)
@@ -104,17 +107,10 @@ if __name__ == '__main__':
 
     cfg.GPU_ID = args.gpu_id
     if args.rotate != 0: cfg.IMAGE_ROTATE = args.rotate
-    if args.av_save is False:
-        cfg.ACTIVATIONS.SAVE_BOOL = False
-        # cfg.ACTIVATIONS.LAYER_NAMES = []
-        cfg.SAVE_ACTIVITY_VECTOR_BLOBS = []
-    else:
-        cfg.ACTIVATIONS.SAVE_BOOL = True
-
+    if args.av_save is False: cfg.SAVE_ACTIVITY_VECTOR_BLOBS = []
     if args.warp_affine_pretrain is True:
         cfg.WARP_AFFINE_PRETRAIN = True
-    if args.create_angle_dataset is True:
-        cfg.TEST.CREATE_ANGLE_DATASET = True        
+        
 
     print('Using config:')
     pprint.pprint(cfg)
@@ -122,7 +118,6 @@ if __name__ == '__main__':
     while not os.path.exists(args.caffemodel) and args.wait:
         print('Waiting for {} to exist...'.format(args.caffemodel))
         time.sleep(10)
-
 
     caffe.set_mode_gpu()
     caffe.set_device(args.gpu_id)
@@ -171,21 +166,35 @@ if __name__ == '__main__':
     computeUpdatedConfigInformation()
     if args.export_cfg:
         saveExperimentConfig()
-        print("exported cfg file. now quitting.")
-        exit()
-    test_net(net, imdb, max_dets_per_image=args.max_dets_per_image, vis=args.vis, al_net=al_net, new_cache=args.new_cache)
+
+    print("Creating an angle dataset for the dataset provided. Augmentation according to the configs.")
+    correctness_records = [] # same as in testing currently (01/30/19)
+    data_loader = imdb.create_data_loader(cfg,correctness_records,al_net)
+    iterations = 300
+    output_dir = get_output_dir(imdb, net)
+    save_cache = TestResultsCache(output_dir,cfg,imdb.config,None,'angle_dataset')
+    data = save_cache.load()
+    if data is None or args.new_cache is True:
+        input_angles,optimal_angles = optimal_angles_for_net_and_imdb(net,data_loader,iterations,cfg.DATASET_AUGMENTATION.CONFIGS)
+        data = [input_angles,optimal_angles]
+        save_cache.save(data)
+    else:
+        input_angles,optimal_angles = data
+
+    print(input_angles)
+    plot_input_angles_versus_optimal_angles(input_angles,optimal_angles,scale_angles=False,postfix_string=args.append_save_string)
+    plot_optimal_angles_histogram(optimal_angles,scale_angles=False,postfix_string=args.append_save_string)
+
     
-'''
-argparse.ArgumentParser
-Input: (description='Test an Object Detection network'), Output: parser
+    angle_data = np.transpose(np.vstack((input_angles,optimal_angles)))
+    print(angle_data.shape)
+    if args.append_save_string:
+        savename = "{}_{}".format(cfg.modelInfo.name,args.append_save_string)
+    else:
+        savename = "{}".format(cfg.modelInfo.name)
 
-caffe.Net
-input: (args.prototxt, args.caffemodel, caffe.TEST), Output: net
+    writeNdarray(savename+".npy",angle_data)
+    
+    print("done.")
 
-os.path.splitext
-input: (os.path.basename(args.caffemodel)), output: net.name
-
-get_repo_imdb
-input: (args.imdb_name), output: imdb
-'''
     

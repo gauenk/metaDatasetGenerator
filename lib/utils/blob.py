@@ -27,11 +27,11 @@ def im_list_to_blob(ims):
     """
     max_shape = np.array([im.shape for im in ims]).max(axis=0)
     num_images = len(ims)
-    blob = np.zeros((num_images, max_shape[0], max_shape[1], 3),dtype=np.float32)
+    blob = np.zeros((num_images, max_shape[0], max_shape[1], cfg.COLOR_CHANNEL),dtype=np.float32)
 
     for i in xrange(num_images):
         im = ims[i]
-        blob[i, 0:im.shape[0], 0:im.shape[1], :] = im
+        blob[i, 0:im.shape[0], 0:im.shape[1], :] = im.reshape(max_shape[0], max_shape[1], cfg.COLOR_CHANNEL)
         img = blob[i]
     
     # Move channels (axis 3) to axis 1
@@ -51,9 +51,9 @@ def blob_list_im(blobs):
     max_shape = np.array([blob.shape for blob in blobs]).max(axis=0)
     num_blobs = len(blobs)
     if len(max_shape) == 1:
-        sqrt_shape = np.sqrt(max_shape[0]/3)
+        sqrt_shape = np.sqrt(max_shape[0]/cfg.COLOR_CHANNEL)
         max_shape = [0,sqrt_shape,sqrt_shape]
-    imgs = np.zeros((num_blobs, 3, max_shape[1], max_shape[2]),dtype=np.float32)
+    imgs = np.zeros((num_blobs, cfg.COLOR_CHANNEL, max_shape[1], max_shape[2]),dtype=np.float32)
     for i in xrange(num_blobs):
         blob = blobs[i]
         imgs[i, :, 0:max_shape[1], 0:max_shape[2]] = blob.reshape(imgs[i].shape)
@@ -305,7 +305,8 @@ def preprocess_image_for_model(im, pixel_means, target_size, max_size):
 def prep_im_for_blob(im, pixel_means, target_size, max_size):
     """Mean subtract and scale an image for use in a blob."""
     im = im.astype(np.float32, copy=False)
-    im -= pixel_means
+    if len(pixel_means) > 0:
+        im -= pixel_means
     im_shape = im.shape
     im_size_min = np.min(im_shape[0:2])
     im_size_max = np.max(im_shape[0:2])
@@ -349,7 +350,7 @@ def save_blob_list_to_file(blob_list,append_str_l,vis=False,size=cfg.CROPPED_IMA
         if useAppendStr:
             fn += "{}_{}.png".format(idx,append_str_l[idx])
         else:
-            fn = "{}.png".format(idx)
+            fn += "{}.png".format(idx)
 
         if vis is False:
             cv2.imwrite(fn,img)

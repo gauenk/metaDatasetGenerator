@@ -5,6 +5,15 @@ WRITE_RESULTS: False
 CLS_PROBS: "cls_prob"
 PRUNE_NET: 0
 CROPPED_IMAGE_SIZE: 32
+ACTIVATIONS:
+   SAVE_BOOL: False
+   LAYER_NAMES: !!python/list [] # we need this because the current aggActivations will still try to use this list to aggregate model outputs
+ADDITIONAL_INPUT:
+   BOOL: True
+   TYPE: 'activations'
+   EXP_CFG_FILE: "./output/experiment_cfgs/4a540dd9-f19d-475f-8408-b964eae39f13.yml"
+   ACTIVATIONS:
+      LAYER_NAMES: !!python/list ['conv1','conv2','ip1']
 DATASETS:
    ANNOTATION_CLASS: "regression"
    MODEL: lenet5
@@ -23,19 +32,25 @@ TRANSFORM_EACH_SAMPLE:
    - BOOL: True
      TYPE: "file_replace"
      PARAMS: !!python/dict {'filename':"angle_dataset_cifar_10_val_5k_default_cifar_10_train_default_lenet5_sgd_noImageNoise_noPrune_noDsAug_yesClassFilter2_iter_10500.npy",'labels':None,'index_type':'roidb_index'}
+   - BOOL: True
+     TYPE: "normalize"
+     PARAMS: !!python/dict {"min":0,"max":1,"data_min":-1,"data_max":1}
+   - BOOL: False
+     TYPE: "angle"
+     PARAMS: !!python/dict {"angle_index":2}
 TRAIN:
    MAX_ITERS: 28120
    SNAPSHOT_ITERS: 703
    BATCH_SIZE: 10
    CLS:
       BATCH_SIZE: 10
-   MAX_SIZE: 32
+   MAX_SIZE: 84
    IMAGE_NOISE: False
-   SCALES: !!python/list [32,]
+   SCALES: !!python/list [32,84]
 TEST:
    BATCH_SIZE: 1
-   SCALES: !!python/list [32,]
-   MAX_SIZE: 32
+   SCALES: !!python/list [32,84]
+   MAX_SIZE: 84
    CREATE_ANGLE_DATASET: True
    CLASSIFICATION:
       TASK: "tp_fn"

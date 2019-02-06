@@ -127,10 +127,20 @@ def im_detect(net, modelInputs, image_scales, layer_names_for_activations, image
         boxes (ndarray): R x (4*K) array of predicted bounding boxes
     """
     pre_process_model_inputs(net,modelInputs,image_scales,image_id,layer_names_for_activations)
-    modelOutputs = net.forward(**modelInputs)
+    modelOutputs = predict_with_model(net,modelInputs)
     scores, pred_boxes, activations = post_process_model_outputs(net,modelOutputs,image_scales,layer_names_for_activations)
 
     return scores, pred_boxes, activations
+
+def predict_with_model(net,modelInputs):
+    if cfg.FRAMEWORK == 'caffe':
+        modelOutputs = net.forward(**modelInputs)
+    elif cfg.FRAMEWORK == 'tensorflow':
+        modelOutputs = net.predict(**modelInputs)
+    else:
+        print("unknown framework [{}]".format(cfg.FRAMEWORK))
+        exit()
+    return modelOutputs
 
 def model_inference(net,ds_loader,aggModelOutput,aggActivations,alReport):
     # timers
@@ -192,14 +202,11 @@ def test_net(net, imdb, max_dets_per_image=100, thresh=1/80., vis=False, al_net=
     2.) have we already computed the model's outputs? If not, compute them.
         -> we might not need to recompute the model's output (expensive in time and memory)
     """
-    print("PRETEST_NEW")
     check_activations_loaded = aggActivations.load_and_verify(cfg.ACTIVATIONS.LAYER_NAMES)
-    print("POSTTEST_NEW")
-    print("PRETEST_NEW@")
     eval_results = aggModelOutput.load()
-    print("POSTTEST_NEW#")
     if eval_results is None or check_activations_loaded is False or new_cache is True:
         aggModelOutput.clear()
+        aggActivations.clear()
         aggActivations.save_bool = cfg.ACTIVATIONS.SAVE_BOOL
         model_inference(net,ds_loader,aggModelOutput,aggActivations,alReport)
 

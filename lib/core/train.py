@@ -15,6 +15,8 @@ import alcls_data_layer.roidb as alcls_roidb
 import aim_data_layer.roidb as aim_roidb
 import vae_data_layer.roidb as vae_rdl_roidb
 from utils.timer import Timer
+from utils.blob import blob_list_to_images
+from utils.image_utils import save_image_list_to_file
 from datasets import ds_utils
 from core.prune import prune_net_iterative_step
 import numpy as np
@@ -85,7 +87,7 @@ class SolverWrapper(object):
         # set data for dataLoader class
         if cfg.TASK == "object_detection":
             self.solver.net.layers[0].set_roidb(roidb)
-        elif cfg.TASK == "classification" or cfg.TASK == "regeneration" or cfg.TASK == "regression": # do I ever use regeneration? I think I can delete it.
+        elif cfg.TASK == "classification" or cfg.TASK == "generation" or cfg.TASK == "regression":
             if cfg.SUBTASK == "tp_fn":
                 person_records = ds_utils.loadEvaluationRecords("person")
                 # write_keys_to_csv(person_records)
@@ -183,6 +185,8 @@ class SolverWrapper(object):
                     self.view_sigmoid_output()
                 elif 'Softmax' in self.solver.net.layers[-1].type:
                     self.view_softmax_output()
+                elif cfg.TASK == 'generation':
+                    self.view_generation_values()
                 else:
                     self.view_warp_angle_output()
                 print('speed: {:.3f}s / iter'.format(timer.average_time))
@@ -231,6 +235,22 @@ class SolverWrapper(object):
         # grads = net.layer_dict['sm_cls'].blobs[0].diff
         # print(np.sum(grads),"sm_cls")
 
+    def view_generation_values(self):
+        net = self.solver.net        
+        channel_swap = (0, 2, 3, 1)
+
+        images = net.blobs['generated_images'].data
+        print("gen",images.max(),images.min())
+        images = images.reshape(cfg.BATCH_SIZE,cfg.IMAGE_SIZE[0],cfg.IMAGE_SIZE[1],cfg.COLOR_CHANNEL)
+        save_image_list_to_file(images,None,size=cfg.CROPPED_IMAGE_SIZE,infix="generated_")
+
+        images = net.blobs['flatdata'].data
+        images = images.reshape(cfg.BATCH_SIZE,cfg.IMAGE_SIZE[0],cfg.IMAGE_SIZE[1],cfg.COLOR_CHANNEL)
+        print("label",images.max(),images.min())
+        #images = images.transpose(channel_swap)
+        save_image_list_to_file(images,None,size=cfg.CROPPED_IMAGE_SIZE,infix="label_")
+
+        
     def test_SoftmaxLoss(self):
         net = self.solver.net
         #print(net.blobs.keys())
@@ -344,7 +364,7 @@ def get_training_roidb(imdb):
         rdl_roidb.prepare_roidb(imdb) # gets image sizes.. might be nice
     elif cfg.TASK == "classification" or cfg.TASK == "regression":
         cls_roidb.prepare_roidb(imdb)
-    elif cfg.TASK == "regeneration":
+    elif cfg.TASK == "generation":
         vae_rdl_roidb.prepare_roidb(imdb)
 
     return imdb.roidb
@@ -378,6 +398,7 @@ def train_net(solver_prototxt, imdb, output_dir,datasetName="",
     """Train *any* object detection network."""
 
     #roidb = filter_roidb(roidb)
+    print("yo")
     sw = SolverWrapper(solver_prototxt, imdb, output_dir,
                        pretrained_model=pretrained_model,
                        solver_state=solver_state,
@@ -385,6 +406,7 @@ def train_net(solver_prototxt, imdb, output_dir,datasetName="",
                        warp_affine_net=warp_affine_net,
                        warp_affine_def=warp_affine_def,
     )
+    print("do")
     print('Solving...')
     model_paths = sw.train_model(max_iters)
     print('done solving')

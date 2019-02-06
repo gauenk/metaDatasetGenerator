@@ -80,3 +80,35 @@ def splitImageForSiameseNet(img,axis=1,location="middle"):
     else:
         print("[image_utils.py splitImageForSiameseNet]: unknown split location {}".format(location))
         exit()
+
+def save_image_list_to_file(image_list,append_str_l,vis=False,size=cfg.CROPPED_IMAGE_SIZE,infix=None):
+    print("[./utils/image_utils.py: save_image_list_to_file]: saving images")
+    useAppendStr = append_str_l is not None and len(append_str_l) == len(image_list)
+    prev_img = image_list[0]
+    for idx,img in enumerate(image_list):
+        # print(img.max(),img.min())
+        # print(img.shape)
+        if img.max() <= 1: # rescaleImageValues
+            img[:,:,:] *= 255
+        #img[:size,:size,:] += cfg.PIXEL_MEANS
+        img = img.astype(np.uint8)
+        if idx >= 1:
+            print(prev_img[15:17,15:17])
+            print(img[15:17,15:17])
+            print(np.all(prev_img == img))
+            prev_img = img
+        fn = "save_image_list_image"
+        if infix:
+            fn += "_{}".format(infix)
+        if useAppendStr:
+            fn += "{}_{}.png".format(idx,append_str_l[idx])
+        else:
+            fn += "{}.png".format(idx)
+
+        print(fn)
+        if vis is False:
+            cv2.imwrite(fn,img)
+        else:
+            plt.imshow(img[:,:,::-1])
+            plt.show()
+

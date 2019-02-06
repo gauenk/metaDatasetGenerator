@@ -8,7 +8,7 @@ layer {
   python_param {
     module: 'cls_data_layer.layer'
     layer: 'ClsDataLayer'
-    param_str: "'num_classes': 2"
+    param_str: "'num_classes': 2\n'generation': True"
   }
   include {
     phase: TRAIN
@@ -17,7 +17,7 @@ layer {
 layer {
   name: "flatdata"
   type: "Flatten"
-  bottom: "data"
+  bottom: "labels"
   top: "flatdata"
   flatten_param {
     end_axis: 3
@@ -692,25 +692,21 @@ layer{
   type: "DummyData"
   top: "noise"
   dummy_data_param{
-    shape {
-        dim:1
-        dim:1
-    	dim: 1 # train batch_size
-	dim: 100 # num z's
-	  }
+    shape { dim: 10 dim:  1  dim: 1  dim:  100 } #(.,.,batch_size,# z values)
     data_filler{
       type: "gaussian"
 	    std: 1.
-	  }
+    }
   }
 }
+
 layer {
   name: "sd_reshape"
   type: "Reshape"
   bottom: "sd"
   top: "sd_reshape"  
   reshape_param {
-     shape { dim: 1 dim:  1  dim: 1  dim:  100 }
+     shape { dim: -1 dim:  1  dim: 1  dim:  100 }
   }
 }
 layer {
@@ -719,7 +715,7 @@ layer {
   bottom: "mu"
   top: "mu_reshape"  
   reshape_param {
-     shape { dim: 1 dim:  1  dim: 1  dim:  100 }
+     shape { dim: -1 dim:  1  dim: 1  dim:  100 }
   }
 }
 layer{
@@ -846,7 +842,7 @@ layer {
     decay_mult: 0
   }
   inner_product_param {
-    num_output: 7500
+    num_output: 3072
     weight_filler {
       type: "gaussian"
 	    std: 0.1
@@ -858,19 +854,20 @@ layer {
 	  }
   }
 }
-layer {
-  name: "generated_images_reshape"
-  type: "Reshape"
-  bottom: "decode1"
-  top: "generated_images_reshape"
-  reshape_param {
-     shape { dim: 1 dim:  7500 }
-  }
-}
+# layer {
+#   name: "generated_images_reshape"
+#   type: "Reshape"
+#   bottom: "decode1"
+#   top: "generated_images_reshape"
+#   reshape_param {
+#      shape { dim: 1 dim:  1024 }
+#   }
+# }
 layer {
   name: "generated_images"
   type: "Sigmoid"
-  bottom: "generated_images_reshape"
+  bottom: "decode1"
+  #  bottom: "generated_images_reshape"
   top: "generated_images"
 }
 layer {

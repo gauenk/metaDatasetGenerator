@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 import _init_paths
-from core.config import replaceFillmeNetwork
+from core.net_utils.replace_fillme import replaceFillmeNetwork
 import argparse,sys
 
 def parse_args():

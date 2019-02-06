@@ -55,7 +55,6 @@ class Cache():
             #isEqual = checkEdictEquality(self.config,expData['config'])
             if isEqual:
                 if self.fieldname is not None:
-                    print(self.fieldname)
                     if self.fieldname in expData['data'].keys():
                         match_list.append(expData['data'][self.fieldname])
                         uuid_list.append(uuID)
@@ -87,7 +86,8 @@ class Cache():
         if len(matching_saves) > 1 and enforceOneMatch:
             print("[one_level_cache.py] ERROR: more than one config match. quittng")
             exit()
-        if saveField == "": saveField = self.fieldname
+        if saveField == "":
+            saveField = self.fieldname
         cache = readPickle(self.filename)
         if cache is None:
             cache = {}
@@ -103,8 +103,10 @@ class Cache():
             exit()
         blob = {'config':self.config}
         blob['data'] = {}
-        if saveField is not None: blob['data'][saveField] = payload
-        else: blob['data'] = payload
+        if saveField is not None:
+            blob['data'][saveField] = payload
+        else:
+            blob['data'] = payload
         cache[uuID] = blob
         writePickle(self.filename,cache)
 

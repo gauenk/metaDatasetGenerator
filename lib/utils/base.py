@@ -3,6 +3,15 @@ import os.path as osp
 import numpy as np
 import cv2
 
+def print_warning(scriptname,input_string):
+    print("\n\n\n\n\n\n\n\n\n")
+    print("-"*100)
+    print("WARNING:")
+    print(scriptname)
+    print(input_string)
+    print("-"*100)
+    print("\n\n\n\n\n\n\n\n\n")
+
 def readPickle(fn):
     print("[readPickle]: {} *pickle pickle*".format(fn))
     if not osp.exists(fn):

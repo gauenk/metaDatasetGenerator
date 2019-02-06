@@ -2,13 +2,15 @@ import cv2,copy
 import numpy as np
 import numpy.random as npr
 from easydict import EasyDict as edict
-from utils.base import readNdarray
+from utils.base import readNdarray,print_warning
 from utils.blob import preprocess_image_for_model,im_list_to_blob,siameseImagesToBlobs
+from utils.image_utils import save_image_list_to_file
 from datasets.data_utils.dataset_augmentation_utils import applyDatasetAugmentation,rotateImage
 from datasets.data_utils.sample_loader import loadSampleDataWithEdictSettings,loadAdditionalInput
 from core.test_utils.agg_activations import aggregateActivations
 from utils.image_utils import splitImageForSiameseNet
 from cache.roidb_cache import RoidbCache
+
 
 class DataLoader():
 
@@ -45,30 +47,33 @@ class DataLoader():
     def set_transform_each_sample(self,transform_each_sample):
         self.transform_each_sample = edict()
 
-        self.transform_each_sample.data = edict()
-        self.transform_each_sample.data.bool = transform_each_sample.DATA.BOOL
-        self.transform_each_sample.data.rand = transform_each_sample.DATA.RAND
-        self.transform_each_sample.data.type = transform_each_sample.DATA.TYPE
-        self.transform_each_sample.data.type_params = transform_each_sample.DATA.TYPE_PARAMS
+        self.transform_each_sample.data_list = []
+        for data_info_from_init in transform_each_sample.DATA_LIST:
+            data_info = edict()
+            print(data_info_from_init)
+            data_info.bool = data_info_from_init.BOOL
+            data_info.rand = data_info_from_init.RAND
+            data_info.type = data_info_from_init.TYPE
+            data_info.params = data_info_from_init.PARAMS
+            self.set_transform_data_info(data_info) 
+            self.transform_each_sample.data_list.append(data_info)
 
-        self.transform_each_sample.label = edict()
-        self.transform_each_sample.label.bool = transform_each_sample.LABEL.BOOL
-        self.transform_each_sample.label.rand = transform_each_sample.LABEL.RAND
-        self.transform_each_sample.label.type = transform_each_sample.LABEL.TYPE
-        self.transform_each_sample.label.type_params = transform_each_sample.LABEL.TYPE_PARAMS
-        
-        # init some variables based on transform types.
-        if self.transform_each_sample.label.bool and self.transform_each_sample.label.type == "file_replace":
-            filename = self.transform_each_sample.label.type_params['file_replace']['filename']
+        self.transform_each_sample.label_list = []
+        for label_info_from_init in transform_each_sample.LABEL_LIST:
+            label_info = edict()
+            label_info.bool = label_info_from_init.BOOL
+            label_info.type = label_info_from_init.TYPE
+            label_info.params = label_info_from_init.PARAMS
+            self.set_transform_label_params_by_type(label_info)
+            self.transform_each_sample.label_list.append(label_info)
+
+    def set_transform_label_params_by_type(self,label_info):
+        if label_info.bool and label_info.type == "file_replace":
+            filename = label_info.params['filename']
             new_labels = readNdarray(filename)
-            self.transform_each_sample.label.type_params['file_replace']['labels'] = new_labels
+            label_info.params['labels'] = new_labels
             assert self.num_samples == len(new_labels), "the replacing labels size needs to be equal"
-
-        assert self.transform_each_sample.data.type in self.transform_each_sample.data.type_params.keys(), "we must have the type [{}] parameters in the data.type_param".format(self.transform_each_sample.type)
-        assert self.transform_each_sample.label.type in self.transform_each_sample.label.type_params.keys(), "we must have the type [{}] parameters in the label.type_param".format(self.transform_each_sample.type)
         
-        self.set_transform_each_sample_info()
-
     def get_dataset_size(self,num_original_samples):
         self.num_original_samples = num_original_samples
         if not self.dataset_augmentation.any_augmented:
@@ -113,39 +118,29 @@ class DataLoader():
             index += step
         return augmentation_indices
 
-    def set_transform_each_sample_info(self):
-        self.get_transform_each_sample_info_data()
-
-    def get_transform_each_sample_info_data(self):
-        """
-        1. finish the transform_info
-        2. re-align the "config" for [dataset augmentation] and [rotate image]
-            -> they should not both be truth (i don't think(
-            -> 
-        """
-        if self.transform_each_sample.data.bool is False:
-            return np.zeros(self.roidb_size,dtype=np.bool)
-        if self.transform_each_sample.data.rand:
-            transform_cache_postfix = "{}_index".format(self.transform_each_sample.data.type)
+    def set_transform_data_info(self,data_info):
+        if data_info.bool is False:
+            return
+        if data_info.rand:
+            transform_cache_postfix = "{}_index".format(data_info.type)
             roidb_cache_fieldname = "{}_{}".format(self.roidb_cache_fieldname_prefix,transform_cache_postfix)
-            self.transform_each_sample.data.roidb_info = self.roidb_cache.load(roidb_cache_fieldname)
-            if self.transform_each_sample.data.roidb_info is None:
-                index = self.get_transform_each_sample_info_by_type(self.transform_each_sample.data.type,self.transform_each_sample.data.type_params)
-                self.transform_each_sample.data.roidb_info = index
-                self.roidb_cache.save(roidb_cache_fieldname,index)
-            return self.transform_each_sample.data.roidb_info
+            data_info.params['roidb_info'] = self.roidb_cache.load(roidb_cache_fieldname)
+            if data_info.params['roidb_info'] is None:
+                print_warning(__file__,"new roidb_info for transform data")
+                roidb_info = self.get_transform_data_roidb_info_by_type(data_info.type,data_info.params)
+                data_info.params['roidb_info'] = roidb_info
+                self.roidb_cache.save(roidb_cache_fieldname,roidb_info)
         else:
             print("[data_loader] transform each sample is not random... lame. Quitting.")
             exit()
         
-        
-    def get_transform_each_sample_info_by_type(self,transform_type,transform_params_dict):
-        transform_params = transform_params_dict[transform_type]
+    def get_transform_data_roidb_info_by_type(self,transform_type,params):
+        # what does this code even do? Why is "rotate_index" an integer between 0 and 360?
         if transform_type == 'rotate':
-            angle_min = transform_params['angle_min']
-            angle_max = transform_params['angle_max']
-            rotate_index = (npr.rand(self.roidb_size) * 360).astype(np.int)
-            return rotate_index
+            angle_min = params['angle_min']
+            angle_max = params['angle_max']
+            rotate_angle = (npr.rand(self.roidb_size) * (angle_max - angle_min)) + angle_min
+            return rotate_angle
         else:
             print("[data_loader] unknown transform type: {}. quitting.".format(transform_type))
             exit()
@@ -196,40 +191,73 @@ class DataLoader():
         sample['image_id'] = self.image_index[roidb_index]
         sample['index'] = roidb_index
         
-    def add_sample_transform_information(self,sample,roidb_index,index):
+    def add_data_transform_information(self,sample,roidb_index):
         # add info for transforming data
-        if self.transform_each_sample.data.bool:
-            sample['data_transform_info'] = self.transform_each_sample.data.roidb_info[roidb_index]
-        # complete the modification for the labels here
-        if self.transform_each_sample.label.bool:
-            if self.transform_each_sample.label.type == "file_replace":
-                new_labels = self.transform_each_sample.label.type_params['file_replace']['labels']
-                index_type = self.transform_each_sample.label.type_params['file_replace']['index_type']
-                if index_type == 'roidb_index':
-                    sample['gt_classes'] = new_labels[roidb_index]
-                elif index_type == 'index':
-                    sample['gt_classes'] = new_labels[index]
-                else:
-                    print("unkown label paraam index type {}".format(params.index_type))
-                # sample['label_transform_info'] = self.transform_each_sample.label.roidb_info[roidb_index]
+        sample['data_transform_info'] = []
+        sample['data_replace_label'] = False
+        for data_info in self.transform_each_sample.data_list:
+            if data_info.bool is False:
+                continue
+            sample['data_transform_info'].append(data_info.params['roidb_info'][roidb_index])
 
-    def replace_label(self,sample,index):
-        if self.replace_labels_after_augmentation is not None:
-            # print("[data_loader.py: replace_label] replacing labels with ones from file")
-            # print("\n\n\n\n\n\n\n\n\n\n\n\n\n")
-            # print("REMOVE ME I MODIFIED THE OUTPUT TO ZERO ONE")
-            # print("\n\n\n\n\n\n\n\n\n\n\n\n\n")
-            sample['gt_classes'] = self.replace_labels_after_augmentation[index]
-            #sample['gt_classes'] = (1.+self.replace_labels_after_augmentation[index])/2.
-            
+    def apply_sample_label_transform(self,sample,roidb_index,index):
+        for label_info in self.transform_each_sample.label_list:
+            #print(label_info)
+            if label_info.bool is False:
+                continue
+            if label_info.type == "file_replace":
+                new_labels = label_info.params['labels']
+                index_type = label_info.params['index_type']
+                index_dict = {'roidb_index':roidb_index,'index':index}
+                sample['gt_classes'] = new_labels[index_dict[index_type]]
+            elif label_info.type == "angle":
+                angle_index = label_info.params['angle_index']
+                transforms = self.dataset_augmentation.configs[sample['aug_index']]
+                sample['gt_classes'] = transforms[angle_index]['angle'] / 360.
+            elif label_info.type == "normalize":
+                min_val,max_val = label_info.params['min'],label_info.params['max']
+                data_min_val,data_max_val = label_info.params['data_min'],label_info.params['data_max']
+                # 1.) shift interval from [a,b] to [0,b-a]
+                gt_labels = sample['gt_classes'] - data_min_val
+                # 2.) shift interval from [0,b-a] to [0,1]
+                gt_labels = gt_labels/(data_max_val - data_min_val)
+                # 3.) change [0,1] to [min_val,max_val]
+                sample['gt_classes'] = (gt_labels * (max_val - min_val)) + min_val
+            elif label_info.type == "data_replace":
+                load_settings = label_info.params.load_settings
+                load_as_blob = label_info.params.load_as_blob
+                load_image = label_info.params.load_image
+                label_image,_ = self.load_sample(sample,load_settings,load_as_blob=load_as_blob,load_image=load_image)
+                # save_image_list_to_file([label_image],None,size=32,infix="dataloader_")
+                sample['gt_classes'] = label_image
+            else:
+                print("[data_loader] unknown transformation label.type of each sample [{}]. quitting.".format(label_info.type))
+                exit()
+
+    def apply_sample_data_transformation(self,sample,img):
+        if img is None:
+            return 
+        trans_img = img
+        for info_index,data_info in enumerate(self.transform_each_sample.data_list):
+            if data_info.bool is False:
+                continue
+            if data_info.type == 'rotate':
+                angle = sample['data_transform_info'][info_index]
+                trans_img,_ = rotateImage(trans_img,angle)
+            else:
+                print("[data_loader] unknown transformation data.type of each sample [{}]. quitting.".format(data_info.type))
+                exit()
+        return trans_img
+
     def get_sample_with_info(self,index):
         sample,roidb_index = self.add_dataset_augmentation_information(index)
         self.add_records_information(sample,roidb_index)
         self.add_image_id_information(sample,roidb_index)
-        self.add_sample_transform_information(sample,roidb_index)
-        #self.replace_label(sample,index)
+        self.add_data_transform_information(sample,roidb_index)
+        self.apply_sample_label_transform(sample,roidb_index,index)
         return sample
 
+    
     def balance_classes(self):
         raise NotImplemented("we can not balance classes currently")
     #
@@ -296,6 +324,10 @@ class DataLoader():
             yield image,scale,sample,dataset_index
             dataset_index += 1
 
+# /home/gauenk/Documents/experiments/metaDatasetGenerator/output/classification/cifar_10/cifar_10_train_default_lenet5_sgd_noImageNoise_noPrune_noDsAug_yesClassFilter2_iter_10500/lookup_agg_model_output.pkl
+
+# /home/gauenk/Documents/experiments/metaDatasetGenerator/output/classification/cifar_10/cifar_10_train_default_lenet5_sgd_noImageNoise_noPrune_noDsAug_yesClassFilter2_iter_10500/a0a52333-5888-46af-86a0-b9b3d70246ec.pkl
+
     def set_dataset_loader_config(self,dataset_loader_config):
         self.dataset_loader_config = dataset_loader_config
         if self.dataset_loader_config.additional_input.bool:
@@ -318,46 +350,24 @@ class DataLoader():
         #print(self.dataset_loader_config)
         return self.minibatch_generator(indicies,self.dataset_loader_config,load_as_blob,load_image)
 
-    def apply_sample_transformation(self,sample,img):
-        trans_img = img
-        if self.transform_each_sample.data.bool and img is not None:
-            if self.transform_each_sample.type == 'rotate':
-                angle = sample['data_transform_info']
-                trans_img,_ = rotateImage(img,angle)
-            else:
-                print("[data_loader] unknown transformation data.type of each sample [{}]. quitting.".format(self.transform_each_sample.data.type))
-                exit()
-        if self.transform_each_sample.label.bool and not self.transform_each_sample.label.apply_at_get_sample_with_info_bool:
-            #TODO; this code doesn't work
-            print("no this is bad. don't go here.")
-            exit()
-            if self.transform_each_sample.type == 'file':
-                new_label = ['label_transform_info']
-                self.replace_labels_after_augmentation
-                
-                trans_img,_ = rotateImage(img,angle)
-            else:
-                print("[data_loader] unknown transformation data.type of each sample [{}]. quitting.".format(self.transform_each_sample.data.type))
-                exit()
-
-        return trans_img
 
     #
     # primary loading functions
     #
 
     def load_sample(self,sample,load_settings,load_as_blob=False,load_image=True):
-        #self.modify_label(sample)
         if load_image is False:
             return None,None
         label = sample['gt_classes']
         image_path = self.imdb.image_path_at(sample['image_id'])
         img = cv2.imread(image_path)
+        image_shape = img.shape
+        if load_settings.color_bool == False:
+           img = img[:,:,0][:,:,np.newaxis]
         scales = []
         if load_settings.cropped_to_box_bool:
             img = cropImageToAnnoRegion(img,sample['boxes'][load_settings.cropped_to_box_index]) 
-        if self.transform_each_sample.bool:
-            img = self.apply_sample_transformation(sample,img)
+        self.apply_sample_data_transformation(sample,img)
         if sample['aug_bool']:
             assert sample['aug_index'] >= 0, "if the sample is augmented the aug_index must be non-negative"
             transforms = self.dataset_augmentation.configs[sample['aug_index']]
@@ -383,13 +393,11 @@ class DataLoader():
                 img = siameseImagesToBlobs([img])
             else:
                 img = im_list_to_blob([img]) # returns blob
-        return self.format_return_values(img,label,scales,load_settings)
 
-    def modify_label(self,sample):
-        # GAH> this should merge with when we load labels.. can't we just modify the labels when we run "load_sample"? not in the "apply_at_the_..." ugh. that is gross.
-        transforms = self.dataset_augmentation.configs[sample['aug_index']]
-        sample['gt_classes'] = transforms[2]['angle'] / 360.
-        # label = sample['gt_classes']        
+        if load_settings.color_bool == False:
+            img_shape = img.shape + (-1,)
+            img = img.reshape(img_shape)
+        return self.format_return_values(img,label,scales,load_settings)
 
     def format_return_values(self,imgs,labels,scales,load_settings):
         """

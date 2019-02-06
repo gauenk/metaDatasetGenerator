@@ -16,7 +16,7 @@ Most tools in $ROOT/tools take a --cfg option to specify an override file.
     - See experiments/cfgs/*.yml for example YAML config override files
 """
 
-import os,pickle,uuid
+import os,pickle,uuid,copy
 import os.path as osp
 import numpy as np
 from easydict import EasyDict as edict
@@ -34,6 +34,7 @@ __C = cfg
 # Global Options
 #
 
+__C.FRAMEWORK = 'caffe'
 __C.BATCH_SIZE = None
 __C.SCALES = None
 
@@ -201,9 +202,6 @@ __C.TRAIN.AL_CLS.BALANCE_CLASSES = True
 #__C.TRAIN.AL_CLS.LAYERS = ['conv5_1','conv4_3','conv4_1','conv3_3']
 #__C.TRAIN.AL_CLS.LAYERS = ['conv5_1','conv4_3']
 __C.TRAIN.AL_CLS.LAYERS = ['conv1','conv2','ip1','cls_score']
-
-__C.REPLACE_LABELS_AFTER_AUGMENTATION_FILE = None
-
 
 #
 # Testing options
@@ -440,9 +438,9 @@ def GET_SAVE_ACTIVITY_VECTOR_BLOBS_DIR(exp_dir=None):
 # used for saving activity vectors
 __C.ACTIVATIONS = edict()
 __C.ACTIVATIONS.SAVE_BOOL = False
-#__C.ACTIVATIONS.LAYER_NAMES = ['conv1','conv2','ip1','cls_score','cls_prob']
+__C.ACTIVATIONS.LAYER_NAMES = ['conv1','conv2','ip1','cls_score','cls_prob']
 #__C.ACTIVATIONS.LAYER_NAMES = ['warp_angle']
-__C.ACTIVATIONS.LAYER_NAMES = []
+#__C.ACTIVATIONS.LAYER_NAMES = []
 __C.ACTIVATIONS.GET_SAVE_DIR = GET_SAVE_ACTIVITY_VECTOR_BLOBS_DIR
 __C.ACTIVATIONS.SAVE_OBJ = 'order' # 'image_id','order'
 #__C.ACTIVATIONS.INPUT_SIZE = [84,84,3] # not need to only have 3 channels, but we can for now
@@ -485,19 +483,28 @@ __C.TRAIN.MAX_ITERS = None
 
 cfg.TRANSFORM_EACH_SAMPLE = edict()
 
-cfg.TRANSFORM_EACH_SAMPLE.DATA = edict()
-cfg.TRANSFORM_EACH_SAMPLE.DATA.BOOL = False
-cfg.TRANSFORM_EACH_SAMPLE.DATA.RAND = True
-cfg.TRANSFORM_EACH_SAMPLE.DATA.TYPE = "rotate"
-cfg.TRANSFORM_EACH_SAMPLE.DATA.TYPE_PARAMS = {"rotate":{'angle_min':0.,'angle_max':360.}}
+DATA_0 = edict()
+DATA_0.BOOL = False
+DATA_0.RAND = True
+DATA_0.TYPE = "rotate"
+DATA_0.PARAMS = {'angle_min':0.,'angle_max':360.}
 
-cfg.TRANSFORM_EACH_SAMPLE.LABEL = edict()
-cfg.TRANSFORM_EACH_SAMPLE.LABEL.BOOL = False
-cfg.TRANSFORM_EACH_SAMPLE.LABEL.RAND = True
-cfg.TRANSFORM_EACH_SAMPLE.LABEL.TYPE = "angle" # "file"
-cfg.TRANSFORM_EACH_SAMPLE.LABEL.TYPE_PARAMS = {"angle":2,
-                                               "file_replace":{'filename':None,'labels':None,'index_type':'roidb_index'},
-                                               }
+# order of the list is the order the transformations are applied
+cfg.TRANSFORM_EACH_SAMPLE.DATA_LIST = [DATA_0]
+
+LABEL_0 = edict()
+LABEL_0.BOOL = False
+LABEL_0.RAND = True
+LABEL_0.TYPE = "file_replace"
+LABEL_0.PARAMS = {'filename':None,'labels':None,'index_type':'roidb_index'}
+
+LABEL_1 = edict()
+LABEL_1.BOOL = False
+LABEL_1.TYPE = "angle"
+LABEL_1.PARAMS = {"angle_index":2}
+
+# order of the list is the order the transformations are applied
+cfg.TRANSFORM_EACH_SAMPLE.LABEL_LIST = [LABEL_0,LABEL_1]
 
 #
 # Addition input from the original sample
@@ -709,133 +716,11 @@ def setAdditionInput(modelInfo):
             print("[config] addition_input type uses activations but none loaded. quitting.")
             exit()
 
-def mangleFillmePrototxtTemplateFilename(prototxt_path):
-    path = os.path.dirname(prototxt_path)
-    prototxt = os.path.basename(prototxt_path)
-    prototxt_base = prototxt.split('.')[0]
-    if '_template' in prototxt_base:
-        new_prototxt = prototxt_base.replace('_template','') + '.prototxt'
-    else:
-        new_prototxt = prototxt_base + 'fillme-in.prototxt'
-    new_prototxt_path = os.path.join(path,new_prototxt)
-    return new_prototxt_path
-
-def findFillMeLayers(net):
-    layer_list = [l for l in net.layer]
-    found = []
-    for layer in layer_list:
-        layerName = layer.name
-        print(layerName)
-        if 'fillme' in layerName.lower():
-            found.append(layer)
-    return found
-
-def getFillmeLayerFilename(fillmeLayer):
-    # SO HACKY; only temporary solution until change to pytorch
-    return fillmeLayer.convolution_param.weight_filler.type
-
-def getLayerInfo(layer):
-    if type(layer.bottom) is unicode:
-        layer_bottom = str(layer.bottom)
-    else:
-        layer_bottom = [b for b in layer.bottom]
-    if type(layer.top) is unicode:
-        layer_top = str(layer.top)
-    else:
-        layer_top = [b for b in layer.top]
-    layer_name = str(layer.name)
-    # print(layer_name,layer_top)
-    return layer_bottom,layer_top,layer_name
-
-def replaceFillmeLayerValues(layer,fillmeNet):
-    old_layer_bottom,old_layer_top,layer_name = getLayerInfo(layer)
-    oglayer_name_base = layer_name.split('-')[0]
-    replaceName = {}
-    for l in fillmeNet.layer:
-        l_name = l.name + '-' + oglayer_name_base
-        l_bottoms = [b for b in l.bottom]
-        l_tops = [b for b in l.bottom]
-        replaceName[l.name] = l_name
-        # print(l.name)
-        l.name = l_name
-        for idx,l_bottom in enumerate(l_bottoms):
-            if l_bottom == 'bottom':
-                l.bottom[idx] = old_layer_bottom
-                replaceName[l_bottom] = old_layer_bottom
-            elif l_bottom == 'bottom_0':
-                l.bottom[idx] = old_layer_bottom[0]
-                replaceName[l_bottom] = old_layer_bottom[0]
-            elif l_bottom == 'bottom_1':
-                l.bottom[idx] = old_layer_bottom[1]
-                replaceName[l_bottom] = old_layer_bottom
-        for idx,l_top in enumerate(l.top):
-            if l_top == 'top':
-                # print(l.top,old_layer_top)
-                l.top[idx] = old_layer_top[idx]
-                replaceName[l_top] = old_layer_top[idx]
-            elif l_top == 'top_0':
-                l.top[idx] = old_layer_top[0]
-                replaceName[l_top] = old_layer_top[0]
-            elif l_top == 'top_1':
-                l.top[idx] = old_layer_top[1]
-                replaceName[l_top] = old_layer_top
-    # for replace strings now
-    for l in fillmeNet.layer:
-        # print(l.name)
-        l_bottoms = [b for b in l.bottom]
-        l_tops = [t for t in l.top]
-        if l.name in replaceName.keys():
-            l.name = replaceName[l.name]
-        for idx,l_bottom in enumerate(l_bottoms):
-            if l_bottom in replaceName.keys():
-                l.bottom[idx] = replaceName[l_bottom]
-        for idx,l_top in enumerate(l_tops):
-            if l_top in replaceName.keys():
-                if type(l.top) is unicode:
-                    l.top = replaceName[l_top]
-                else:
-                    l.top[idx] = replaceName[l_top]
-
-def replaceFillmeLayer(net,fillmeLayer):
-    # get fillme net info
-    fillmePrototxt = getFillmeLayerFilename(fillmeLayer)
-    fillmeNet = buildNetFromPrototxt(fillmePrototxt)
-    replaceFillmeLayerValues(fillmeLayer,fillmeNet)
-
-    # use new net to replace current fillme layer
-    """
-    ** method outline **
-    1. write layers before current layer to temporary file
-    2. write the replacement network to temporary file
-    3. write the remaining layers to the temporary file
-    4. load file into network from temporary file
-    5. remove temporary file
-    """
-    tmp_prototxt = 'tmp_file_prototxt.prototxt'
-    for layer in net.layer:
-        # print("written tmp_layer: {}".format(layer.name))
-        if layer is fillmeLayer:
-            appendPrototxtWithNet(fillmeNet,tmp_prototxt)
-        else:
-            appendPrototxtWithLayer(layer,tmp_prototxt)
-    newNet = buildNetFromPrototxt(tmp_prototxt)
-    os.remove(tmp_prototxt)
-    return newNet
-
-def replaceFillmeNetwork(prototxt):
-    net = buildNetFromPrototxt(prototxt)
-    fillMeLayerList = findFillMeLayers(net)
-    while len(fillMeLayerList) > 0:
-        layer = fillMeLayerList[0]
-        print(layer.name)
-        net = replaceFillmeLayer(net,layer)
-        fillMeLayerList = findFillMeLayers(net)
-    new_prototxt = mangleFillmePrototxtTemplateFilename(prototxt)
-    writeNetFromProto(net,new_prototxt)
-
 def computeUpdatedConfigInformation():
     # compute the input image size
     cfg.IMAGE_SIZE = [cfg.CROPPED_IMAGE_SIZE,cfg.CROPPED_IMAGE_SIZE]
+    if cfg.COLOR_CHANNEL == 1:
+        cfg.PIXEL_MEANS = np.array([np.mean(cfg.PIXEL_MEANS)])
     if cfg.ADDITIONAL_INPUT.BOOL:
         if cfg.ADDITIONAL_INPUT.TYPE == 'image' and cfg.modelInfo.siamese is False:
             axis = cfg.ADDITIONAL_INPUT.INFO['image']['axis']
